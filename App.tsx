@@ -9,7 +9,6 @@ import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import TasksView from './components/TasksView';
 import DealsView from './components/DealsView';
 import ProspectingView from './components/ProspectingView';
 import CalendarView from './components/CalendarView';
@@ -26,6 +25,8 @@ import ClientDetailModal from './components/ClientDetailModal';
 import ProfileModal from './components/ProfileModal';
 import SettingsModal from './components/SettingsModal';
 import AddClientModal from './components/AddClientModal';
+import SubscriptionView from './components/SubscriptionView'; // Import the new view
+import TasksView from './components/TasksView';
 import { auth, db, storage } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
@@ -33,11 +34,11 @@ import AddUserModal from './components/AddUserModal';
 import { ExclamationTriangleIcon } from './components/icons';
 
 export type ActiveView = 
-    | 'dashboard' 
+    | 'dashboard'
+    | 'action-plan'
     | 'prospecting' 
     | 'budgeting' 
     | 'deals' 
-    | 'tasks' 
     | 'clients' 
     | 'reports' 
     | 'calendar' 
@@ -467,9 +468,10 @@ const App: React.FC = () => {
             const budgetData = budgetDoc.data() as Budget;
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-// FIX: Explicitly cast properties to string to resolve 'unknown' type error.
-                date: followUp.date as string,
-                notes: followUp.notes as string,
+                // FIX: The `followUp.date` is already a string. The explicit `String()` casting is unnecessary and was causing a type error.
+                date: followUp.date,
+                // FIX: The `followUp.notes` is already a string. The explicit `String()` casting is unnecessary and was causing a type error.
+                notes: followUp.notes,
             };
             if (followUp.audioUrl) {
                 newFollowUp.audioUrl = followUp.audioUrl;
@@ -585,7 +587,6 @@ const App: React.FC = () => {
 
     const handleGenerateSelectionReport = (selectedIds: string[]) => {
         if (!userProfile) return;
-        type ReportDataItem = { budget: Budget; client: Client; contact: Contact; followUps: FollowUp[] };
         
         const reportData = selectedIds
             .map(id => {
@@ -594,10 +595,11 @@ const App: React.FC = () => {
                 const client = clients.find(c => c.id === budget.clientId);
                 if (!client) return null;
                 const contact = contacts.find(c => c.id === budget.contactId);
-                // Contact can be optional
-                return { budget, client, contact: contact!, followUps: budget.followUps };
+                // Contact is required for the report.
+                if (!contact) return null;
+                return { budget, client, contact, followUps: budget.followUps };
             })
-            .filter((item): item is ReportDataItem => item !== null && item.contact !== null);
+            .filter((item): item is ReportDataItem => item !== null);
 
         if (reportData.length > 0) {
             generateFollowUpReport('Relatório de Follow-Ups', reportData, userProfile, organization);
@@ -700,6 +702,13 @@ const App: React.FC = () => {
 
     if (loading) return <FullScreenLoader message={loadingMessage} />;
     if (!user || !userProfile) return <Auth />;
+    
+    // Gatekeeper logic for subscription
+    if (userProfile.role !== UserRole.SUPER_ADMIN && organization?.subscriptionStatus !== 'active') {
+        // Here we can also check for a 'trial' status in the future
+        // e.g., !['active', 'trial'].includes(organization?.subscriptionStatus)
+        return <SubscriptionView organization={organization} user={user} />;
+    }
 
     const selectedBudgetClient = clients.find(c => c.id === selectedBudget?.clientId);
     const selectedBudgetContact = contacts.find(c => c.id === selectedBudget?.contactId);
@@ -746,7 +755,7 @@ const App: React.FC = () => {
                     ) : (
                         <>
                             {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                            {activeView === 'tasks' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                            {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
                             {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
                             {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
                             {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
@@ -781,7 +790,7 @@ const App: React.FC = () => {
                     onClose={() => setBudgetDetailModalOpen(false)}
                     budget={selectedBudget}
                     client={selectedBudgetClient}
-                    contact={selectedBudgetContact!}
+                    contact={selectedBudgetContact}
                     onAddFollowUp={handleAddFollowUp}
                     onChangeStatus={handleChangeStatus}
                 />

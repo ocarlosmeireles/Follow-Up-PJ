@@ -9,7 +9,7 @@ interface BudgetDetailModalProps {
     onClose: () => void;
     budget: Budget;
     client: Client;
-    contact: Contact;
+    contact?: Contact;
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
     onChangeStatus: (budgetId: string, status: BudgetStatus) => void;
 }
@@ -161,14 +161,15 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
                 ? budget.followUps.map(f => `- ${formatDisplayDate(f.date)}: ${f.notes}`).join('\n')
                 : 'Nenhum contato anterior registrado.';
     
-            const prompt = `Gere um e-mail de follow-up para o orçamento '${budget.title}' no valor de ${formatCurrency(budget.value)}, enviado para ${contact.name} da empresa ${client.name}.
+            const contactName = contact?.name || 'Cliente';
+            const prompt = `Gere um e-mail de follow-up para o orçamento '${budget.title}' no valor de ${formatCurrency(budget.value)}, enviado para ${contactName} da empresa ${client.name}.
 
 O status atual do orçamento é: '${budget.status}'.
 
 Histórico de contatos anteriores:
 ${history}
 
-O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e gentilmente buscar os próximos passos. Mantenha o e-mail conciso e termine com uma pergunta clara para incentivar uma resposta. Não inclua placeholders como '[Seu Nome]' ou '[Sua Empresa]', apenas o corpo do e-mail. Comece com uma saudação como "Olá ${contact.name}," ou "Prezado(a) ${contact.name},".`;
+O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e gentilmente buscar os próximos passos. Mantenha o e-mail conciso e termine com uma pergunta clara para incentivar uma resposta. Não inclua placeholders como '[Seu Nome]' ou '[Sua Empresa]', apenas o corpo do e-mail. Comece com uma saudação como "Olá ${contactName}," ou "Prezado(a) ${contactName},".`;
     
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -188,12 +189,12 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
         }
     };
     
-    const isFinalStatus = budget.status === BudgetStatus.WON || budget.status === BudgetStatus.LOST;
+    const isFinalStatus = [BudgetStatus.INVOICED, BudgetStatus.LOST].includes(budget.status);
     const contactPhone = contact?.phone || '';
     const canContactOnWhatsApp = isPhoneNumber(contactPhone);
 
     const handleSendWhatsApp = () => {
-        if (!canContactOnWhatsApp) return;
+        if (!canContactOnWhatsApp || !contact) return;
 
         const phoneNumber = `55${cleanPhoneNumber(contactPhone)}`;
         const message = `Olá ${contact.name}, tudo bem?\n\nReferente à proposta *${budget.title}* para a empresa ${client.name}.\n\n*Valor:* ${formatCurrency(budget.value)}\n\nQualquer dúvida, estou à disposição!`;
@@ -211,7 +212,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{budget.title}</h2>
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-400 mt-1">
                            <span className="text-blue-600 dark:text-blue-400 font-semibold">{client.name}</span>
-                           <span className="flex items-center gap-1.5"><UserIcon className="w-4 h-4 text-gray-400"/> {contact.name}</span>
+                           <span className="flex items-center gap-1.5"><UserIcon className="w-4 h-4 text-gray-400"/> {contact?.name || 'N/A'}</span>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
@@ -362,7 +363,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
 
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row-reverse items-center justify-start gap-3">
                     <div className="flex w-full sm:w-auto sm:space-x-4 space-x-2">
-                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.WON)} className="flex-1 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
+                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ORDER_PLACED)} className="flex-1 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
                             <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
                         </button>
                         <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">

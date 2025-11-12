@@ -2,7 +2,8 @@ export enum BudgetStatus {
   SENT = 'Enviado',
   FOLLOWING_UP = 'Em Follow-up',
   ON_HOLD = 'Congelado',
-  WON = 'Ganho',
+  ORDER_PLACED = 'Pedido Emitido',
+  INVOICED = 'Faturado',
   LOST = 'Perdido',
 }
 
@@ -19,6 +20,10 @@ export interface Organization {
   status: 'active' | 'suspended';
   logoUrl?: string;
   companyInfo?: string; // Could be used for address, phone, etc.
+  // Campos para gerenciamento de assinatura
+  subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'unpaid' | 'canceled';
+  stripeCustomerId?: string;
+  subscriptionId?: string;
 }
 
 export interface Invite {

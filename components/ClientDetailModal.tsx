@@ -28,7 +28,8 @@ const getStatusBadgeColor = (status: BudgetStatus) => {
   switch (status) {
     case BudgetStatus.SENT: return { classes: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300', barColor: 'bg-blue-400 dark:bg-blue-600' };
     case BudgetStatus.FOLLOWING_UP: return { classes: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300', barColor: 'bg-yellow-400 dark:bg-yellow-500' };
-    case BudgetStatus.WON: return { classes: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300', barColor: 'bg-green-400 dark:bg-green-500' };
+    case BudgetStatus.ORDER_PLACED: return { classes: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300', barColor: 'bg-green-400 dark:bg-green-500' };
+    case BudgetStatus.INVOICED: return { classes: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300', barColor: 'bg-emerald-400 dark:bg-emerald-500' };
     case BudgetStatus.LOST: return { classes: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', barColor: 'bg-red-400 dark:bg-red-500' };
     case BudgetStatus.ON_HOLD: return { classes: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200', barColor: 'bg-gray-400 dark:bg-slate-500' };
     default: return { classes: 'bg-gray-100 text-gray-700 dark:bg-slate-600 dark:text-slate-200', barColor: 'bg-gray-300 dark:bg-slate-600' };
@@ -98,12 +99,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
     if (!isOpen) return null;
 
     // --- KPI Calculations ---
-    const wonBudgets = budgets.filter(b => b.status === BudgetStatus.WON);
+    const invoicedBudgets = budgets.filter(b => b.status === BudgetStatus.INVOICED);
     const lostBudgets = budgets.filter(b => b.status === BudgetStatus.LOST);
-    const totalValueWon = wonBudgets.reduce((sum, b) => sum + b.value, 0);
-    const totalClosed = wonBudgets.length + lostBudgets.length;
-    const conversionRate = totalClosed > 0 ? `${((wonBudgets.length / totalClosed) * 100).toFixed(0)}%` : 'N/A';
-    const averageTicket = wonBudgets.length > 0 ? formatCurrency(totalValueWon / wonBudgets.length) : 'N/A';
+    const totalValueInvoiced = invoicedBudgets.reduce((sum, b) => sum + b.value, 0);
+    const totalClosed = invoicedBudgets.length + lostBudgets.length;
+    const conversionRate = totalClosed > 0 ? `${((invoicedBudgets.length / totalClosed) * 100).toFixed(0)}%` : 'N/A';
+    const averageTicket = invoicedBudgets.length > 0 ? formatCurrency(totalValueInvoiced / invoicedBudgets.length) : 'N/A';
     
     // --- Chart Data Calculations ---
     const statusCounts = budgets.reduce((acc, budget) => {
@@ -112,7 +113,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
     }, {} as Record<string, number>);
     const maxStatusCount = Math.max(0, ...Object.values(statusCounts).map(Number));
 
-    const monthlyPerformance = wonBudgets.reduce((acc, b) => {
+    const monthlyPerformance = invoicedBudgets.reduce((acc, b) => {
         const date = new Date(b.dateSent);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         if (!acc[monthKey]) acc[monthKey] = 0;
@@ -266,7 +267,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                     <div className="lg:col-span-1 space-y-6">
                         <div className="space-y-3">
                             <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300">Performance</h3>
-                            <KPICard title="Total Ganho" value={formatCurrency(totalValueWon)} icon={<TrophyIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} />
+                            <KPICard title="Total Faturado" value={formatCurrency(totalValueInvoiced)} icon={<TrophyIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} />
                             <KPICard title="Taxa de Conversão" value={conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400"/>} />
                             <KPICard title="Ticket Médio" value={averageTicket} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500 dark:text-blue-400"/>} />
                         </div>
@@ -304,7 +305,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                         </div>
                                     ))}
                                 </div>
-                            ) : <p className="text-center text-gray-400 dark:text-slate-500 text-sm py-8 italic">Nenhum negócio ganho para exibir.</p>}
+                            ) : <p className="text-center text-gray-400 dark:text-slate-500 text-sm py-8 italic">Nenhum negócio faturado para exibir.</p>}
                         </div>
                     </div>
                 </div>

@@ -34,28 +34,28 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
     
     const metrics = useMemo(() => {
-        const wonBudgets = budgets.filter(b => b.status === BudgetStatus.WON);
+        const invoicedBudgets = budgets.filter(b => b.status === BudgetStatus.INVOICED);
         const lostBudgets = budgets.filter(b => b.status === BudgetStatus.LOST);
 
-        const totalWonValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
-        const totalClosed = wonBudgets.length + lostBudgets.length;
+        const totalInvoicedValue = invoicedBudgets.reduce((sum, b) => sum + b.value, 0);
+        const totalClosed = invoicedBudgets.length + lostBudgets.length;
         
         const conversionRate = totalClosed > 0 
-            ? ((wonBudgets.length / totalClosed) * 100).toFixed(1) + '%' 
+            ? ((invoicedBudgets.length / totalClosed) * 100).toFixed(1) + '%' 
             : 'N/A';
         
-        const averageTicket = wonBudgets.length > 0 
-            ? totalWonValue / wonBudgets.length 
+        const averageTicket = invoicedBudgets.length > 0 
+            ? totalInvoicedValue / invoicedBudgets.length 
             : 0;
             
-        return { totalWonValue, conversionRate, averageTicket };
+        return { totalWonValue: totalInvoicedValue, conversionRate, averageTicket };
     }, [budgets]);
 
     const monthlyPerformance = useMemo(() => {
         const performance: { [key: string]: number } = {};
-        const wonBudgets = budgets.filter(b => b.status === BudgetStatus.WON);
+        const invoicedBudgets = budgets.filter(b => b.status === BudgetStatus.INVOICED);
         
-        wonBudgets.forEach(b => {
+        invoicedBudgets.forEach(b => {
             const date = new Date(b.dateSent);
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             if (!performance[monthKey]) {
@@ -84,13 +84,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
     
     const salesFunnelData = useMemo(() => {
         const sent = budgets;
-        const followingUp = budgets.filter(b => [BudgetStatus.FOLLOWING_UP, BudgetStatus.ON_HOLD, BudgetStatus.WON, BudgetStatus.LOST].includes(b.status));
-        const won = budgets.filter(b => b.status === BudgetStatus.WON);
+        const followingUp = budgets.filter(b => [BudgetStatus.FOLLOWING_UP, BudgetStatus.ON_HOLD, BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+        const orderPlaced = budgets.filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+        const invoiced = budgets.filter(b => b.status === BudgetStatus.INVOICED);
 
         const stages = [
             { name: 'Enviado', count: sent.length, value: sent.reduce((sum, b) => sum + b.value, 0) },
             { name: 'Em Follow-up', count: followingUp.length, value: followingUp.reduce((sum, b) => sum + b.value, 0) },
-            { name: 'Ganhos', count: won.length, value: won.reduce((sum, b) => sum + b.value, 0) }
+            { name: 'Pedido Emitido', count: orderPlaced.length, value: orderPlaced.reduce((sum, b) => sum + b.value, 0) },
+            { name: 'Faturados', count: invoiced.length, value: invoiced.reduce((sum, b) => sum + b.value, 0) }
         ];
         
         const maxCount = Math.max(...stages.map(s => s.count), 1);
@@ -106,7 +108,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
     const topClients = useMemo(() => {
         const valueByClient: { [clientId: string]: number } = {};
         budgets.forEach(b => {
-            if (b.status === BudgetStatus.WON) {
+            if (b.status === BudgetStatus.INVOICED) {
                 if (!valueByClient[b.clientId]) {
                     valueByClient[b.clientId] = 0;
                 }
@@ -181,7 +183,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                             ${topClients.map(c => `<tr><td>${c.name}</td><td>${formatCurrency(c.value)}</td></tr>`).join('')}
                         </tbody>
                     </table>
-                    ` : '<p>Nenhum cliente com negócios ganhos para exibir.</p>'}
+                    ` : '<p>Nenhum cliente com negócios faturados para exibir.</p>'}
                 </div>
 
                 <div class="section">
@@ -278,7 +280,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                 ) : (
                     <div className="text-center py-16 text-gray-400 dark:text-slate-500 border-t border-gray-200 dark:border-slate-700">
                         <p>Nenhum dado de performance para exibir.</p>
-                        <p>Conclua um orçamento como "Ganho" para começar a gerar dados.</p>
+                        <p>Conclua um orçamento como "Faturado" para começar a gerar dados.</p>
                     </div>
                 )}
             </div>
@@ -343,7 +345,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                         </div>
                     ) : (
                         <div className="text-center py-16 text-gray-400 dark:text-slate-500 border-t border-gray-200 dark:border-slate-700">
-                            <p>Nenhum cliente com negócios ganhos para exibir.</p>
+                            <p>Nenhum cliente com negócios faturados para exibir.</p>
                         </div>
                     )}
                 </div>

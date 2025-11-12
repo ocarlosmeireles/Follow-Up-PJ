@@ -72,15 +72,15 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
     }, [budgets, timePeriod]);
 
     const metrics = useMemo(() => {
-        const activeBudgets = filteredBudgetsByTime.filter(b => b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP);
-        const wonBudgets = filteredBudgetsByTime.filter(b => b.status === BudgetStatus.WON);
+        const activeBudgets = filteredBudgetsByTime.filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED].includes(b.status));
+        const invoicedBudgets = filteredBudgetsByTime.filter(b => b.status === BudgetStatus.INVOICED);
         const lostBudgets = filteredBudgetsByTime.filter(b => b.status === BudgetStatus.LOST);
 
         const totalActiveValue = activeBudgets.reduce((sum, b) => sum + b.value, 0);
-        const totalWonValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
+        const totalInvoicedValue = invoicedBudgets.reduce((sum, b) => sum + b.value, 0);
 
-        const totalClosed = wonBudgets.length + lostBudgets.length;
-        const conversionRateRaw = totalClosed > 0 ? (wonBudgets.length / totalClosed) : 0;
+        const totalClosed = invoicedBudgets.length + lostBudgets.length;
+        const conversionRateRaw = totalClosed > 0 ? (invoicedBudgets.length / totalClosed) : 0;
         const conversionRate = totalClosed > 0 ? (conversionRateRaw * 100).toFixed(1) + '%' : 'N/A';
         
         const forecastValue = totalActiveValue * conversionRateRaw;
@@ -93,7 +93,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
             (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)
         ).length;
 
-        return { totalActiveValue, totalWonValue, conversionRate, overdueCount, forecastValue };
+        return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue };
     }, [filteredBudgetsByTime, budgets]);
     
     const nextTasks = useMemo(() => {
@@ -121,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
                 <MetricCard title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500 dark:text-blue-400" />} />
                 <MetricCard title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500 dark:text-purple-400" />} />
-                <MetricCard title="Total Ganho" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500 dark:text-green-400" />} />
+                <MetricCard title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500 dark:text-green-400" />} />
                 <MetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />} />
                 <MetricCard title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500 dark:text-red-400" />} />
             </div>

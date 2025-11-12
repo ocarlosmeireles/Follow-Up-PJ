@@ -87,6 +87,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                             isActive={activeView === 'dashboard'}
                             onClick={() => setActiveView('dashboard')}
                         />
+                         <NavLink 
+                            label="Plano de Ação"
+                            icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
+                            isActive={activeView === 'action-plan'}
+                            onClick={() => setActiveView('action-plan')}
+                        />
 
                         <NavSection title="Vendas">
                             <NavLink 
@@ -102,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                                 onClick={() => setActiveView('budgeting')}
                             />
                              <NavLink 
-                                label="Negócios"
+                                label="Hub de Negócios"
                                 icon={<CurrencyDollarIcon className="w-6 h-6" />}
                                 isActive={activeView === 'deals'}
                                 onClick={() => setActiveView('deals')}
@@ -116,12 +122,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                         </NavSection>
 
                         <NavSection title="Organização">
-                             <NavLink 
-                                label="Tarefas"
-                                icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
-                                isActive={activeView === 'tasks'}
-                                onClick={() => setActiveView('tasks')}
-                            />
                              <NavLink 
                                 label="Calendário"
                                 icon={<CalendarDaysIcon className="w-6 h-6" />}
@@ -144,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                             />
                         </NavSection>
 
-                        {userProfile?.role === UserRole.ADMIN && (
+                        {(userProfile?.role === UserRole.ADMIN || userProfile?.role === UserRole.MANAGER) && (
                             <NavSection title="Admin">
                                 <NavLink 
                                     label="Gerenciar Usuários"

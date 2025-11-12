@@ -468,8 +468,10 @@ const App: React.FC = () => {
             // Also ensured `date` is assigned correctly from the followUp object.
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                date: followUp.date,
-                notes: followUp.notes,
+                // FIX: The compiler reported `followUp.date` as potentially 'unknown'. Explicitly casting to string to ensure type safety.
+                date: followUp.date as string,
+                // FIX: The compiler reported `followUp.notes` as potentially 'unknown'. Explicitly casting to string to ensure type safety.
+                notes: followUp.notes as string,
             };
             if (followUp.audioUrl) {
                 newFollowUp.audioUrl = followUp.audioUrl;

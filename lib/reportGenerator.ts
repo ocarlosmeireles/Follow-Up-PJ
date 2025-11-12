@@ -1,4 +1,4 @@
-import type { Budget, Client, Contact, UserProfile, FollowUp } from '../types';
+import type { Budget, Client, Contact, UserProfile, FollowUp, Organization } from '../types';
 
 type ReportDataItem = {
     budget: Budget;
@@ -34,7 +34,8 @@ const formatTimestamp = (dateString: string) => {
 export const generateFollowUpReport = (
     title: string,
     reportData: ReportDataItem[],
-    userProfile: UserProfile
+    userProfile: UserProfile,
+    organization: Organization | null
 ) => {
     const reportHtml = `
         <!DOCTYPE html>
@@ -67,6 +68,15 @@ export const generateFollowUpReport = (
                     border-bottom: 2px solid #eee;
                     padding-bottom: 15px;
                     margin-bottom: 20px;
+                    position: relative;
+                }
+                .org-logo {
+                    position: absolute;
+                    top: -10px;
+                    left: 0;
+                    max-height: 40px;
+                    max-width: 150px;
+                    object-fit: contain;
                 }
                 .report-header h1 {
                     margin: 0;
@@ -154,6 +164,7 @@ export const generateFollowUpReport = (
         <body>
             <div class="page">
                 <div class="report-header">
+                    ${organization?.logoUrl ? `<img src="${organization.logoUrl}" class="org-logo" alt="${organization.name} logo">` : ''}
                     <h1>${title}</h1>
                     <p>Gerado por: <strong>${userProfile.name}</strong> (Matrícula: ${userProfile.matricula})</p>
                     <p>Data de Geração: ${new Date().toLocaleString('pt-BR')}</p>

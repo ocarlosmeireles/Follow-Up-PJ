@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -24,7 +24,7 @@ import AddClientModal from './components/AddClientModal';
 import { auth, db } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
-
+import AddUserModal from './components/AddUserModal';
 
 export type ActiveView = 
     | 'dashboard' 
@@ -47,628 +47,538 @@ const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-slate-300">{message}</p>
+            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-slate-200">{message}</p>
         </div>
     </div>
 );
 
-const MainLayout: React.FC<{ user: User }> = ({ user }) => {
+type ReportDataItem = { budget: Budget; client: Client; contact: Contact; followUps: FollowUp[] };
+
+const App: React.FC = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadingMessage, setLoadingMessage] = useState('Autenticando...');
+    const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+    
+    // Data states
+    const [budgets, setBudgets] = useState<Budget[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
-    const [budgets, setBudgets] = useState<Budget[]>([]);
     const [prospects, setProspects] = useState<Prospect[]>([]);
-    const [prospectingStages, setProspectingStages] = useState<ProspectingStage[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-    const [allUsers, setAllUsers] = useState<UserData[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const [isAddModalOpen, setAddModalOpen] = useState(false);
-    const [isAddProspectModalOpen, setAddProspectModalOpen] = useState(false);
-    const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
-    const [isProfileModalOpen, setProfileModalOpen] = useState(false);
-    const [newBudgetFromProspect, setNewBudgetFromProspect] = useState<{ clientName: string; contactName: string; contactInfo: string; clientCnpj?: string } | null>(null);
-    const [initialClientIdForNewBudget, setInitialClientIdForNewBudget] = useState<string | null>(null);
-    const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
-    const [selectedClientForDetail, setSelectedClientForDetail] = useState<string | null>(null);
-    const [activeView, setActiveView] = useState<ActiveView>('dashboard');
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
-    const [theme, setTheme] = useState<Theme>('light');
-   
-    useEffect(() => {
-        const storedTheme = localStorage.getItem('theme') as Theme | null;
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light');
-        setTheme(initialTheme);
-        if (initialTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, []);
-
-    const toggleTheme = () => {
-        setTheme(prevTheme => {
-            const newTheme = prevTheme === 'light' ? 'dark' : 'light';
-            localStorage.setItem('theme', newTheme);
-            if (newTheme === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            return newTheme;
-        });
-    };
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const profileDoc = await getDoc(doc(db, "users", user.uid));
-                let profileData: UserProfile;
-
-                if (profileDoc.exists()) {
-                    profileData = profileDoc.data() as UserProfile;
-                } else {
-                    console.warn(`Profile for user ${user.uid} not found. Creating default.`);
-                     profileData = {
-                        name: user.displayName || 'Novo Usuário',
-                        matricula: 'N/A',
-                        email: user.email || 'n/a',
-                        role: UserRole.SALESPERSON // Default role
-                    };
-                    await setDoc(doc(db, "users", user.uid), profileData);
-                }
-                setUserProfile(profileData);
-
-                const isSalesperson = profileData.role === UserRole.SALESPERSON;
-
-                const clientsQuery = isSalesperson ? query(collection(db, 'clients'), where('userId', '==', user.uid)) : collection(db, 'clients');
-                const budgetsQuery = isSalesperson ? query(collection(db, 'budgets'), where('userId', '==', user.uid)) : collection(db, 'budgets');
-                const prospectsQuery = isSalesperson ? query(collection(db, 'prospects'), where('userId', '==', user.uid)) : collection(db, 'prospects');
-                
-                const [
-                    clientsSnapshot,
-                    contactsSnapshot,
-                    budgetsSnapshot,
-                    prospectsSnapshot,
-                    stagesSnapshot,
-                    allUsersSnapshot
-                ] = await Promise.all([
-                    getDocs(clientsQuery),
-                    getDocs(collection(db, 'contacts')), // Contacts are linked via clients, fetch all for now
-                    getDocs(budgetsQuery),
-                    getDocs(prospectsQuery),
-                    getDocs(collection(db, 'prospecting_stages')),
-                    profileData.role === UserRole.ADMIN ? getDocs(collection(db, 'users')) : Promise.resolve(null)
-                ]);
-
-                const clientsData = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Client[];
-                const contactsData = contactsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Contact[];
-                const budgetsData = budgetsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Budget[];
-                const prospectsData = prospectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Prospect[];
-                const stagesData = stagesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as ProspectingStage[];
-                const allUsersData = allUsersSnapshot ? allUsersSnapshot.docs.map(doc => ({ ...(doc.data() as UserProfile), id: doc.id })) : [];
-                
-                setClients(clientsData);
-                setContacts(contactsData);
-                setBudgets(budgetsData);
-                setProspects(prospectsData);
-                setProspectingStages(stagesData.sort((a,b) => a.order - b.order));
-                setAllUsers(allUsersData);
-
-            } catch (error) {
-                console.error("Failed to fetch data from Firebase", error);
-                alert("Não foi possível carregar os dados. Verifique o console e sua configuração do Firebase.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [user]);
-
-
-    useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth >= 768) { // md breakpoint
-                setSidebarOpen(false);
-            }
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
+    const [stages, setStages] = useState<ProspectingStage[]>([]);
+    const [users, setUsers] = useState<UserData[]>([]);
     
+    // UI states
+    const [isSidebarOpen, setSidebarOpen] = useState(false);
+    const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
+    const [isBudgetDetailModalOpen, setBudgetDetailModalOpen] = useState(false);
+    const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+    const [isAddProspectModalOpen, setAddProspectModalOpen] = useState(false);
+    const [prospectToConvert, setProspectToConvert] = useState<Prospect | null>(null);
+    const [isClientDetailModalOpen, setClientDetailModalOpen] = useState(false);
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+    const [isProfileModalOpen, setProfileModalOpen] = useState(false);
+    const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
+    const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
+    const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
+
+
+    useEffect(() => {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setLoadingMessage('Carregando perfil...');
+                const userDocRef = doc(db, 'users', currentUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    setUser(currentUser);
+                    setUserProfile(userDocSnap.data() as UserProfile);
+                } else {
+                    console.error("User profile not found in Firestore.");
+                    await signOut(auth);
+                    setUser(null);
+                    setUserProfile(null);
+                }
+            } else {
+                setUser(null);
+                setUserProfile(null);
+                setLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const fetchData = useCallback(async () => {
+        if (!user || !userProfile) return;
+        setLoading(true);
+        setLoadingMessage('Carregando dados da organização...');
+
+        try {
+            const { organizationId } = userProfile;
+
+            const collectionsToFetch = {
+                clients: collection(db, 'clients'),
+                budgets: collection(db, 'budgets'),
+                prospects: collection(db, 'prospects'),
+                prospectingStages: collection(db, 'prospectingStages'),
+                contacts: collection(db, 'contacts'),
+                users: collection(db, 'users'),
+            };
+
+            const queries = Object.fromEntries(
+                Object.entries(collectionsToFetch).map(([key, coll]) => [
+                    key,
+                    query(coll, where('organizationId', '==', organizationId))
+                ])
+            );
+
+            const [
+                clientsSnapshot, 
+                budgetsSnapshot, 
+                prospectsSnapshot, 
+                stagesSnapshot,
+                contactsSnapshot,
+                usersSnapshot
+            ] = await Promise.all([
+                getDocs(queries.clients),
+                getDocs(queries.budgets),
+                getDocs(queries.prospects),
+                getDocs(queries.prospectingStages),
+                getDocs(queries.contacts),
+                getDocs(queries.users),
+            ]);
+
+            const clientsData = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+            setClients(clientsData);
+
+            const budgetsData = budgetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
+            setBudgets(budgetsData);
+
+            const prospectsData = prospectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect));
+            setProspects(prospectsData);
+            
+            if (stagesSnapshot.empty) {
+                const defaultStages = [
+                    { name: 'Qualificação', order: 0 }, { name: 'Contato Inicial', order: 1 },
+                    { name: 'Apresentação', order: 2 }, { name: 'Negociação', order: 3 },
+                ];
+                const batch = writeBatch(db);
+                const createdStages: ProspectingStage[] = [];
+                defaultStages.forEach(stage => {
+                    const newStageRef = doc(collection(db, 'prospectingStages'));
+                    const newStageData = { ...stage, id: newStageRef.id, organizationId };
+                    batch.set(newStageRef, newStageData);
+                    createdStages.push(newStageData);
+                });
+                await batch.commit();
+                setStages(createdStages);
+            } else {
+                 setStages(stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProspectingStage)));
+            }
+
+            setContacts(contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
+            setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData)));
+
+        } catch (error) {
+            console.error("Error fetching data: ", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user, userProfile]);
+
+    useEffect(() => {
+        if (userProfile) {
+            fetchData();
+        }
+    }, [userProfile, fetchData]);
+
     useEffect(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        const clientMap = new Map(clients.map(c => [c.id, c.name]));
         const newNotifications: Notification[] = [];
-
-        budgets.forEach(budget => {
-            if (budget.nextFollowUpDate && (budget.status === BudgetStatus.SENT || budget.status === BudgetStatus.FOLLOWING_UP)) {
-                 const [year, month, day] = budget.nextFollowUpDate!.split('-').map(Number);
-                 const followUpDate = new Date(year, month - 1, day);
-                
+        budgets.forEach(b => {
+            if (b.nextFollowUpDate && (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)) {
+                const followUpDate = new Date(b.nextFollowUpDate);
+                const clientName = clientMap.get(b.clientId) || 'Cliente Desconhecido';
                 if (followUpDate < today) {
-                    newNotifications.push({
-                        id: `overdue-${budget.id}`,
-                        type: 'overdue',
-                        message: `Follow-up atrasado para ${budget.title}`,
-                        budgetId: budget.id,
-                        clientName: clientMap.get(budget.clientId) || 'Cliente'
-                    });
-                } else if (followUpDate.getTime() === today.getTime()) {
-                     newNotifications.push({
-                        id: `today-${budget.id}`,
-                        type: 'today',
-                        message: `Follow-up hoje para ${budget.title}`,
-                        budgetId: budget.id,
-                        clientName: clientMap.get(budget.clientId) || 'Cliente'
-                    });
+                    newNotifications.push({ id: `${b.id}-overdue`, type: 'overdue', message: 'Follow-up atrasado!', budgetId: b.id, clientName });
+                } else if (followUpDate.toDateString() === today.toDateString()) {
+                    newNotifications.push({ id: `${b.id}-today`, type: 'today', message: 'Follow-up para hoje.', budgetId: b.id, clientName });
                 }
             }
         });
         setNotifications(newNotifications);
-    }, [budgets, clientMap]);
+    }, [budgets, clients]);
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        setBudgets([]); setClients([]); setContacts([]); setProspects([]); setStages([]); setUsers([]);
+        setActiveView('dashboard');
+    };
+
+    const handleSelectBudget = useCallback((budgetId: string) => {
+        const budget = budgets.find(b => b.id === budgetId);
+        if (budget) {
+            setSelectedBudget(budget);
+            setBudgetDetailModalOpen(true);
+        }
+    }, [budgets]);
+    
+     const handleSelectClient = useCallback((clientId: string) => {
+        const client = clients.find(c => c.id === clientId);
+        if (client) {
+            setSelectedClient(client);
+            setClientDetailModalOpen(true);
+        }
+    }, [clients]);
 
     const handleAddBudget = useCallback(async (
-        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId'>,
-        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId'> },
+        // FIX: Correctly type `budgetData` to not include properties that will be added later.
+        // This avoids a type mismatch that can lead to obscure errors.
+        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId' | 'organizationId'>,
+        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id'> },
         contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId'> }
     ) => {
-        let finalClientId = clientInfo.existingId;
-        let finalContactId = contactInfo.existingId;
-
+        if (!user || !userProfile) return;
         try {
-            if (!finalClientId && clientInfo.newClientData) {
-                const newClientRef = await addDoc(collection(db, 'clients'), { ...clientInfo.newClientData, userId: user.uid });
+            let finalClientId = clientInfo.existingId;
+            if (clientInfo.newClientData) {
+                const newClientRef = await addDoc(collection(db, 'clients'), { 
+                    ...clientInfo.newClientData, 
+                    userId: user.uid,
+                    organizationId: userProfile.organizationId
+                });
                 finalClientId = newClientRef.id;
-                const newClient: Client = { id: finalClientId, userId: user.uid, ...clientInfo.newClientData };
-                setClients(prev => [...prev, newClient]);
             }
-            
-            if (!finalClientId) throw new Error("Client ID is missing for the budget.");
 
-            if (!finalContactId && contactInfo.newContactData) {
-                const contactToInsert = { ...contactInfo.newContactData, clientId: finalClientId };
-                const newContactRef = await addDoc(collection(db, 'contacts'), contactToInsert);
+            if (!finalClientId) throw new Error("Client ID is missing.");
+
+            let finalContactId = contactInfo.existingId;
+            if (contactInfo.newContactData) {
+                const newContactRef = await addDoc(collection(db, 'contacts'), {
+                    ...contactInfo.newContactData,
+                    clientId: finalClientId,
+                    organizationId: userProfile.organizationId
+                });
                 finalContactId = newContactRef.id;
-                const newContact: Contact = { id: finalContactId, ...contactToInsert };
-                setContacts(prev => [...prev, newContact]);
             }
-
-            if (!finalContactId) throw new Error("Contact ID is missing for the budget.");
             
-            const budgetToInsert = {
+            if (!finalContactId) throw new Error("Contact ID is missing.");
+            
+            const newBudget: Omit<Budget, 'id'> = {
                 ...budgetData,
                 userId: user.uid,
+                organizationId: userProfile.organizationId,
                 clientId: finalClientId,
                 contactId: finalContactId,
                 status: BudgetStatus.SENT,
-                followUps: [],
+                followUps: []
             };
-            
-            const newBudgetRef = await addDoc(collection(db, 'budgets'), budgetToInsert);
-            const newBudget: Budget = { ...budgetToInsert, id: newBudgetRef.id };
-            setBudgets(prev => [...prev, newBudget]);
-
-            setAddModalOpen(false);
-            setNewBudgetFromProspect(null);
-            setInitialClientIdForNewBudget(null);
-
+            await addDoc(collection(db, 'budgets'), newBudget);
+            await fetchData();
+            setAddBudgetModalOpen(false);
         } catch (error) {
-            console.error("Error saving budget:", error);
-            alert("Falha ao salvar o orçamento.");
+            console.error("Error adding budget:", error);
         }
-    }, [user.uid]);
-    
-    const handleUpdateBudgetStatus = useCallback(async (budgetId: string, newStatus: BudgetStatus) => {
-        const budget = budgets.find(b => b.id === budgetId);
-        if (!budget) return;
+    }, [user, userProfile, fetchData]);
 
-        const isFinal = newStatus === BudgetStatus.WON || newStatus === BudgetStatus.LOST;
-        const isOnHold = newStatus === BudgetStatus.ON_HOLD;
-        const nextFollowUpDate = isFinal || isOnHold ? null : (budget.nextFollowUpDate || new Date().toISOString().split('T')[0]);
-
-        try {
-            const budgetRef = doc(db, 'budgets', budgetId);
-            await updateDoc(budgetRef, { status: newStatus, nextFollowUpDate: nextFollowUpDate });
-            
-            setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, status: newStatus, nextFollowUpDate: nextFollowUpDate } : b));
-        } catch (error) {
-            console.error("Error updating budget status:", error);
-            alert("Falha ao atualizar o status.");
-        }
-    }, [budgets]);
-
-    const handleAddFollowUp = useCallback(async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
-        const budget = budgets.find(b => b.id === budgetId);
-        if (!budget) return;
-
-        const updatedFollowUps = [...(budget.followUps || []), { ...followUp, id: crypto.randomUUID() }];
-
-        try {
-            const budgetRef = doc(db, 'budgets', budgetId);
-
-            const plainFollowUps = updatedFollowUps.map(f => ({
-                id: f.id,
-                date: f.date,
-                notes: f.notes,
-                ...(f.audioUrl && { audioUrl: f.audioUrl }),
-            }));
-
-            await updateDoc(budgetRef, { 
-                followUps: plainFollowUps, 
-                nextFollowUpDate: nextFollowUpDate,
-                status: BudgetStatus.FOLLOWING_UP
-            });
-
-            setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, followUps: updatedFollowUps, nextFollowUpDate, status: BudgetStatus.FOLLOWING_UP } : b));
-        } catch (error) {
-            console.error("Error adding follow-up:", error);
-            alert("Falha ao adicionar follow-up.");
-        }
-    }, [budgets]);
-
-    const handleChangeStatus = useCallback((budgetId: string, status: BudgetStatus) => {
-        handleUpdateBudgetStatus(budgetId, status);
-        if (status === BudgetStatus.WON || status === BudgetStatus.LOST) {
-            setSelectedBudgetId(null);
-        }
-    }, [handleUpdateBudgetStatus]);
-
-    const handleAddProspect = useCallback(async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId'>) => {
-        const firstStage = prospectingStages.find(s => s.order === 0);
+    const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId'>) => {
+        if (!user || !userProfile) return;
+        const firstStage = stages.find(s => s.order === 0);
         if (!firstStage) {
-            alert("Crie uma etapa no funil de prospecção primeiro.");
+            alert("Nenhuma etapa de prospecção configurada. Configure as etapas primeiro.");
             return;
         }
-        const prospectToInsert = {
-            ...prospectData,
+        await addDoc(collection(db, 'prospects'), { 
+            ...prospectData, 
             userId: user.uid,
-            stageId: firstStage.id,
-        };
-        try {
-            const newProspectRef = await addDoc(collection(db, 'prospects'), prospectToInsert);
-            const newProspect: Prospect = { ...prospectToInsert, id: newProspectRef.id };
-            setProspects(prev => [...prev, newProspect]);
-        } catch (error) {
-            console.error("Error adding prospect:", error);
-            alert("Falha ao adicionar prospect.");
-        }
-    }, [prospectingStages, user.uid]);
+            organizationId: userProfile.organizationId,
+            stageId: firstStage.id 
+        });
+        await fetchData();
+    };
 
-    const handleUpdateProspectStage = useCallback(async (prospectId: string, newStageId: string) => {
-        try {
-            const prospectRef = doc(db, 'prospects', prospectId);
-            await updateDoc(prospectRef, { stageId: newStageId });
-            setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, stageId: newStageId } : p));
-        } catch (error) {
-            console.error("Error updating prospect stage:", error);
-            alert("Falha ao mover o prospect.");
-        }
-    }, []);
+    const handleUpdateProspectStage = async (prospectId: string, newStageId: string) => {
+        const prospectRef = doc(db, 'prospects', prospectId);
+        await updateDoc(prospectRef, { stageId: newStageId });
+        await fetchData();
+    };
     
-    const handleUpdateProspectingStages = useCallback(async (stages: ProspectingStage[]) => {
-        try {
-            const batch = writeBatch(db);
-            const newStageIds = new Set(stages.map(s => s.id));
-            const stagesToDelete = prospectingStages.filter(s => !newStageIds.has(s.id));
+    const handleUpdateStages = async (updatedStages: ProspectingStage[]) => {
+        if (!userProfile) return;
+        const batch = writeBatch(db);
+        const stageCollection = collection(db, 'prospectingStages');
+        const existingStageIds = stages.map(s => s.id);
+        
+        updatedStages.forEach(stage => {
+            const stageRef = doc(stageCollection, stage.id);
+            batch.set(stageRef, { ...stage, organizationId: userProfile.organizationId }, { merge: true });
+        });
 
-            stages.forEach(stage => {
-                const stageRef = doc(db, 'prospecting_stages', stage.id);
-                batch.set(stageRef, stage);
-            });
-
-            stagesToDelete.forEach(stage => {
-                const stageRef = doc(db, 'prospecting_stages', stage.id);
+        // Delete removed stages
+        existingStageIds.forEach(id => {
+            if (!updatedStages.some(s => s.id === id)) {
+                const stageRef = doc(stageCollection, id);
                 batch.delete(stageRef);
+            }
+        });
+
+        await batch.commit();
+        await fetchData();
+    };
+
+    const handleConvertProspect = async (prospectId: string) => {
+        const prospectToConvert = prospects.find(p => p.id === prospectId);
+        if (prospectToConvert) {
+            setProspectToConvert(prospectToConvert);
+            setAddBudgetModalOpen(true);
+            const prospectRef = doc(db, 'prospects', prospectId);
+            await deleteDoc(prospectRef);
+            await fetchData();
+        }
+    };
+    
+    const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
+        const budgetRef = doc(db, 'budgets', budgetId);
+        const budgetDoc = await getDoc(budgetRef);
+        if (budgetDoc.exists()) {
+            const budgetData = budgetDoc.data() as Budget;
+            const newFollowUp = { ...followUp, id: crypto.randomUUID() };
+            const updatedFollowUps = [...budgetData.followUps, newFollowUp];
+            await updateDoc(budgetRef, {
+                followUps: updatedFollowUps,
+                status: BudgetStatus.FOLLOWING_UP,
+                nextFollowUpDate: nextFollowUpDate
             });
-            
-            await batch.commit();
-            setProspectingStages(stages.sort((a,b) => a.order - b.order));
-        } catch (error) {
-            console.error("Error updating stages:", error);
-            alert("Falha ao salvar as etapas.");
-        }
-    }, [prospectingStages]);
-    
-    const handleConvertProspect = useCallback(async (prospectId: string) => {
-        const prospect = prospects.find(p => p.id === prospectId);
-        if (prospect) {
-            try {
-                await deleteDoc(doc(db, 'prospects', prospectId));
-                
-                const contactInfo = prospect.phone || prospect.email || '';
-                setNewBudgetFromProspect({ 
-                    clientName: prospect.company, 
-                    contactName: prospect.name, 
-                    contactInfo: contactInfo, 
-                    clientCnpj: prospect.cnpj 
-                });
-                setProspects(prev => prev.filter(p => p.id !== prospectId));
-                setAddModalOpen(true);
-            } catch (error) {
-                console.error("Error converting prospect:", error);
-                alert("Falha ao converter o prospect.");
-            }
-        }
-    }, [prospects]);
-
-    const handleUpdateProfile = async (newProfileData: Omit<UserProfile, 'role'>) => {
-        try {
-            const profileRef = doc(db, 'users', user.uid);
-            const dataToUpdate = {
-                name: newProfileData.name,
-                matricula: newProfileData.matricula,
-                email: newProfileData.email,
-            };
-            await updateDoc(profileRef, dataToUpdate);
-            setUserProfile(prev => prev ? { ...prev, ...newProfileData } : null);
-            setProfileModalOpen(false);
-        } catch(error) {
-            console.error("Error updating profile:", error);
-            alert("Falha ao atualizar perfil.");
+            await fetchData();
         }
     };
 
-    const handleLogout = async () => {
-        try {
-            await signOut(auth);
-        } catch (error) {
-            console.error("Error signing out: ", error);
-            alert("Falha ao sair. Tente novamente.");
-        }
+    const handleChangeStatus = async (budgetId: string, status: BudgetStatus) => {
+        const budgetRef = doc(db, 'budgets', budgetId);
+        await updateDoc(budgetRef, { status });
+        await fetchData();
     };
 
-
-    const handleAddClient = useCallback(async (
-        clientData: Omit<Client, 'id' | 'userId'>,
-        contactData?: Omit<Contact, 'id' | 'clientId'>
-    ) => {
-        try {
-            const clientToInsert = { ...clientData, userId: user.uid };
-            const newClientRef = await addDoc(collection(db, 'clients'), clientToInsert);
-            const newClient: Client = { ...clientToInsert, id: newClientRef.id };
-            setClients(prev => [...prev, newClient]);
-
-            if (contactData && contactData.name) {
-                const contactToInsert = { ...contactData, clientId: newClient.id };
-                const newContactRef = await addDoc(collection(db, 'contacts'), contactToInsert);
-                const newContact: Contact = { ...contactToInsert, id: newContactRef.id };
-                setContacts(prev => [...prev, newContact]);
-            }
-            setAddClientModalOpen(false);
-        } catch (error) {
-             console.error("Error adding client:", error);
-             alert("Falha ao adicionar novo cliente.");
+    const handleAddClient = async (clientData: Omit<Client, 'id'>, contactData?: Omit<Contact, 'id' | 'clientId'>) => {
+        if (!user || !userProfile) return;
+        const clientRef = await addDoc(collection(db, 'clients'), {
+            ...clientData,
+            userId: user.uid,
+            organizationId: userProfile.organizationId,
+        });
+        if (contactData) {
+            await addDoc(collection(db, 'contacts'), {
+                ...contactData,
+                clientId: clientRef.id,
+                organizationId: userProfile.organizationId
+            });
         }
-    }, [user.uid]);
+        await fetchData();
+    };
     
-    const handleUpdateUserRole = async (userIdToUpdate: string, newRole: UserRole) => {
-        if (userProfile?.role !== UserRole.ADMIN) {
-            alert("Você não tem permissão para realizar esta ação.");
+    const handleUpdateUserProfile = async (profileUpdate: Partial<UserProfile>) => {
+        if (!user) return;
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, profileUpdate);
+        setUserProfile(prev => prev ? { ...prev, ...profileUpdate } : null);
+    };
+
+    const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, { role: newRole });
+        await fetchData();
+    };
+
+    const handleInviteUser = async (email: string, role: UserRole) => {
+        if (!userProfile) return;
+        
+        const usersQuery = query(collection(db, 'users'), where('email', '==', email), where('organizationId', '==', userProfile.organizationId));
+        const invitesQuery = query(collection(db, 'invites'), where('email', '==', email), where('organizationId', '==', userProfile.organizationId));
+        
+        const [usersSnap, invitesSnap] = await Promise.all([getDocs(usersQuery), getDocs(invitesQuery)]);
+
+        if (!usersSnap.empty || !invitesSnap.empty) {
+            alert('Um usuário ou convite com este e-mail já existe nesta organização.');
             return;
         }
-        try {
-            const userRef = doc(db, 'users', userIdToUpdate);
-            await updateDoc(userRef, { role: newRole });
-            setAllUsers(prev => prev.map(u => u.id === userIdToUpdate ? { ...u, role: newRole } : u));
-            if (userIdToUpdate === user.uid) {
-                setUserProfile(prev => prev ? { ...prev, role: newRole } : null);
-            }
-        } catch (error) {
-            console.error("Error updating user role:", error);
-            alert("Falha ao atualizar o cargo do usuário.");
-        }
+
+        await addDoc(collection(db, 'invites'), {
+            email,
+            role,
+            organizationId: userProfile.organizationId,
+            status: 'pending'
+        });
+        alert(`Convite enviado para ${email}!`);
+        setAddUserModalOpen(false);
     };
-    
+
     const handleGenerateSelectionReport = (selectedIds: string[]) => {
         if (!userProfile) return;
-        const reportTitle = "Relatório de Follow-ups Selecionados";
-        const clientMap = new Map(clients.map(c => [c.id, c]));
-        const contactMap = new Map(contacts.map(c => [c.id, c]));
-
-        // FIX: Use flatMap to simplify mapping and filtering, and to ensure correct type inference.
-        const reportData = selectedIds.flatMap(id => {
-            const budget = budgets.find(b => b.id === id);
-            if (!budget) return [];
-            const client = clientMap.get(budget.clientId);
-            const contact = contactMap.get(budget.contactId || '');
-            if (!client || !contact) return [];
-            return [{ budget, client, contact, followUps: budget.followUps || [] }];
-        });
+        type ReportDataItem = { budget: Budget; client: Client; contact: Contact; followUps: FollowUp[] };
         
-        generateFollowUpReport(reportTitle, reportData, userProfile);
+        const reportData = selectedIds
+            .map(id => {
+                const budget = budgets.find(b => b.id === id);
+                if (!budget) return null;
+                const client = clients.find(c => c.id === budget.clientId);
+                if (!client) return null;
+                const contact = contacts.find(c => c.id === budget.contactId);
+                if (!contact) return null;
+                return { budget, client, contact, followUps: budget.followUps };
+            })
+            .filter((item): item is ReportDataItem => item !== null);
+
+        if (reportData.length > 0) {
+            generateFollowUpReport('Relatório de Orçamentos Selecionados', reportData, userProfile);
+        }
     };
 
     const handleGenerateDailyReport = () => {
         if (!userProfile) return;
-        const reportTitle = "Relatório de Follow-ups do Dia";
-        const todayStr = new Date().toISOString().split('T')[0];
-        const clientMap = new Map(clients.map(c => [c.id, c]));
-        const contactMap = new Map(contacts.map(c => [c.id, c]));
+        const today = new Date().toDateString();
 
-        // FIX: Use flatMap to resolve type inference issue and simplify mapping/filtering logic.
-        const reportData = budgets.flatMap(budget => {
-            const todayFollowUps = (budget.followUps || []).filter(f => f.date.startsWith(todayStr));
-            if (todayFollowUps.length === 0) return [];
-            const client = clientMap.get(budget.clientId);
-            const contact = contactMap.get(budget.contactId || '');
-            if (!client || !contact) return [];
-            return [{ budget, client, contact, followUps: todayFollowUps }];
-        });
+        const reportData = budgets
+            .filter(b => b.nextFollowUpDate && new Date(b.nextFollowUpDate).toDateString() === today)
+            .map(budget => {
+                const client = clients.find(c => c.id === budget.clientId);
+                if (!client) return null;
+                const contact = contacts.find(c => c.id === budget.contactId);
+                if (!contact) return null;
+                const todaysFollowUps = budget.followUps.filter(fu => new Date(fu.date).toDateString() === today);
+                return { budget, client, contact, followUps: todaysFollowUps };
+            })
+            .filter((item): item is ReportDataItem => item !== null);
         
-        if (reportData.length === 0) {
-            alert("Nenhum follow-up registrado hoje.");
-            return;
-        }
-
-        generateFollowUpReport(reportTitle, reportData, userProfile);
-    };
-
-    const selectedBudget = budgets.find(b => b.id === selectedBudgetId);
-    const selectedClient = clients.find(c => c.id === selectedBudget?.clientId);
-    const selectedContact = contacts.find(c => c.id === selectedBudget?.contactId);
-    
-    const clientForDetail = clients.find(c => c.id === selectedClientForDetail);
-
-    const openAddBudgetModal = () => {
-        setNewBudgetFromProspect(null);
-        setInitialClientIdForNewBudget(null);
-        setAddModalOpen(true);
-    }
-    
-    const openAddProspectModal = () => setAddProspectModalOpen(true);
-
-    const handleViewChange = (view: ActiveView) => {
-        setActiveView(view);
-        if(window.innerWidth < 768) { // md breakpoint
-            setSidebarOpen(false);
+        if (reportData.length > 0) {
+            generateFollowUpReport('Relatório de Follow-ups do Dia', reportData, userProfile);
+        } else {
+            alert('Nenhum follow-up agendado para hoje.');
         }
     };
 
-    const handleOpenNewBudgetForClient = (client: Client) => {
-        setSelectedClientForDetail(null); // Close the detail modal
-        setInitialClientIdForNewBudget(client.id);
-        setAddModalOpen(true);
-    };
 
-    if (isLoading || !userProfile) {
-        return <FullScreenLoader message="Carregando dados..." />;
-    }
+    if (loading) return <FullScreenLoader message={loadingMessage} />;
+    if (!user || !userProfile) return <Auth />;
 
-    const renderActiveView = () => {
-        switch (activeView) {
-            case 'dashboard':
-                return <Dashboard budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
-            case 'prospecting':
-                return <ProspectingView prospects={prospects} stages={prospectingStages} onAddProspectClick={openAddProspectModal} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateProspectingStages} onConvertProspect={handleConvertProspect} />;
-            case 'budgeting':
-                return <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={setSelectedBudgetId} onGenerateReport={handleGenerateSelectionReport} />;
-            case 'deals':
-                return <DealsView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} onUpdateStatus={handleUpdateBudgetStatus} />;
-            case 'tasks':
-                return <TasksView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
-            case 'clients':
-                return <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={setSelectedClientForDetail} onAddClientClick={() => setAddClientModalOpen(true)} />;
-            case 'reports':
-                return <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />;
-            case 'calendar':
-                return <CalendarView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
-            case 'map':
-                return <MapView clients={clients} />;
-            case 'users':
-                return userProfile.role === UserRole.ADMIN ? <UsersView users={allUsers} onUpdateRole={handleUpdateUserRole} /> : <p>Acesso negado.</p>;
-            default:
-                return <Dashboard budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
-        }
-    }
+    const selectedBudgetClient = clients.find(c => c.id === selectedBudget?.clientId);
+    const selectedBudgetContact = contacts.find(c => c.id === selectedBudget?.contactId);
 
     return (
-        <div className="h-screen bg-slate-50 flex text-gray-800 dark:bg-slate-900 dark:text-slate-200 overflow-hidden">
-            {isSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                ></div>
-            )}
-            <Sidebar activeView={activeView} setActiveView={handleViewChange} isOpen={isSidebarOpen} userProfile={userProfile}/>
-            <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex h-screen bg-slate-100 dark:bg-slate-900">
+             {/* Sidebar backdrop for mobile */}
+            {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 md:hidden"></div>}
+            <Sidebar activeView={activeView} setActiveView={setActiveView} isOpen={isSidebarOpen} userProfile={userProfile} />
+            <div className="flex-1 flex flex-col h-screen">
                 <Header 
-                    onAddBudget={openAddBudgetModal} 
-                    onAddProspect={openAddProspectModal} 
-                    onToggleSidebar={() => setSidebarOpen(true)}
+                    onAddBudget={() => setAddBudgetModalOpen(true)} 
+                    onAddProspect={() => setAddProspectModalOpen(true)}
+                    onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
                     theme={theme}
                     toggleTheme={toggleTheme}
                     notifications={notifications}
-                    onNotificationClick={(budgetId) => setSelectedBudgetId(budgetId)}
+                    onNotificationClick={handleSelectBudget}
                     userProfile={userProfile}
                     onEditProfile={() => setProfileModalOpen(true)}
                     onLogout={handleLogout}
                 />
-                <main className="p-4 md:p-8 flex-grow bg-slate-100 dark:bg-slate-900 overflow-y-auto">
-                    {renderActiveView()}
+                <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+                    {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                    {activeView === 'tasks' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                    {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
+                    {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
+                    {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
+                    {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                    {activeView === 'map' && <MapView clients={clients} />}
+                    {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
+                    {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
+                    {activeView === 'users' && userProfile.role === UserRole.ADMIN && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
                 </main>
             </div>
-            <AddBudgetModal
-                isOpen={isAddModalOpen}
-                onClose={() => { setAddModalOpen(false); setNewBudgetFromProspect(null); setInitialClientIdForNewBudget(null); }}
+            
+            {/* Modals */}
+            <AddBudgetModal 
+                isOpen={isAddBudgetModalOpen} 
+                onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }}
                 onSave={handleAddBudget}
                 clients={clients}
                 contacts={contacts}
-                prospectData={newBudgetFromProspect}
-                initialClientId={initialClientIdForNewBudget}
+                prospectData={prospectToConvert ? { 
+                    clientName: prospectToConvert.company, 
+                    contactName: prospectToConvert.name,
+                    contactInfo: prospectToConvert.email || prospectToConvert.phone || '',
+                    clientCnpj: prospectToConvert.cnpj
+                } : null}
+                initialClientId={initialClientIdForBudget}
             />
-            <AddProspectModal
-                isOpen={isAddProspectModalOpen}
+            {isBudgetDetailModalOpen && selectedBudget && selectedBudgetClient && selectedBudgetContact && (
+                <BudgetDetailModal 
+                    isOpen={isBudgetDetailModalOpen} 
+                    onClose={() => setBudgetDetailModalOpen(false)}
+                    budget={selectedBudget}
+                    client={selectedBudgetClient}
+                    contact={selectedBudgetContact}
+                    onAddFollowUp={handleAddFollowUp}
+                    onChangeStatus={handleChangeStatus}
+                />
+            )}
+             <AddProspectModal 
+                isOpen={isAddProspectModalOpen} 
                 onClose={() => setAddProspectModalOpen(false)}
                 onSave={handleAddProspect}
             />
+            {isClientDetailModalOpen && selectedClient && (
+                <ClientDetailModal
+                    isOpen={isClientDetailModalOpen}
+                    onClose={() => setClientDetailModalOpen(false)}
+                    client={selectedClient}
+                    contacts={contacts.filter(c => c.clientId === selectedClient.id)}
+                    budgets={budgets.filter(b => b.clientId === selectedClient.id)}
+                    onSelectBudget={handleSelectBudget}
+                    onAddBudgetForClient={(client) => {
+                        setClientDetailModalOpen(false);
+                        setInitialClientIdForBudget(client.id);
+                        setAddBudgetModalOpen(true);
+                    }}
+                />
+            )}
             <ProfileModal
                 isOpen={isProfileModalOpen}
                 onClose={() => setProfileModalOpen(false)}
-                onSave={handleUpdateProfile}
+                onSave={(profileUpdate) => {
+                    handleUpdateUserProfile(profileUpdate);
+                    setProfileModalOpen(false);
+                }}
                 userProfile={userProfile}
             />
             <AddClientModal
                 isOpen={isAddClientModalOpen}
                 onClose={() => setAddClientModalOpen(false)}
-                onSave={handleAddClient}
+                onSave={(client, contact) => {
+                    handleAddClient(client, contact);
+                    setAddClientModalOpen(false);
+                }}
             />
-            {selectedBudget && selectedClient && selectedContact && (
-                <BudgetDetailModal
-                    isOpen={!!selectedBudget}
-                    onClose={() => setSelectedBudgetId(null)}
-                    budget={selectedBudget}
-                    client={selectedClient}
-                    contact={selectedContact}
-                    onAddFollowUp={handleAddFollowUp}
-                    onChangeStatus={handleChangeStatus}
-                />
-            )}
-            {clientForDetail && (
-                 <ClientDetailModal
-                    isOpen={!!clientForDetail}
-                    onClose={() => setSelectedClientForDetail(null)}
-                    client={clientForDetail}
-                    contacts={contacts.filter(c => c.clientId === clientForDetail.id)}
-                    budgets={budgets.filter(b => b.clientId === clientForDetail.id)}
-                    onSelectBudget={(id) => {
-                        setSelectedClientForDetail(null);
-                        setSelectedBudgetId(id);
-                    }}
-                    onAddBudgetForClient={handleOpenNewBudgetForClient}
+             {userProfile.role === UserRole.ADMIN && (
+                <AddUserModal
+                    isOpen={isAddUserModalOpen}
+                    onClose={() => setAddUserModalOpen(false)}
+                    onInvite={handleInviteUser}
                 />
             )}
         </div>
     );
 };
-
-const App: React.FC = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setIsLoading(false);
-        });
-        // Cleanup subscription on unmount
-        return () => unsubscribe();
-    }, []);
-
-    if (isLoading) {
-        return <FullScreenLoader message="Verificando autenticação..." />;
-    }
-
-    if (!user) {
-        return <Auth />;
-    }
-
-    return <MainLayout user={user} />;
-}
 
 export default App;

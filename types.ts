@@ -12,9 +12,23 @@ export enum UserRole {
   SALESPERSON = 'Salesperson',
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+}
+
+export interface Invite {
+  id: string;
+  email: string;
+  organizationId: string;
+  role: UserRole;
+  status: 'pending' | 'completed';
+}
+
 export interface Contact {
   id: string;
   clientId: string;
+  organizationId: string;
   name: string;
   email?: string;
   phone?: string;
@@ -23,6 +37,7 @@ export interface Contact {
 export interface Client {
   id: string;
   userId: string;
+  organizationId: string;
   name: string;
   address?: string;
   cnpj?: string;
@@ -38,6 +53,7 @@ export interface FollowUp {
 export interface Budget {
   id: string;
   userId: string;
+  organizationId: string;
   clientId: string;
   contactId: string | null;
   title: string;
@@ -53,11 +69,13 @@ export interface ProspectingStage {
   id: string;
   name: string;
   order: number;
+  organizationId: string;
 }
 
 export interface Prospect {
-  id: string;
+  id:string;
   userId: string;
+  organizationId: string;
   name: string; // Contact person's name
   company: string;
   email?: string;
@@ -80,6 +98,7 @@ export interface UserProfile {
   matricula: string;
   email: string;
   role: UserRole;
+  organizationId: string;
 }
 
 export interface UserData extends UserProfile {

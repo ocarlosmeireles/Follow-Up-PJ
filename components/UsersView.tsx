@@ -1,11 +1,12 @@
 import React from 'react';
 import type { UserData } from '../types';
 import { UserRole } from '../types';
-import { UserGroupIcon } from './icons';
+import { UserGroupIcon, UserPlusIcon } from './icons';
 
 interface UsersViewProps {
   users: UserData[];
   onUpdateRole: (userId: string, newRole: UserRole) => void;
+  onInviteUserClick: () => void;
 }
 
 const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
@@ -21,12 +22,21 @@ const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
     );
 };
 
-const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole }) => {
+const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUserClick }) => {
   return (
     <div className="space-y-6">
-        <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">Gerenciar Usuários</h1>
-            <p className="text-gray-500 dark:text-gray-400">Altere o nível de acesso de cada usuário no sistema.</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">Gerenciar Usuários</h1>
+                <p className="text-gray-500 dark:text-gray-400">Convide e gerencie os membros da sua equipe.</p>
+            </div>
+            <button 
+                onClick={onInviteUserClick}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm"
+            >
+                <UserPlusIcon className="w-5 h-5 mr-2"/>
+                Convidar Usuário
+            </button>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700">
@@ -35,10 +45,10 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole }) => {
                     <thead className="border-b-2 border-gray-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 uppercase text-xs">
                         <tr>
                             <th className="p-4">Nome</th>
+                            <th className="p-4 min-w-[180px]">Alterar Cargo</th>
                             <th className="p-4">E-mail</th>
                             <th className="p-4">Matrícula</th>
                             <th className="p-4 text-center">Cargo Atual</th>
-                            <th className="p-4">Alterar Cargo</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -48,9 +58,6 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole }) => {
                                 className="border-b border-gray-200 dark:border-slate-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
                             >
                                 <td className="p-4 text-gray-800 dark:text-slate-100 font-semibold">{user.name}</td>
-                                <td className="p-4 text-gray-600 dark:text-slate-300">{user.email}</td>
-                                <td className="p-4 text-gray-600 dark:text-slate-300">{user.matricula}</td>
-                                <td className="p-4 text-center"><RoleBadge role={user.role} /></td>
                                 <td className="p-4">
                                     <select
                                         value={user.role}
@@ -62,6 +69,9 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole }) => {
                                         ))}
                                     </select>
                                 </td>
+                                <td className="p-4 text-gray-600 dark:text-slate-300">{user.email}</td>
+                                <td className="p-4 text-gray-600 dark:text-slate-300">{user.matricula}</td>
+                                <td className="p-4 text-center"><RoleBadge role={user.role} /></td>
                             </tr>
                         ))}
                     </tbody>

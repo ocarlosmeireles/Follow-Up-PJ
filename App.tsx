@@ -468,18 +468,18 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
     const handleGenerateSelectionReport = (selectedIds: string[]) => {
         if (!userProfile) return;
         const reportTitle = "Relatório de Follow-ups Selecionados";
-        // FIX: Add explicit types to Map constructors to aid TypeScript's type inference.
-        const clientMap: Map<string, Client> = new Map(clients.map(c => [c.id, c]));
-        const contactMap: Map<string, Contact> = new Map(contacts.map(c => [c.id, c]));
+        const clientMap = new Map(clients.map(c => [c.id, c]));
+        const contactMap = new Map(contacts.map(c => [c.id, c]));
 
-        const reportData = selectedIds.map(id => {
+        // FIX: Use flatMap to simplify mapping and filtering, and to ensure correct type inference.
+        const reportData = selectedIds.flatMap(id => {
             const budget = budgets.find(b => b.id === id);
-            if (!budget) return null;
+            if (!budget) return [];
             const client = clientMap.get(budget.clientId);
             const contact = contactMap.get(budget.contactId || '');
-            if (!client || !contact) return null;
-            return { budget, client, contact, followUps: budget.followUps || [] };
-        }).filter((item): item is NonNullable<typeof item> => item !== null);
+            if (!client || !contact) return [];
+            return [{ budget, client, contact, followUps: budget.followUps || [] }];
+        });
         
         generateFollowUpReport(reportTitle, reportData, userProfile);
     };
@@ -488,18 +488,18 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
         if (!userProfile) return;
         const reportTitle = "Relatório de Follow-ups do Dia";
         const todayStr = new Date().toISOString().split('T')[0];
-        // FIX: Add explicit types to Map constructors for consistency and to prevent potential type inference issues.
-        const clientMap: Map<string, Client> = new Map(clients.map(c => [c.id, c]));
-        const contactMap: Map<string, Contact> = new Map(contacts.map(c => [c.id, c]));
+        const clientMap = new Map(clients.map(c => [c.id, c]));
+        const contactMap = new Map(contacts.map(c => [c.id, c]));
 
-        const reportData = budgets.map(budget => {
+        // FIX: Use flatMap to resolve type inference issue and simplify mapping/filtering logic.
+        const reportData = budgets.flatMap(budget => {
             const todayFollowUps = (budget.followUps || []).filter(f => f.date.startsWith(todayStr));
-            if (todayFollowUps.length === 0) return null;
+            if (todayFollowUps.length === 0) return [];
             const client = clientMap.get(budget.clientId);
             const contact = contactMap.get(budget.contactId || '');
-            if (!client || !contact) return null;
-            return { budget, client, contact, followUps: todayFollowUps };
-        }).filter((item): item is NonNullable<typeof item> => item !== null);
+            if (!client || !contact) return [];
+            return [{ budget, client, contact, followUps: todayFollowUps }];
+        });
         
         if (reportData.length === 0) {
             alert("Nenhum follow-up registrado hoje.");

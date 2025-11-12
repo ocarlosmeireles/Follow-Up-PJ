@@ -89,6 +89,8 @@ export interface Prospect {
   cnpj?: string;
   notes?: string;
   stageId: string;
+  source?: string;
+  createdAt: string;
 }
 
 export interface Notification {

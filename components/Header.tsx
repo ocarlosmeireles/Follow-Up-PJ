@@ -1,8 +1,8 @@
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon } from './icons';
-// FIX: Corrected import path for the 'Theme' type. It is now imported from '../types' where it is defined, resolving the module resolution error.
 import type { Notification, UserProfile, Theme } from '../types';
 import { UserRole } from '../types';
 

@@ -403,7 +403,7 @@ const App: React.FC = () => {
         }
     }, [user, userProfile, fetchOrganizationData]);
 
-    const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId'>) => {
+    const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => {
         if (!user || !userProfile) return;
         const firstStage = stages.find(s => s.order === 0);
         if (!firstStage) {
@@ -414,7 +414,8 @@ const App: React.FC = () => {
             ...prospectData, 
             userId: user.uid,
             organizationId: userProfile.organizationId,
-            stageId: firstStage.id 
+            stageId: firstStage.id,
+            createdAt: new Date().toISOString(),
         });
         await fetchOrganizationData();
     };
@@ -464,13 +465,10 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
-            // FIX: Replaced potentially untyped crypto.randomUUID() with a safe method for generating unique IDs to prevent type errors.
-            // Also ensured `date` is assigned correctly from the followUp object.
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                // FIX: The compiler reported `followUp.date` as potentially 'unknown'. Explicitly casting to string to ensure type safety.
+// FIX: Explicitly cast properties to string to resolve 'unknown' type error.
                 date: followUp.date as string,
-                // FIX: The compiler reported `followUp.notes` as potentially 'unknown'. Explicitly casting to string to ensure type safety.
                 notes: followUp.notes as string,
             };
             if (followUp.audioUrl) {

@@ -5,7 +5,7 @@ import { XMarkIcon } from './icons';
 interface AddProspectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (prospect: Omit<Prospect, 'id' | 'stageId'>) => void;
+  onSave: (prospect: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => void;
 }
 
 const maskCnpj = (value: string) => {
@@ -25,6 +25,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [notes, setNotes] = useState('');
+    const [source, setSource] = useState('');
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
     const [cnpjError, setCnpjError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
         setEmail('');
         setPhone('');
         setNotes('');
+        setSource('');
         setCnpjError(null);
         setIsFetchingCnpj(false);
         setCompanyIsFromApi(false);
@@ -95,7 +97,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
             return;
         }
         
-        onSave({ name, company, cnpj, email, phone, notes });
+        onSave({ name, company, cnpj, email, phone, notes, source });
         resetForm();
         onClose();
     };
@@ -114,7 +116,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
 
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-40">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 transform transition-all">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Novo Prospect</h2>
                     <button onClick={handleClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
@@ -137,12 +139,18 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
                         <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" placeholder="Pessoa de referência na empresa" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">E-mail</label>
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Origem (Opcional)</label>
+                        <input type="text" value={source} onChange={e => setSource(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" placeholder="Indicação, Site, Evento..." />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Telefone</label>
-                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">E-mail</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Telefone</label>
+                            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
+                        </div>
                     </div>
                     <div>
                          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Observações</label>

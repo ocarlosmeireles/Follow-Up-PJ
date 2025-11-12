@@ -46,6 +46,7 @@ export interface Client {
   address?: string;
   cnpj?: string;
   notes?: string;
+  logoUrl?: string;
 }
 
 export interface FollowUp {

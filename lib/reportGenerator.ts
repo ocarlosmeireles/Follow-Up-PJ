@@ -89,6 +89,14 @@ export const generateFollowUpReport = (
                     border-bottom: 1px solid #e2e8f0;
                     padding-bottom: 10px;
                     margin-bottom: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                }
+                .budget-header .client-logo {
+                    max-width: 50px;
+                    max-height: 50px;
+                    object-fit: contain;
                 }
                 .budget-header h2 {
                     font-size: 16px;
@@ -154,8 +162,11 @@ export const generateFollowUpReport = (
                 ${reportData.map(item => `
                     <div class="budget-section">
                         <div class="budget-header">
-                            <h2>${item.budget.title}</h2>
-                            <span><strong>Cliente:</strong> ${item.client.name}</span>
+                            ${item.client.logoUrl ? `<img src="${item.client.logoUrl}" class="client-logo" alt="${item.client.name} logo">` : ''}
+                            <div>
+                                <h2>${item.budget.title}</h2>
+                                <span><strong>Cliente:</strong> ${item.client.name}</span>
+                            </div>
                         </div>
                         <div class="budget-details">
                             <div><strong>Contato:</strong> ${item.contact.name}</div>

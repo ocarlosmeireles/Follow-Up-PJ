@@ -11,7 +11,7 @@ interface ClientDetailModalProps {
     budgets: Budget[];
     onSelectBudget: (budgetId: string) => void;
     onAddBudgetForClient: (client: Client) => void;
-    onSaveNotes: (clientId: string, notes: string) => void;
+    onUpdateClient: (clientId: string, updates: Partial<Client>, logoFile?: File) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -48,25 +48,51 @@ const KPICard = ({ title, value, icon }: { title: string, value: string | number
 );
 
 
-const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, client, contacts, budgets, onSelectBudget, onAddBudgetForClient, onSaveNotes }) => {
-    const [notes, setNotes] = useState(client.notes || '');
-    const [isEditingNotes, setIsEditingNotes] = useState(false);
+const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, client, contacts, budgets, onSelectBudget, onAddBudgetForClient, onUpdateClient }) => {
+    const [notes, setNotes] = useState('');
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setNotes(client.notes || '');
-            setIsEditingNotes(false);
+            setLogoFile(null);
+            setLogoPreview(client.logoUrl || null);
+            setIsDirty(false);
         }
-    }, [isOpen, client.notes]);
+        return () => {
+            if (logoPreview && logoPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(logoPreview);
+            }
+        }
+    }, [isOpen, client]);
     
-    const handleSaveNotes = () => {
-        onSaveNotes(client.id, notes);
-        setIsEditingNotes(false);
+    const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setNotes(e.target.value);
+        setIsDirty(true);
     };
 
-    const handleCancelEditNotes = () => {
-        setNotes(client.notes || '');
-        setIsEditingNotes(false);
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setLogoFile(file);
+            if (logoPreview && logoPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(logoPreview);
+            }
+            setLogoPreview(URL.createObjectURL(file));
+            setIsDirty(true);
+        }
+    };
+
+    const handleSave = () => {
+        const updates: Partial<Client> = {};
+        if (notes !== (client.notes || '')) {
+            updates.notes = notes;
+        }
+        onUpdateClient(client.id, updates, logoFile || undefined);
+        setIsDirty(false);
+        setLogoFile(null);
     };
 
     if (!isOpen) return null;
@@ -109,14 +135,35 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-6xl m-4 max-h-[90vh] flex flex-col transform transition-all">
                 <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-200 dark:border-slate-700">
-                    <div>
-                        <h2 className="text-3xl font-bold text-gray-900 dark:text-slate-100">{client.name}</h2>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-slate-400 mt-2">
-                            {client.cnpj && <span>CNPJ: {client.cnpj}</span>}
-                            {client.address && <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4"/>{client.address}</span>}
+                    <div className="flex items-center gap-4">
+                         <div className="relative group flex-shrink-0">
+                            <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" id="client-logo-upload" />
+                            {logoPreview ? (
+                                <img src={logoPreview} alt="Logo" className="w-16 h-16 rounded-lg object-contain bg-slate-100 dark:bg-slate-700 p-1"/>
+                            ) : (
+                                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                                    <BriefcaseIcon className="w-8 h-8 text-slate-400"/>
+                                </div>
+                            )}
+                            <label htmlFor="client-logo-upload" className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <PencilIcon className="w-6 h-6"/>
+                            </label>
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-slate-100">{client.name}</h2>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-slate-400 mt-2">
+                                {client.cnpj && <span>CNPJ: {client.cnpj}</span>}
+                                {client.address && <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4"/>{client.address}</span>}
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
+                        {isDirty && (
+                             <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm">
+                                <CheckCircleIcon className="w-4 h-4 mr-2" />
+                                Salvar Alterações
+                            </button>
+                        )}
                         <button
                             onClick={() => onAddBudgetForClient(client)}
                             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm"
@@ -169,29 +216,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                 <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 flex items-center">
                                     <ClipboardDocumentListIcon className="w-5 h-5 mr-2 text-blue-500 dark:text-blue-400"/> Anotações Gerais
                                 </h3>
-                                {!isEditingNotes ? (
-                                    <button onClick={() => setIsEditingNotes(true)} className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-                                        <PencilIcon className="w-4 h-4" /> Editar
-                                    </button>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={handleCancelEditNotes} className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 font-semibold hover:underline">
-                                            Cancelar
-                                        </button>
-                                        <button onClick={handleSaveNotes} className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-semibold bg-green-100 dark:bg-green-900/50 px-3 py-1 rounded-md hover:bg-green-200 dark:hover:bg-green-800">
-                                            <CheckCircleIcon className="w-4 h-4" /> Salvar
-                                        </button>
-                                    </div>
-                                )}
                             </div>
-                            <div className="bg-yellow-50/70 dark:bg-yellow-900/40 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50">
+                            <div className="bg-yellow-50/70 dark:bg-yellow-900/40 p-1 rounded-lg border border-yellow-200 dark:border-yellow-800/50">
                                 <textarea
                                     value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    readOnly={!isEditingNotes}
-                                    placeholder={isEditingNotes ? "Adicione anotações sobre o cliente aqui..." : "Nenhuma anotação."}
+                                    onChange={handleNotesChange}
+                                    placeholder={"Adicione anotações sobre o cliente aqui..."}
                                     rows={5}
-                                    className={`w-full bg-transparent text-yellow-800 dark:text-yellow-200 text-sm focus:outline-none resize-y ${isEditingNotes ? 'ring-1 ring-yellow-400 rounded-md p-1' : 'cursor-default'}`}
+                                    className="w-full bg-transparent text-yellow-800 dark:text-yellow-200 text-sm focus:outline-none resize-y p-2"
                                 />
                             </div>
                         </div>

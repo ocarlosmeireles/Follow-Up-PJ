@@ -107,8 +107,8 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
     const sortedStages = useMemo(() => [...stages].sort((a,b) => a.order - b.order), [stages]);
     
     return (
-        <>
-            <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-6 flex-shrink-0">
                 <div>
                     <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Funil de Prospecção</h2>
                     <p className="text-gray-500 dark:text-gray-400">Arraste os prospects entre as etapas para avançar no funil.</p>
@@ -130,7 +130,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                     </button>
                 </div>
             </div>
-            <div className="flex gap-6 overflow-x-auto pb-4">
+            <div className="flex gap-6 pb-4 flex-grow overflow-x-auto">
                 {sortedStages.map(stage => (
                     <div
                         key={stage.id}
@@ -138,13 +138,13 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                         onDrop={(e) => handleDrop(e, stage.id)}
                         onDragEnter={() => setDraggingOverColumn(stage.id)}
                         onDragLeave={() => setDraggingOverColumn(null)}
-                        className={`flex-1 min-w-[300px] bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4 border-t-4 border-blue-500 transition-colors duration-200 ${draggingOverColumn === stage.id ? 'bg-slate-200 dark:bg-slate-700' : ''}`}
+                        className={`flex-1 min-w-[300px] bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4 border-t-4 border-blue-500 flex flex-col transition-colors duration-200 ${draggingOverColumn === stage.id ? 'bg-slate-200 dark:bg-slate-700' : ''}`}
                     >
-                        <div className="flex justify-between items-center mb-4">
+                        <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <h3 className="font-semibold text-lg text-gray-800 dark:text-slate-200">{stage.name}</h3>
                             <span className="text-sm font-bold bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-full px-2 py-0.5">{prospectsByStage[stage.id]?.length || 0}</span>
                         </div>
-                        <div className="space-y-3 h-[calc(100vh-380px)] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
                             {(prospectsByStage[stage.id] || []).map(prospect => (
                                 <ProspectCard key={prospect.id} prospect={prospect} onConvert={onConvertProspect} />
                             ))}
@@ -158,7 +158,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                 stages={stages}
                 onSave={onUpdateStages}
             />
-        </>
+        </div>
     );
 };
 

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -462,9 +464,8 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
-            // FIX: Replaced `crypto.randomUUID()` with a more compatible unique ID generator.
-            // The original `crypto.randomUUID()` can return type `unknown` if the TS environment
-            // is not configured for modern DOM APIs, causing the type errors reported on lines 326 and 328.
+            // The crypto.randomUUID() function can have an 'unknown' type in some environments, causing assignment errors.
+            // This replaces it with a compatible method to generate a unique string ID.
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 date: followUp.date,
@@ -535,6 +536,24 @@ const App: React.FC = () => {
         setOrganization(prev => prev ? { ...prev, ...finalUpdate } : null);
     };
 
+    const handleUpdateClientData = async (clientId: string, clientUpdate: Partial<Client>, logoFile?: File) => {
+        const clientRef = doc(db, 'clients', clientId);
+        const currentClient = clients.find(c => c.id === clientId);
+        if (!currentClient) return;
+    
+        let finalUpdate: Partial<Client> & { [key: string]: any } = { ...clientUpdate };
+    
+        if (logoFile) {
+            const logoRef = ref(storage, `clients/${clientId}/logo`);
+            await uploadBytes(logoRef, logoFile);
+            const logoUrl = await getDownloadURL(logoRef);
+            finalUpdate.logoUrl = logoUrl;
+        }
+    
+        await updateDoc(clientRef, finalUpdate);
+        await fetchOrganizationData();
+    };
+
     const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
         const userRef = doc(db, "users", userId);
         await updateDoc(userRef, { role: newRole });
@@ -594,15 +613,22 @@ const App: React.FC = () => {
     // Super Admin Actions
     const handleImpersonate = (targetOrg: Organization) => {
         if (!userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
-        const targetAdmin = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
-        if (!targetAdmin) {
-            alert('Não foi possível encontrar um administrador para esta organização.');
+
+        // Prioritize finding an Admin, but fall back to a Manager
+        let targetUser = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
+        if (!targetUser) {
+            targetUser = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.MANAGER);
+        }
+
+        if (!targetUser) {
+            alert('Não foi possível encontrar um administrador ou gerente para esta organização.');
             return;
         }
+
         sessionStorage.setItem('impersonation', JSON.stringify({ 
             originalProfile: userProfile, 
             targetOrg,
-            impersonatedProfile: targetAdmin
+            impersonatedProfile: targetUser
         }));
         window.location.reload();
     };
@@ -778,7 +804,7 @@ const App: React.FC = () => {
                         setInitialClientIdForBudget(client.id);
                         setAddBudgetModalOpen(true);
                     }}
-                    onSaveNotes={handleSaveClientNotes}
+                    onUpdateClient={handleUpdateClientData}
                 />
             )}
             <ProfileModal

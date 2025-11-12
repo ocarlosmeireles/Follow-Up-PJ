@@ -26,8 +26,6 @@ const StageSettingsModal: React.FC<StageSettingsModalProps> = ({ isOpen, onClose
         const newStage: ProspectingStage = {
             id: crypto.randomUUID(),
             name: 'Nova Etapa',
-            // FIX: Add a placeholder organizationId to satisfy the ProspectingStage type.
-            // The correct ID will be set by the parent component upon saving.
             organizationId: stages.length > 0 ? stages[0].organizationId : '',
             order: localStages.length > 0 ? Math.max(...localStages.map(s => s.order)) + 1 : 0
         };

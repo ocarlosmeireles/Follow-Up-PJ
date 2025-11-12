@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Organization, UserData, Client, Budget } from '../types';
 import { BudgetStatus } from '../types';
-import { BriefcaseIcon, CurrencyDollarIcon, MagnifyingGlassIcon, UserGroupIcon } from './icons';
+import { BriefcaseIcon, CurrencyDollarIcon, MagnifyingGlassIcon, UserGroupIcon, ArrowRightStartOnRectangleIcon, CheckCircleIcon, XCircleIcon, TrashIcon } from './icons';
 
 interface SuperAdminViewProps {
   organizations: Organization[];
   users: UserData[];
   clients: Client[];
   budgets: Budget[];
+  onImpersonate: (org: Organization) => void;
+  onToggleStatus: (orgId: string, currentStatus: 'active' | 'suspended') => void;
+  onDelete: (orgId: string, orgName: string) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -33,32 +36,81 @@ const KPICard = ({ title, value, icon }: { title: string, value: string | number
     </div>
 );
 
-const OrganizationCard: React.FC<{ org: ExtendedOrg }> = ({ org }) => (
-    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        <h3 className="font-bold text-lg text-blue-600 dark:text-blue-400 truncate">{org.name}</h3>
-        <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">ID: {org.id}</p>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
-                <p className="font-semibold text-gray-700 dark:text-slate-200">{org.userCount}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Usuários</p>
-            </div>
-             <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
-                <p className="font-semibold text-gray-700 dark:text-slate-200">{org.clientCount}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Clientes</p>
-            </div>
-             <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
-                <p className="font-semibold text-gray-700 dark:text-slate-200">{org.budgetCount}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Orçamentos</p>
-            </div>
-             <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
-                <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(org.totalRevenue)}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Faturamento</p>
-            </div>
-        </div>
-    </div>
+const EllipsisVerticalIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+    </svg>
 );
 
-const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, clients, budgets }) => {
+const OrganizationCard: React.FC<{ 
+    org: ExtendedOrg;
+    onImpersonate: (org: Organization) => void;
+    onToggleStatus: (orgId: string, currentStatus: 'active' | 'suspended') => void;
+    onDelete: (orgId: string, orgName: string) => void;
+}> = ({ org, onImpersonate, onToggleStatus, onDelete }) => {
+    const [isMenuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const isSuspended = org.status === 'suspended';
+
+    return (
+        <div className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 relative ${isSuspended ? 'opacity-60' : ''}`}>
+            {isSuspended && <div className="absolute top-2 left-2 text-xs font-bold bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full">SUSPENSA</div>}
+            <div className="absolute top-2 right-2" ref={menuRef}>
+                <button onClick={() => setMenuOpen(prev => !prev)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
+                    <EllipsisVerticalIcon className="w-5 h-5"/>
+                </button>
+                {isMenuOpen && (
+                     <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden z-10">
+                         <button onClick={() => { onImpersonate(org); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700">
+                             <ArrowRightStartOnRectangleIcon className="w-4 h-4" /> Entrar como Admin
+                         </button>
+                         <button onClick={() => { onToggleStatus(org.id, org.status); setMenuOpen(false); }} className={`w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 ${isSuspended ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-500'}`}>
+                             {isSuspended ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+                             {isSuspended ? 'Reativar' : 'Suspender'}
+                         </button>
+                         <button onClick={() => { onDelete(org.id, org.name); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">
+                            <TrashIcon className="w-4 h-4" /> Excluir
+                         </button>
+                     </div>
+                )}
+            </div>
+
+            <h3 className="font-bold text-lg text-blue-600 dark:text-blue-400 truncate pr-8">{org.name}</h3>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">ID: {org.id}</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
+                    <p className="font-semibold text-gray-700 dark:text-slate-200">{org.userCount}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Usuários</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
+                    <p className="font-semibold text-gray-700 dark:text-slate-200">{org.clientCount}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Clientes</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
+                    <p className="font-semibold text-gray-700 dark:text-slate-200">{org.budgetCount}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Orçamentos</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
+                    <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(org.totalRevenue)}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Faturamento</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, clients, budgets, onImpersonate, onToggleStatus, onDelete }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const extendedOrgs = useMemo<ExtendedOrg[]>(() => {
@@ -90,9 +142,10 @@ const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, c
     }, [extendedOrgs, organizations, users]);
 
     const filteredOrgs = useMemo(() => {
-        if (!searchTerm) return extendedOrgs;
+        const sortedOrgs = [...extendedOrgs].sort((a, b) => (a.status === 'suspended' ? 1 : -1) - (b.status === 'suspended' ? 1 : -1) || a.name.localeCompare(b.name));
+        if (!searchTerm) return sortedOrgs;
         const lowerSearch = searchTerm.toLowerCase();
-        return extendedOrgs.filter(org => org.name.toLowerCase().includes(lowerSearch));
+        return sortedOrgs.filter(org => org.name.toLowerCase().includes(lowerSearch));
     }, [extendedOrgs, searchTerm]);
     
 
@@ -125,7 +178,7 @@ const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, c
 
                 {filteredOrgs.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredOrgs.map(org => <OrganizationCard key={org.id} org={org} />)}
+                        {filteredOrgs.map(org => <OrganizationCard key={org.id} org={org} onImpersonate={onImpersonate} onToggleStatus={onToggleStatus} onDelete={onDelete} />)}
                     </div>
                 ) : (
                     <div className="text-center py-16 text-gray-400 dark:text-slate-500">

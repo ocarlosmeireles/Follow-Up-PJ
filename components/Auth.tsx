@@ -87,7 +87,8 @@ const Auth: React.FC = () => {
 
                     // Create new organization
                     const orgRef = await addDoc(collection(db, "organizations"), {
-                        name: companyName
+                        name: companyName,
+                        status: 'active'
                     });
                     
                     // Create user profile as ADMIN of the new organization

@@ -26,6 +26,7 @@ import { auth, db } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
+import { ExclamationTriangleIcon } from './components/icons';
 
 export type ActiveView = 
     | 'dashboard' 
@@ -77,6 +78,10 @@ const App: React.FC = () => {
     const [allClients, setAllClients] = useState<Client[]>([]);
     const [allBudgets, setAllBudgets] = useState<Budget[]>([]);
 
+    // Impersonation state
+    const [originalUserProfile, setOriginalUserProfile] = useState<UserProfile | null>(null);
+    const [impersonatingOrg, setImpersonatingOrg] = useState<Organization | null>(null);
+
     // UI states
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
@@ -105,27 +110,60 @@ const App: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setLoadingMessage('Carregando perfil...');
+                
+                // Impersonation Check
+                const impersonationData = sessionStorage.getItem('impersonation');
+                if (impersonationData) {
+                    const { originalProfile, targetOrg } = JSON.parse(impersonationData);
+                    const targetAdmin = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
+                    
+                    if (targetAdmin) {
+                        setUser(currentUser); // Keep the auth user
+                        setUserProfile(targetAdmin);
+                        setOriginalUserProfile(originalProfile);
+                        setImpersonatingOrg(targetOrg);
+                        setLoading(false);
+                        return; // Skip normal flow
+                    } else {
+                        // Could not find admin to impersonate, clear session
+                        sessionStorage.removeItem('impersonation');
+                    }
+                }
+                
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
+
                 if (userDocSnap.exists()) {
                     const profile = userDocSnap.data() as UserProfile;
+                    
+                     if (profile.role !== UserRole.SUPER_ADMIN) {
+                        const orgDocRef = doc(db, 'organizations', profile.organizationId);
+                        const orgDocSnap = await getDoc(orgDocRef);
+                        if (!orgDocSnap.exists() || orgDocSnap.data().status === 'suspended') {
+                            alert('Sua organização está suspensa ou foi removida. Contate o suporte.');
+                            await signOut(auth);
+                            return;
+                        }
+                    }
+
                     setUser(currentUser);
                     setUserProfile(profile);
                     setActiveView(profile.role === UserRole.SUPER_ADMIN ? 'organizations' : 'dashboard');
                 } else {
                     console.error("User profile not found in Firestore.");
                     await signOut(auth);
-                    setUser(null);
-                    setUserProfile(null);
                 }
             } else {
                 setUser(null);
                 setUserProfile(null);
+                setOriginalUserProfile(null);
+                setImpersonatingOrg(null);
+                sessionStorage.removeItem('impersonation');
                 setLoading(false);
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [allUsers]); // Re-run when allUsers is populated for impersonation
 
     const fetchOrganizationData = useCallback(async () => {
         if (!user || !userProfile) return;
@@ -237,13 +275,13 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (userProfile) {
-            if (userProfile.role === UserRole.SUPER_ADMIN) {
+            if (userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg) {
                 fetchSuperAdminData();
             } else {
                 fetchOrganizationData();
             }
         }
-    }, [userProfile, fetchOrganizationData, fetchSuperAdminData]);
+    }, [userProfile, fetchOrganizationData, fetchSuperAdminData, impersonatingOrg]);
 
     useEffect(() => {
         if (userProfile?.role === UserRole.SUPER_ADMIN) {
@@ -294,11 +332,9 @@ const App: React.FC = () => {
     }, [clients]);
 
     const handleAddBudget = useCallback(async (
-        // FIX: Correctly type `budgetData` to not include properties that will be added later.
-        // This avoids a type mismatch that can lead to obscure errors.
-        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId' | 'organizationId'>,
-        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id'> },
-        contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId'> }
+        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
+        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
+        contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'> }
     ) => {
         if (!user || !userProfile) return;
         try {
@@ -324,7 +360,7 @@ const App: React.FC = () => {
                 finalContactId = newContactRef.id;
             }
             
-            if (!finalContactId) throw new Error("Contact ID is missing.");
+            if (!finalContactId) finalContactId = null;
             
             const newBudget: Omit<Budget, 'id'> = {
                 ...budgetData,
@@ -343,7 +379,7 @@ const App: React.FC = () => {
         }
     }, [user, userProfile, fetchOrganizationData]);
 
-    const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId'>) => {
+    const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId'>) => {
         if (!user || !userProfile) return;
         const firstStage = stages.find(s => s.order === 0);
         if (!firstStage) {
@@ -421,7 +457,7 @@ const App: React.FC = () => {
         await fetchOrganizationData();
     };
 
-    const handleAddClient = async (clientData: Omit<Client, 'id'>, contactData?: Omit<Contact, 'id' | 'clientId'>) => {
+    const handleAddClient = async (clientData: Omit<Client, 'id' | 'userId' | 'organizationId'>, contactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>) => {
         if (!user || !userProfile) return;
         const clientRef = await addDoc(collection(db, 'clients'), {
             ...clientData,
@@ -485,13 +521,66 @@ const App: React.FC = () => {
                 const client = clients.find(c => c.id === budget.clientId);
                 if (!client) return null;
                 const contact = contacts.find(c => c.id === budget.contactId);
-                if (!contact) return null;
-                return { budget, client, contact, followUps: budget.followUps };
+                // Contact can be optional
+                return { budget, client, contact: contact!, followUps: budget.followUps };
             })
-            .filter((item): item is ReportDataItem => item !== null);
+            .filter((item): item is ReportDataItem => item !== null && item.contact !== null);
 
         if (reportData.length > 0) {
             generateFollowUpReport('Relatório de Orçamentos Selecionados', reportData, userProfile);
+        }
+    };
+
+    // Super Admin Actions
+    const handleImpersonate = (targetOrg: Organization) => {
+        if (!userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
+        const targetAdmin = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
+        if (!targetAdmin) {
+            alert('Não foi possível encontrar um administrador para esta organização.');
+            return;
+        }
+        sessionStorage.setItem('impersonation', JSON.stringify({ originalProfile: userProfile, targetOrg }));
+        window.location.reload();
+    };
+    
+    const handleExitImpersonation = () => {
+        sessionStorage.removeItem('impersonation');
+        window.location.reload();
+    };
+
+    const handleToggleOrgStatus = async (orgId: string, currentStatus: 'active' | 'suspended') => {
+        const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+        if (window.confirm(`Tem certeza que deseja ${newStatus === 'active' ? 'reativar' : 'suspender'} esta organização?`)) {
+            await updateDoc(doc(db, 'organizations', orgId), { status: newStatus });
+            await fetchSuperAdminData();
+        }
+    };
+
+    const handleDeleteOrganization = async (orgId: string, orgName: string) => {
+        if (!window.confirm(`TEM CERTEZA?\n\nIsso excluirá permanentemente a organização "${orgName}" e TODOS os seus dados (usuários, clientes, orçamentos, etc.).\n\nEssa ação não pode ser desfeita.`)) return;
+
+        setLoading(true);
+        setLoadingMessage(`Excluindo ${orgName}...`);
+        try {
+            const collectionsToDelete = ['users', 'clients', 'budgets', 'contacts', 'prospects', 'prospectingStages', 'invites'];
+            const batch = writeBatch(db);
+
+            for (const coll of collectionsToDelete) {
+                const q = query(collection(db, coll), where('organizationId', '==', orgId));
+                const snapshot = await getDocs(q);
+                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            }
+
+            const orgRef = doc(db, 'organizations', orgId);
+            batch.delete(orgRef);
+
+            await batch.commit();
+            await fetchSuperAdminData();
+        } catch (error) {
+            console.error("Error deleting organization:", error);
+            alert("Falha ao excluir organização. Verifique o console para mais detalhes.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -531,6 +620,15 @@ const App: React.FC = () => {
             {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 md:hidden"></div>}
             <Sidebar activeView={activeView} setActiveView={setActiveView} isOpen={isSidebarOpen} userProfile={userProfile} />
             <div className="flex-1 flex flex-col h-screen">
+                 {impersonatingOrg && originalUserProfile && (
+                    <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
+                        <ExclamationTriangleIcon className="w-5 h-5" />
+                        Você está visualizando como {userProfile.name} da organização {impersonatingOrg.name}.
+                        <button onClick={handleExitImpersonation} className="ml-4 bg-black/20 hover:bg-black/40 text-white font-bold py-1 px-3 rounded-lg">
+                            Voltar ao Super Admin
+                        </button>
+                    </div>
+                )}
                 <Header 
                     onAddBudget={() => setAddBudgetModalOpen(true)} 
                     onAddProspect={() => setAddProspectModalOpen(true)}
@@ -544,8 +642,16 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                 />
                 <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-                    {userProfile.role === UserRole.SUPER_ADMIN ? (
-                        <SuperAdminView organizations={allOrganizations} users={allUsers} clients={allClients} budgets={allBudgets} />
+                    {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
+                        <SuperAdminView 
+                            organizations={allOrganizations} 
+                            users={allUsers} 
+                            clients={allClients} 
+                            budgets={allBudgets}
+                            onImpersonate={handleImpersonate}
+                            onToggleStatus={handleToggleOrgStatus}
+                            onDelete={handleDeleteOrganization}
+                        />
                     ) : (
                         <>
                             {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
@@ -557,7 +663,7 @@ const App: React.FC = () => {
                             {activeView === 'map' && <MapView clients={clients} />}
                             {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
                             {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
-                            {activeView === 'users' && userProfile.role === UserRole.ADMIN && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
+                            {(activeView === 'users' && (userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER)) && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
                         </>
                     )}
                 </main>
@@ -578,13 +684,13 @@ const App: React.FC = () => {
                 } : null}
                 initialClientId={initialClientIdForBudget}
             />
-            {isBudgetDetailModalOpen && selectedBudget && selectedBudgetClient && selectedBudgetContact && (
+            {isBudgetDetailModalOpen && selectedBudget && selectedBudgetClient && (
                 <BudgetDetailModal 
                     isOpen={isBudgetDetailModalOpen} 
                     onClose={() => setBudgetDetailModalOpen(false)}
                     budget={selectedBudget}
                     client={selectedBudgetClient}
-                    contact={selectedBudgetContact}
+                    contact={selectedBudgetContact!}
                     onAddFollowUp={handleAddFollowUp}
                     onChangeStatus={handleChangeStatus}
                 />
@@ -626,7 +732,7 @@ const App: React.FC = () => {
                     setAddClientModalOpen(false);
                 }}
             />
-             {userProfile.role === UserRole.ADMIN && (
+             {(userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER) && (
                 <AddUserModal
                     isOpen={isAddUserModalOpen}
                     onClose={() => setAddUserModalOpen(false)}

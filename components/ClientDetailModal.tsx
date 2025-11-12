@@ -62,8 +62,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
         acc[budget.status] = (acc[budget.status] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
-    // FIX: Explicitly convert values to numbers to satisfy TypeScript's type checker,
-    // which may infer `Object.values` on a Record as `unknown[]`.
     const maxStatusCount = Math.max(0, ...Object.values(statusCounts).map(Number));
 
     const monthlyPerformance = wonBudgets.reduce((acc, b) => {

@@ -16,6 +16,7 @@ export enum UserRole {
 export interface Organization {
   id: string;
   name: string;
+  status: 'active' | 'suspended';
 }
 
 export interface Invite {

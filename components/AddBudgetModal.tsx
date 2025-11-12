@@ -6,10 +6,9 @@ interface AddBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-      // FIX: The type for budgetData now correctly omits properties that are added by the parent component, matching the expected signature from App.tsx.
-      budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId' | 'organizationId'>,
-      clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id'> },
-      contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId'> }
+      budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
+      clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
+      contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'> }
   ) => void;
   clients: Client[];
   contacts: Contact[];
@@ -47,7 +46,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
     const isNewClient = !selectedClientId && clientSearch.length > 0;
 
     // Contact fields
-    const [selectedContactId, setSelectedContactId] = useState('');
+    const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
     const [showNewContactForm, setShowNewContactForm] = useState(false);
     const [newContactName, setNewContactName] = useState('');
     const [newContactEmail, setNewContactEmail] = useState('');
@@ -64,13 +63,16 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
     const resetForm = useCallback(() => {
         setTitle(''); setValue(''); setDateSent(today); setObservations('');
         setClientSearch(''); setSelectedClientId(''); setNewClientAddress(''); setNewClientCnpj('');
-        setSelectedContactId(''); setShowNewContactForm(false);
+        setSelectedContactId(null); setShowNewContactForm(false);
         setNewContactName(''); setNewContactEmail(''); setNewContactPhone('');
         setIsFetchingCnpj(false); setCnpjError(null); setCompanyIsFromApi(false);
     }, []);
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            resetForm();
+            return;
+        }
 
         if (initialClientId) {
             const client = clients.find(c => c.id === initialClientId);
@@ -95,7 +97,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
                 setNewContactPhone(prospectData.contactInfo);
             }
         }
-    }, [isOpen, initialClientId, prospectData, clients]);
+    }, [isOpen, initialClientId, prospectData, clients, resetForm]);
     
     // Effect for CNPJ fetching
     useEffect(() => {
@@ -179,11 +181,10 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
         };
 
         onSave(budgetData, clientInfo, contactInfo);
-        resetForm();
+        onClose();
     };
     
     const handleClose = () => {
-        resetForm();
         onClose();
     };
 
@@ -197,7 +198,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
         setClientSearch(e.target.value);
         if (selectedClientId) {
             setSelectedClientId('');
-            setSelectedContactId('');
+            setSelectedContactId(null);
             setShowNewContactForm(false);
         }
         if(companyIsFromApi) {
@@ -207,7 +208,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
 
     const handleContactSelectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         if (e.target.value === 'new') {
-            setSelectedContactId('');
+            setSelectedContactId(null);
             setShowNewContactForm(true);
         } else {
             setSelectedContactId(e.target.value);

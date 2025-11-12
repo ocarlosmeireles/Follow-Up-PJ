@@ -10,7 +10,6 @@ interface UsersViewProps {
 }
 
 const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
-    // FIX: Added SUPER_ADMIN to the roleColors map to satisfy the Record<UserRole, string> type.
     const roleColors: Record<UserRole, string> = {
         [UserRole.ADMIN]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
         [UserRole.MANAGER]: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
@@ -66,7 +65,7 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
                                         onChange={(e) => onUpdateRole(user.id, e.target.value as UserRole)}
                                         className="w-full bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
-                                        {Object.values(UserRole).map(role => (
+                                        {Object.values(UserRole).filter(r => r !== UserRole.SUPER_ADMIN).map(role => (
                                             <option key={role} value={role}>{role}</option>
                                         ))}
                                     </select>

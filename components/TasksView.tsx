@@ -41,8 +41,6 @@ const formatDate = (dateString: string | null) => {
     }
 };
 
-// FIX: Correctly type the `icon` prop to specify that it accepts a `className`.
-// This resolves the TypeScript error when using `React.cloneElement` to add classes.
 const MetricCard = ({ title, value, icon, colorClass = 'text-blue-500' }: { title: string, value: string | number, icon: React.ReactElement<{ className?: string }>, colorClass?: string }) => (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-lg flex items-center gap-4 border border-gray-200 dark:border-slate-700 shadow-sm">
         <div className={`bg-opacity-10 dark:bg-opacity-20 p-3 rounded-full ${colorClass.replace('text-', 'bg-')}`}>
@@ -90,12 +88,12 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, onSelectBudget 
         const upcoming: Budget[] = [];
 
         activeBudgets.forEach(budget => {
-            const [year, month, day] = budget.nextFollowUpDate!.split('-').map(Number);
-            const followUpDate = new Date(year, month - 1, day);
-            
-            if (followUpDate.getTime() < today.getTime()) {
+            const followUpDate = new Date(budget.nextFollowUpDate!);
+            const followUpDateOnly = new Date(followUpDate.getUTCFullYear(), followUpDate.getUTCMonth(), followUpDate.getUTCDate());
+
+            if (followUpDateOnly.getTime() < today.getTime()) {
                 overdue.push(budget);
-            } else if (followUpDate.getTime() === today.getTime()) {
+            } else if (followUpDateOnly.getTime() === today.getTime()) {
                 todayTasks.push(budget);
             } else {
                 upcoming.push(budget);

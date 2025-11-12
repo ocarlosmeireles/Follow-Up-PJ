@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon } from './icons';
+import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon } from './icons';
 import type { Theme } from '../App';
 import type { Notification, UserProfile } from '../types';
 
@@ -13,6 +13,7 @@ interface HeaderProps {
   onNotificationClick: (budgetId: string) => void;
   userProfile: UserProfile;
   onEditProfile: () => void;
+  onLogout: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -24,7 +25,8 @@ const Header: React.FC<HeaderProps> = ({
     notifications,
     onNotificationClick,
     userProfile,
-    onEditProfile
+    onEditProfile,
+    onLogout
 }) => {
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
@@ -144,6 +146,13 @@ const Header: React.FC<HeaderProps> = ({
                           >
                             <Cog6ToothIcon className="w-5 h-5"/>
                             Editar Perfil
+                          </button>
+                          <button 
+                            onClick={() => { onLogout(); setUserMenuOpen(false); }} 
+                            className="w-full text-left text-sm flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                          >
+                            <ArrowRightStartOnRectangleIcon className="w-5 h-5"/>
+                            Sair
                           </button>
                        </div>
                     </div>

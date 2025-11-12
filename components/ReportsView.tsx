@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import type { Budget, Client } from '../types';
+import type { Budget, Client, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
 import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon } from './icons';
 
 interface ReportsViewProps {
   budgets: Budget[];
   clients: Client[];
+  userProfile: UserProfile;
 }
 
 const formatCurrency = (value: number) => {
@@ -27,7 +28,7 @@ const MetricCard = ({ title, value, icon }: { title: string, value: string | num
     </div>
 );
 
-const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile }) => {
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
     
     const metrics = useMemo(() => {
@@ -121,7 +122,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients }) => {
     }, [budgets, clientMap]);
 
     const handleExport = () => {
-        const user = { name: "Ana P.", id: "12345" };
         const date = new Date().toLocaleString('pt-BR');
 
         const reportHtml = `
@@ -150,7 +150,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients }) => {
             <body>
                 <div class="header">
                     <h1>Relatório de Vendas</h1>
-                    <p>Exportado por: <strong>${user.name}</strong> (Matrícula: ${user.id})</p>
+                    <p>Exportado por: <strong>${userProfile.name}</strong> (Matrícula: ${userProfile.matricula})</p>
+                    <p>E-mail: ${userProfile.email}</p>
                     <p>Data: ${date}</p>
                 </div>
 

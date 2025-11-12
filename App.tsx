@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile } from './types';
 import { BudgetStatus } from './types';
@@ -19,7 +20,8 @@ import AddProspectModal from './components/AddProspectModal';
 import ClientDetailModal from './components/ClientDetailModal';
 import ProfileModal from './components/ProfileModal';
 import AddClientModal from './components/AddClientModal';
-import { db } from './lib/firebase';
+import { auth, db } from './lib/firebase';
+import Auth from './components/Auth';
 
 
 export type ActiveView = 
@@ -35,7 +37,19 @@ export type ActiveView =
 
 export type Theme = 'light' | 'dark';
 
-const App: React.FC = () => {
+const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
+     <div className="h-screen w-screen flex justify-center items-center bg-slate-100 dark:bg-slate-900">
+        <div className="text-center">
+            <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-slate-300">{message}</p>
+        </div>
+    </div>
+);
+
+const MainLayout: React.FC<{ user: User }> = ({ user }) => {
     const [clients, setClients] = useState<Client[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -98,7 +112,7 @@ const App: React.FC = () => {
                     getDocs(collection(db, 'budgets')),
                     getDocs(collection(db, 'prospects')),
                     getDocs(collection(db, 'prospecting_stages')),
-                    getDoc(doc(db, "user_profile", "main_profile")),
+                    getDoc(doc(db, "users", user.uid)),
                 ]);
 
                 const clientsData = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Client[];
@@ -107,15 +121,16 @@ const App: React.FC = () => {
                 const prospectsData = prospectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Prospect[];
                 const stagesData = stagesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as ProspectingStage[];
                 
-                let profileData: UserProfile | null = null;
+                let profileData: UserProfile;
                 if (profileDoc.exists()) {
                     profileData = profileDoc.data() as UserProfile;
                 } else {
-                    console.warn("User profile not found in Firestore. Creating a default one.");
-                    // Create a default profile if it doesn't exist
-                    const defaultProfile: UserProfile = { name: 'Usuário', matricula: '00000', email: 'user@example.com' };
-                    await setDoc(doc(db, "user_profile", "main_profile"), defaultProfile);
-                    profileData = defaultProfile;
+                    console.warn(`Profile for user ${user.uid} not found. Using defaults from auth object.`);
+                    profileData = {
+                        name: user.displayName || 'Novo Usuário',
+                        matricula: 'N/A',
+                        email: user.email || 'n/a'
+                    };
                 }
 
                 setClients(clientsData);
@@ -134,7 +149,7 @@ const App: React.FC = () => {
         };
 
         fetchData();
-    }, []);
+    }, [user]);
 
 
     useEffect(() => {
@@ -368,8 +383,7 @@ const App: React.FC = () => {
 
     const handleUpdateProfile = async (newProfile: UserProfile) => {
         try {
-            const profileRef = doc(db, 'user_profile', 'main_profile');
-            // Explicitly create a plain object to prevent passing any non-serializable data to Firestore.
+            const profileRef = doc(db, 'users', user.uid);
             const dataToUpdate = {
                 name: newProfile.name,
                 matricula: newProfile.matricula,
@@ -383,6 +397,16 @@ const App: React.FC = () => {
             alert("Falha ao atualizar perfil.");
         }
     };
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Error signing out: ", error);
+            alert("Falha ao sair. Tente novamente.");
+        }
+    };
+
 
     const handleAddClient = useCallback(async (
         clientData: Omit<Client, 'id'>,
@@ -434,17 +458,7 @@ const App: React.FC = () => {
     };
 
     if (isLoading || !userProfile) {
-        return (
-            <div className="h-screen w-screen flex justify-center items-center bg-slate-100 dark:bg-slate-900">
-                <div className="text-center">
-                    <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-slate-300">Carregando dados...</p>
-                </div>
-            </div>
-        );
+        return <FullScreenLoader message="Carregando dados..." />;
     }
 
     const renderActiveView = () => {
@@ -462,7 +476,7 @@ const App: React.FC = () => {
             case 'clients':
                 return <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={setSelectedClientForDetail} onAddClientClick={() => setAddClientModalOpen(true)} />;
             case 'reports':
-                return <ReportsView budgets={budgets} clients={clients} />;
+                return <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} />;
             case 'calendar':
                 return <CalendarView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
             case 'map':
@@ -492,6 +506,7 @@ const App: React.FC = () => {
                     onNotificationClick={(budgetId) => setSelectedBudgetId(budgetId)}
                     userProfile={userProfile}
                     onEditProfile={() => setProfileModalOpen(true)}
+                    onLogout={handleLogout}
                 />
                 <main className="p-4 md:p-8 flex-grow bg-slate-100 dark:bg-slate-900 overflow-y-auto">
                     {renderActiveView()}
@@ -550,5 +565,29 @@ const App: React.FC = () => {
         </div>
     );
 };
+
+const App: React.FC = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setIsLoading(false);
+        });
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+    }, []);
+
+    if (isLoading) {
+        return <FullScreenLoader message="Verificando autenticação..." />;
+    }
+
+    if (!user) {
+        return <Auth />;
+    }
+
+    return <MainLayout user={user} />;
+}
 
 export default App;

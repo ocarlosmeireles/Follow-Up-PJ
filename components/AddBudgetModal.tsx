@@ -6,7 +6,8 @@ interface AddBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-      budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId'>,
+      // FIX: The type for budgetData now correctly omits properties that are added by the parent component, matching the expected signature from App.tsx.
+      budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId' | 'organizationId'>,
       clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id'> },
       contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId'> }
   ) => void;

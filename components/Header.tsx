@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon } from './icons';
 import type { Theme } from '../App';
 import type { Notification, UserProfile } from '../types';
+import { UserRole } from '../types';
 
 interface HeaderProps {
   onAddBudget: () => void;
@@ -68,21 +69,25 @@ const Header: React.FC<HeaderProps> = ({
 
       <div className="flex justify-end items-center gap-2 sm:gap-4">
         {/* Action Buttons */}
-        <button
-          onClick={onAddProspect}
-          className="bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center transition-colors duration-200 shadow-sm text-sm"
-        >
-          <span className="hidden sm:inline">Novo Prospect</span>
-          <span className="sm:hidden">Prospect</span>
-        </button>
-        <button
-          onClick={onAddBudget}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm"
-        >
-          <PlusIcon className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Novo Orçamento</span>
-          <span className="sm:hidden">Novo</span>
-        </button>
+        {userProfile.role !== UserRole.SUPER_ADMIN && (
+          <>
+            <button
+              onClick={onAddProspect}
+              className="bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center transition-colors duration-200 shadow-sm text-sm"
+            >
+              <span className="hidden sm:inline">Novo Prospect</span>
+              <span className="sm:hidden">Prospect</span>
+            </button>
+            <button
+              onClick={onAddBudget}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Novo Orçamento</span>
+              <span className="sm:hidden">Novo</span>
+            </button>
+          </>
+        )}
         
         <div className="flex items-center gap-1 border-l border-gray-200 dark:border-slate-700 pl-2 sm:pl-4">
             {/* Theme Toggle */}

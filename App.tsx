@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -14,6 +14,7 @@ import MapView from './components/MapView';
 import ClientsView from './components/ClientsView';
 import ReportsView from './components/ReportsView';
 import UsersView from './components/UsersView';
+import SuperAdminView from './components/SuperAdminView';
 import AddBudgetModal from './components/AddBudgetModal';
 import BudgetDetailModal from './components/BudgetDetailModal';
 import BudgetingView from './components/BudgetingView';
@@ -36,7 +37,8 @@ export type ActiveView =
     | 'reports' 
     | 'calendar' 
     | 'map'
-    | 'users';
+    | 'users'
+    | 'organizations';
 
 export type Theme = 'light' | 'dark';
 
@@ -61,7 +63,7 @@ const App: React.FC = () => {
     const [loadingMessage, setLoadingMessage] = useState('Autenticando...');
     const [activeView, setActiveView] = useState<ActiveView>('dashboard');
     
-    // Data states
+    // Data states for regular users
     const [budgets, setBudgets] = useState<Budget[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -69,6 +71,12 @@ const App: React.FC = () => {
     const [stages, setStages] = useState<ProspectingStage[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);
     
+    // Data states for super admin
+    const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
+    const [allUsers, setAllUsers] = useState<UserData[]>([]);
+    const [allClients, setAllClients] = useState<Client[]>([]);
+    const [allBudgets, setAllBudgets] = useState<Budget[]>([]);
+
     // UI states
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
@@ -100,8 +108,10 @@ const App: React.FC = () => {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
+                    const profile = userDocSnap.data() as UserProfile;
                     setUser(currentUser);
-                    setUserProfile(userDocSnap.data() as UserProfile);
+                    setUserProfile(profile);
+                    setActiveView(profile.role === UserRole.SUPER_ADMIN ? 'organizations' : 'dashboard');
                 } else {
                     console.error("User profile not found in Firestore.");
                     await signOut(auth);
@@ -117,7 +127,7 @@ const App: React.FC = () => {
         return () => unsubscribe();
     }, []);
 
-    const fetchData = useCallback(async () => {
+    const fetchOrganizationData = useCallback(async () => {
         if (!user || !userProfile) return;
         setLoading(true);
         setLoadingMessage('Carregando dados da organização...');
@@ -195,13 +205,52 @@ const App: React.FC = () => {
         }
     }, [user, userProfile]);
 
-    useEffect(() => {
-        if (userProfile) {
-            fetchData();
+    const fetchSuperAdminData = useCallback(async () => {
+        if (!user || !userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
+        setLoading(true);
+        setLoadingMessage('Carregando dados da plataforma...');
+    
+        try {
+            const [
+                orgsSnapshot,
+                usersSnapshot,
+                clientsSnapshot,
+                budgetsSnapshot
+            ] = await Promise.all([
+                getDocs(collection(db, 'organizations')),
+                getDocs(collection(db, 'users')),
+                getDocs(collection(db, 'clients')),
+                getDocs(collection(db, 'budgets'))
+            ]);
+    
+            setAllOrganizations(orgsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Organization)));
+            setAllUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData)));
+            setAllClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
+            setAllBudgets(budgetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget)));
+    
+        } catch (error) {
+            console.error("Error fetching super admin data: ", error);
+        } finally {
+            setLoading(false);
         }
-    }, [userProfile, fetchData]);
+    }, [user, userProfile]);
 
     useEffect(() => {
+        if (userProfile) {
+            if (userProfile.role === UserRole.SUPER_ADMIN) {
+                fetchSuperAdminData();
+            } else {
+                fetchOrganizationData();
+            }
+        }
+    }, [userProfile, fetchOrganizationData, fetchSuperAdminData]);
+
+    useEffect(() => {
+        if (userProfile?.role === UserRole.SUPER_ADMIN) {
+            setNotifications([]);
+            return;
+        }
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -219,11 +268,12 @@ const App: React.FC = () => {
             }
         });
         setNotifications(newNotifications);
-    }, [budgets, clients]);
+    }, [budgets, clients, userProfile]);
 
     const handleLogout = async () => {
         await signOut(auth);
         setBudgets([]); setClients([]); setContacts([]); setProspects([]); setStages([]); setUsers([]);
+        setAllOrganizations([]); setAllUsers([]); setAllClients([]); setAllBudgets([]);
         setActiveView('dashboard');
     };
 
@@ -286,12 +336,12 @@ const App: React.FC = () => {
                 followUps: []
             };
             await addDoc(collection(db, 'budgets'), newBudget);
-            await fetchData();
+            await fetchOrganizationData();
             setAddBudgetModalOpen(false);
         } catch (error) {
             console.error("Error adding budget:", error);
         }
-    }, [user, userProfile, fetchData]);
+    }, [user, userProfile, fetchOrganizationData]);
 
     const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId'>) => {
         if (!user || !userProfile) return;
@@ -306,13 +356,13 @@ const App: React.FC = () => {
             organizationId: userProfile.organizationId,
             stageId: firstStage.id 
         });
-        await fetchData();
+        await fetchOrganizationData();
     };
 
     const handleUpdateProspectStage = async (prospectId: string, newStageId: string) => {
         const prospectRef = doc(db, 'prospects', prospectId);
         await updateDoc(prospectRef, { stageId: newStageId });
-        await fetchData();
+        await fetchOrganizationData();
     };
     
     const handleUpdateStages = async (updatedStages: ProspectingStage[]) => {
@@ -335,7 +385,7 @@ const App: React.FC = () => {
         });
 
         await batch.commit();
-        await fetchData();
+        await fetchOrganizationData();
     };
 
     const handleConvertProspect = async (prospectId: string) => {
@@ -345,7 +395,7 @@ const App: React.FC = () => {
             setAddBudgetModalOpen(true);
             const prospectRef = doc(db, 'prospects', prospectId);
             await deleteDoc(prospectRef);
-            await fetchData();
+            await fetchOrganizationData();
         }
     };
     
@@ -361,14 +411,14 @@ const App: React.FC = () => {
                 status: BudgetStatus.FOLLOWING_UP,
                 nextFollowUpDate: nextFollowUpDate
             });
-            await fetchData();
+            await fetchOrganizationData();
         }
     };
 
     const handleChangeStatus = async (budgetId: string, status: BudgetStatus) => {
         const budgetRef = doc(db, 'budgets', budgetId);
         await updateDoc(budgetRef, { status });
-        await fetchData();
+        await fetchOrganizationData();
     };
 
     const handleAddClient = async (clientData: Omit<Client, 'id'>, contactData?: Omit<Contact, 'id' | 'clientId'>) => {
@@ -385,7 +435,7 @@ const App: React.FC = () => {
                 organizationId: userProfile.organizationId
             });
         }
-        await fetchData();
+        await fetchOrganizationData();
     };
     
     const handleUpdateUserProfile = async (profileUpdate: Partial<UserProfile>) => {
@@ -398,7 +448,7 @@ const App: React.FC = () => {
     const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
         const userRef = doc(db, "users", userId);
         await updateDoc(userRef, { role: newRole });
-        await fetchData();
+        await fetchOrganizationData();
     };
 
     const handleInviteUser = async (email: string, role: UserRole) => {
@@ -494,16 +544,22 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                 />
                 <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-                    {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                    {activeView === 'tasks' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                    {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
-                    {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
-                    {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
-                    {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                    {activeView === 'map' && <MapView clients={clients} />}
-                    {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
-                    {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
-                    {activeView === 'users' && userProfile.role === UserRole.ADMIN && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
+                    {userProfile.role === UserRole.SUPER_ADMIN ? (
+                        <SuperAdminView organizations={allOrganizations} users={allUsers} clients={allClients} budgets={allBudgets} />
+                    ) : (
+                        <>
+                            {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                            {activeView === 'tasks' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                            {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
+                            {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
+                            {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
+                            {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                            {activeView === 'map' && <MapView clients={clients} />}
+                            {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
+                            {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
+                            {activeView === 'users' && userProfile.role === UserRole.ADMIN && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
+                        </>
+                    )}
                 </main>
             </div>
             

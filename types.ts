@@ -10,6 +10,7 @@ export enum UserRole {
   ADMIN = 'Admin',
   MANAGER = 'Manager',
   SALESPERSON = 'Salesperson',
+  SUPER_ADMIN = 'Super Admin',
 }
 
 export interface Organization {

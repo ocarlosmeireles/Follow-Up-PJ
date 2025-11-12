@@ -13,6 +13,7 @@ import {
     CurrencyDollarIcon,
     UserIcon,
     UserGroupIcon as UsersIcon,
+    Cog6ToothIcon
 } from './icons';
 
 interface SidebarProps {
@@ -59,78 +60,93 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
             </div>
 
             <nav className="flex-grow overflow-y-auto custom-scrollbar">
-                 <NavLink 
-                    label="Painel"
-                    icon={<DashboardIcon className="w-6 h-6" />}
-                    isActive={activeView === 'dashboard'}
-                    onClick={() => setActiveView('dashboard')}
-                />
-
-                <NavSection title="Vendas">
-                    <NavLink 
-                        label="Prospecção"
-                        icon={<FunnelIcon className="w-6 h-6" />}
-                        isActive={activeView === 'prospecting'}
-                        onClick={() => setActiveView('prospecting')}
-                    />
-                    <NavLink 
-                        label="Orçamentos"
-                        icon={<BriefcaseIcon className="w-6 h-6" />}
-                        isActive={activeView === 'budgeting'}
-                        onClick={() => setActiveView('budgeting')}
-                    />
-                     <NavLink 
-                        label="Negócios"
-                        icon={<CurrencyDollarIcon className="w-6 h-6" />}
-                        isActive={activeView === 'deals'}
-                        onClick={() => setActiveView('deals')}
-                    />
-                    <NavLink 
-                        label="Clientes"
-                        icon={<UserIcon className="w-6 h-6" />}
-                        isActive={activeView === 'clients'}
-                        onClick={() => setActiveView('clients')}
-                    />
-                </NavSection>
-
-                <NavSection title="Organização">
-                     <NavLink 
-                        label="Tarefas"
-                        icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
-                        isActive={activeView === 'tasks'}
-                        onClick={() => setActiveView('tasks')}
-                    />
-                     <NavLink 
-                        label="Calendário"
-                        icon={<CalendarDaysIcon className="w-6 h-6" />}
-                        isActive={activeView === 'calendar'}
-                        onClick={() => setActiveView('calendar')}
-                    />
-                </NavSection>
-                 <NavSection title="Análise">
-                     <NavLink 
-                        label="Relatórios"
-                        icon={<ChartBarIcon className="w-6 h-6" />}
-                        isActive={activeView === 'reports'}
-                        onClick={() => setActiveView('reports')}
-                    />
-                     <NavLink 
-                        label="Mapa"
-                        icon={<MapPinIcon className="w-6 h-6" />}
-                        isActive={activeView === 'map'}
-                        onClick={() => setActiveView('map')}
-                    />
-                </NavSection>
-
-                {userProfile?.role === UserRole.ADMIN && (
-                    <NavSection title="Admin">
+                {userProfile?.role === UserRole.SUPER_ADMIN ? (
+                    <>
+                        <NavSection title="Super Admin">
+                             <NavLink 
+                                label="Organizações"
+                                icon={<Cog6ToothIcon className="w-6 h-6" />}
+                                isActive={activeView === 'organizations'}
+                                onClick={() => setActiveView('organizations')}
+                            />
+                        </NavSection>
+                    </>
+                ) : (
+                    <>
                         <NavLink 
-                            label="Gerenciar Usuários"
-                            icon={<UsersIcon className="w-6 h-6" />}
-                            isActive={activeView === 'users'}
-                            onClick={() => setActiveView('users')}
+                            label="Painel"
+                            icon={<DashboardIcon className="w-6 h-6" />}
+                            isActive={activeView === 'dashboard'}
+                            onClick={() => setActiveView('dashboard')}
                         />
-                    </NavSection>
+
+                        <NavSection title="Vendas">
+                            <NavLink 
+                                label="Prospecção"
+                                icon={<FunnelIcon className="w-6 h-6" />}
+                                isActive={activeView === 'prospecting'}
+                                onClick={() => setActiveView('prospecting')}
+                            />
+                            <NavLink 
+                                label="Orçamentos"
+                                icon={<BriefcaseIcon className="w-6 h-6" />}
+                                isActive={activeView === 'budgeting'}
+                                onClick={() => setActiveView('budgeting')}
+                            />
+                             <NavLink 
+                                label="Negócios"
+                                icon={<CurrencyDollarIcon className="w-6 h-6" />}
+                                isActive={activeView === 'deals'}
+                                onClick={() => setActiveView('deals')}
+                            />
+                            <NavLink 
+                                label="Clientes"
+                                icon={<UserIcon className="w-6 h-6" />}
+                                isActive={activeView === 'clients'}
+                                onClick={() => setActiveView('clients')}
+                            />
+                        </NavSection>
+
+                        <NavSection title="Organização">
+                             <NavLink 
+                                label="Tarefas"
+                                icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
+                                isActive={activeView === 'tasks'}
+                                onClick={() => setActiveView('tasks')}
+                            />
+                             <NavLink 
+                                label="Calendário"
+                                icon={<CalendarDaysIcon className="w-6 h-6" />}
+                                isActive={activeView === 'calendar'}
+                                onClick={() => setActiveView('calendar')}
+                            />
+                        </NavSection>
+                         <NavSection title="Análise">
+                             <NavLink 
+                                label="Relatórios"
+                                icon={<ChartBarIcon className="w-6 h-6" />}
+                                isActive={activeView === 'reports'}
+                                onClick={() => setActiveView('reports')}
+                            />
+                             <NavLink 
+                                label="Mapa"
+                                icon={<MapPinIcon className="w-6 h-6" />}
+                                isActive={activeView === 'map'}
+                                onClick={() => setActiveView('map')}
+                            />
+                        </NavSection>
+
+                        {userProfile?.role === UserRole.ADMIN && (
+                            <NavSection title="Admin">
+                                <NavLink 
+                                    label="Gerenciar Usuários"
+                                    icon={<UsersIcon className="w-6 h-6" />}
+                                    isActive={activeView === 'users'}
+                                    onClick={() => setActiveView('users')}
+                                />
+                            </NavSection>
+                        )}
+                    </>
                 )}
             </nav>
 

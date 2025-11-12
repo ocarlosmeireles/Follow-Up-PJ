@@ -10,10 +10,12 @@ interface UsersViewProps {
 }
 
 const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
+    // FIX: Added SUPER_ADMIN to the roleColors map to satisfy the Record<UserRole, string> type.
     const roleColors: Record<UserRole, string> = {
         [UserRole.ADMIN]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
         [UserRole.MANAGER]: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
         [UserRole.SALESPERSON]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+        [UserRole.SUPER_ADMIN]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
     };
     return (
         <span className={`px-3 py-1 text-xs font-bold rounded-full ${roleColors[role]}`}>

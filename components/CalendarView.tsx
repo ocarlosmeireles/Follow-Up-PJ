@@ -9,7 +9,11 @@ interface CalendarViewProps {
 }
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
 };
 
 const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, onSelectBudget }) => {

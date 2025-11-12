@@ -10,7 +10,11 @@ interface DealsViewProps {
 }
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
 };
 
 const BudgetCard: React.FC<{ budget: Budget; clientName: string; onSelect: (id: string) => void; }> = ({ budget, clientName, onSelect }) => {

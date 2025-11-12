@@ -439,13 +439,12 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
-            // FIX: Explicitly construct the newFollowUp object with the FollowUp type to ensure type safety.
             const newFollowUp: FollowUp = { 
                 id: crypto.randomUUID(),
-// Fix: Cast properties to string to satisfy type checker, which may be incorrectly inferring 'unknown'.
-                date: followUp.date as string,
-// Fix: Cast properties to string to satisfy type checker, which may be incorrectly inferring 'unknown'.
-                notes: followUp.notes as string,
+// Fix: The function signature correctly types `followUp.date` as string, so no cast is necessary.
+                date: followUp.date,
+// Fix: The function signature correctly types `followUp.notes` as string, so no cast is necessary.
+                notes: followUp.notes,
             };
             if (followUp.audioUrl) {
                 newFollowUp.audioUrl = followUp.audioUrl;

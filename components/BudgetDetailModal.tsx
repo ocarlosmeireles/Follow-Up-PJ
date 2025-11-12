@@ -41,7 +41,11 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
 };
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
 };
 
 const cleanPhoneNumber = (phone: string) => {

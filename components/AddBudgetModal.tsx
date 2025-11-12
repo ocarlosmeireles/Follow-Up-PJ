@@ -28,6 +28,13 @@ const maskCnpj = (value: string) => {
         .substring(0, 18); // Limit to CNPJ format length (18 characters)
 };
 
+const unmaskCurrency = (maskedValue: string): number => {
+    if (!maskedValue) return 0;
+    // Removes thousand separators, replaces decimal comma with a dot
+    const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
+    return parseFloat(numericString);
+};
+
 
 const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave, clients, contacts, prospectData, initialClientId }) => {
     // Budget fields
@@ -162,7 +169,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
     }, [clientSearch, clients, selectedClientId, companyIsFromApi]);
 
     const handleSave = () => {
-        const budgetValue = parseFloat(value);
+        const budgetValue = unmaskCurrency(value);
         if (!title || isNaN(budgetValue) || budgetValue <= 0) return alert('Por favor, preencha o título e um valor válido.');
         if (!selectedClientId && !isNewClient) return alert('Selecione ou cadastre um cliente.');
         if (isNewClient && !clientSearch) return alert('Digite o nome do novo cliente.');
@@ -242,8 +249,14 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Valor (R$)</label>
-                            <input type="number" value={value} onChange={e => setValue(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Valor</label>
+                            <input 
+                               type="text"
+                               inputMode="decimal"
+                               value={value} 
+                               onChange={e => setValue(e.target.value)}
+                               placeholder="1.234,56"
+                               className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Data de Envio</label>

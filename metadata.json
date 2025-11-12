@@ -1,0 +1,7 @@
+{
+  "name": "Sistema de Follow-up de Orçamentos",
+  "description": "Uma aplicação para cadastrar clientes, gerenciar orçamentos e realizar follow-ups para converter orçamentos em pedidos.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

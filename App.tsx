@@ -464,8 +464,8 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
-            // FIX: The crypto.randomUUID() function can have an 'unknown' type in some environments, causing assignment errors.
-            // This replaces it with a compatible method to generate a unique string ID. It also corrects the 'date' property which was incorrectly assigned a UUID.
+            // FIX: Replaced potentially untyped crypto.randomUUID() with a safe method for generating unique IDs to prevent type errors.
+            // Also ensured `date` is assigned correctly from the followUp object.
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 date: followUp.date,
@@ -600,7 +600,7 @@ const App: React.FC = () => {
             .filter((item): item is ReportDataItem => item !== null && item.contact !== null);
 
         if (reportData.length > 0) {
-            generateFollowUpReport('Relatório de Orçamentos Selecionados', reportData, userProfile, organization);
+            generateFollowUpReport('Relatório de Follow-Ups', reportData, userProfile, organization);
         }
     };
 

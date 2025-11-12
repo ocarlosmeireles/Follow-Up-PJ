@@ -1,5 +1,7 @@
 import React from 'react';
 import type { ActiveView } from '../App';
+import type { UserProfile } from '../types';
+import { UserRole } from '../types';
 import { 
     ChartPieIcon as DashboardIcon, 
     BriefcaseIcon, 
@@ -10,12 +12,14 @@ import {
     ChartBarIcon,
     CurrencyDollarIcon,
     UserIcon,
+    UserGroupIcon as UsersIcon,
 } from './icons';
 
 interface SidebarProps {
     activeView: ActiveView;
     setActiveView: (view: ActiveView) => void;
     isOpen: boolean;
+    userProfile: UserProfile | null;
 }
 
 const NavLink: React.FC<{
@@ -47,7 +51,7 @@ const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ ti
 );
 
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, userProfile }) => {
     return (
         <aside className={`w-64 bg-white dark:bg-slate-800 p-4 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-slate-700 fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
             <div className="text-2xl font-bold text-blue-600 mb-8 px-2">
@@ -117,6 +121,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen }) 
                         onClick={() => setActiveView('map')}
                     />
                 </NavSection>
+
+                {userProfile?.role === UserRole.ADMIN && (
+                    <NavSection title="Admin">
+                        <NavLink 
+                            label="Gerenciar Usuários"
+                            icon={<UsersIcon className="w-6 h-6" />}
+                            isActive={activeView === 'users'}
+                            onClick={() => setActiveView('users')}
+                        />
+                    </NavSection>
+                )}
             </nav>
 
             <div className="mt-auto text-center text-xs text-gray-400 dark:text-gray-500 pt-4">

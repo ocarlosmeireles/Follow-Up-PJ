@@ -127,7 +127,7 @@ const Header: React.FC<HeaderProps> = ({
               <button onClick={() => setUserMenuOpen(prev => !prev)} className="flex items-center gap-3 border-l border-gray-200 dark:border-slate-700 pl-2 sm:pl-4">
                   <div className="text-right hidden sm:block">
                       <span className="font-semibold text-sm text-gray-600 dark:text-slate-300">{userProfile.name}</span>
-                      <span className="block text-xs text-gray-400 dark:text-slate-500">Matrícula: {userProfile.matricula}</span>
+                      <span className="block text-xs text-gray-400 dark:text-slate-500 capitalize">{userProfile.role}</span>
                   </div>
                   <div className="w-9 h-9 bg-blue-200 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300 font-bold text-sm">
                       {getInitials(userProfile.name)}
@@ -138,6 +138,7 @@ const Header: React.FC<HeaderProps> = ({
                        <div className="p-3 border-b border-gray-200 dark:border-slate-700 text-left">
                          <p className="font-semibold text-gray-800 dark:text-slate-200 truncate">{userProfile.name}</p>
                          <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{userProfile.email || 'Sem e-mail cadastrado'}</p>
+                         <p className="text-xs text-gray-500 dark:text-slate-400">Matrícula: {userProfile.matricula}</p>
                        </div>
                        <div className="p-2">
                           <button 

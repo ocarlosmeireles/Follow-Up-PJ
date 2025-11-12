@@ -16,6 +16,27 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+const formatFollowUpDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Data inválida';
+        const hasTime = dateString.includes('T');
+        if (hasTime) {
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
+            }).replace(',', ' às');
+        } else {
+            const [year, month, day] = dateString.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(year, month - 1, day));
+            return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        }
+    } catch (e) {
+        return 'Data inválida';
+    }
+};
+
 const MetricCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-lg flex items-center gap-4 border border-gray-200 dark:border-slate-700 shadow-sm">
         <div className="bg-blue-50 dark:bg-slate-700 p-3 rounded-full">
@@ -126,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
                                     <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 text-left sm:text-right">{formatCurrency(budget.value)}</p>
                                     <div className={`flex items-center gap-2 font-semibold ${isOverdue ? 'text-red-500 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                         <CalendarIcon className="w-5 h-5"/>
-                                        <span>{new Date(budget.nextFollowUpDate!).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
+                                        <span>{formatFollowUpDate(budget.nextFollowUpDate)}</span>
                                     </div>
                                 </div>
                             )

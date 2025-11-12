@@ -18,8 +18,27 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Data inválida';
+
+        const hasTime = dateString.includes('T');
+        
+        if (hasTime) {
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                timeZone: 'America/Sao_Paulo'
+            }).replace(',', ' às');
+        } else {
+            const [year, month, day] = dateString.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(year, month - 1, day));
+            return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        }
+    } catch(e) {
+        return 'Data inválida';
+    }
 };
 
 // FIX: Correctly type the `icon` prop to specify that it accepts a `className`.

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import type { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 
 const Auth: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -50,7 +50,12 @@ const Auth: React.FC = () => {
                 
                 await updateProfile(user, { displayName: name });
 
-                const newUserProfile: UserProfile = { name, matricula, email };
+                const newUserProfile: UserProfile = { 
+                    name, 
+                    matricula, 
+                    email,
+                    role: UserRole.SALESPERSON,
+                };
                 await setDoc(doc(db, "users", user.uid), newUserProfile);
             }
         } catch (err: any) {

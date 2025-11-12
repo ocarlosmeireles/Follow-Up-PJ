@@ -6,6 +6,12 @@ export enum BudgetStatus {
   LOST = 'Perdido',
 }
 
+export enum UserRole {
+  ADMIN = 'Admin',
+  MANAGER = 'Manager',
+  SALESPERSON = 'Salesperson',
+}
+
 export interface Contact {
   id: string;
   clientId: string;
@@ -16,6 +22,7 @@ export interface Contact {
 
 export interface Client {
   id: string;
+  userId: string;
   name: string;
   address?: string;
   cnpj?: string;
@@ -30,6 +37,7 @@ export interface FollowUp {
 
 export interface Budget {
   id: string;
+  userId: string;
   clientId: string;
   contactId: string | null;
   title: string;
@@ -49,6 +57,7 @@ export interface ProspectingStage {
 
 export interface Prospect {
   id: string;
+  userId: string;
   name: string; // Contact person's name
   company: string;
   email?: string;
@@ -70,4 +79,9 @@ export interface UserProfile {
   name: string;
   matricula: string;
   email: string;
+  role: UserRole;
+}
+
+export interface UserData extends UserProfile {
+  id: string;
 }

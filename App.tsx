@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile } from './types';
-import { BudgetStatus } from './types';
+import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData } from './types';
+import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -13,6 +13,7 @@ import CalendarView from './components/CalendarView';
 import MapView from './components/MapView';
 import ClientsView from './components/ClientsView';
 import ReportsView from './components/ReportsView';
+import UsersView from './components/UsersView';
 import AddBudgetModal from './components/AddBudgetModal';
 import BudgetDetailModal from './components/BudgetDetailModal';
 import BudgetingView from './components/BudgetingView';
@@ -22,6 +23,7 @@ import ProfileModal from './components/ProfileModal';
 import AddClientModal from './components/AddClientModal';
 import { auth, db } from './lib/firebase';
 import Auth from './components/Auth';
+import { generateFollowUpReport } from './lib/reportGenerator';
 
 
 export type ActiveView = 
@@ -33,7 +35,8 @@ export type ActiveView =
     | 'clients' 
     | 'reports' 
     | 'calendar' 
-    | 'map';
+    | 'map'
+    | 'users';
 
 export type Theme = 'light' | 'dark';
 
@@ -57,6 +60,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
     const [prospectingStages, setProspectingStages] = useState<ProspectingStage[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [allUsers, setAllUsers] = useState<UserData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const [isAddModalOpen, setAddModalOpen] = useState(false);
@@ -99,20 +103,43 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                const profileDoc = await getDoc(doc(db, "users", user.uid));
+                let profileData: UserProfile;
+
+                if (profileDoc.exists()) {
+                    profileData = profileDoc.data() as UserProfile;
+                } else {
+                    console.warn(`Profile for user ${user.uid} not found. Creating default.`);
+                     profileData = {
+                        name: user.displayName || 'Novo Usuário',
+                        matricula: 'N/A',
+                        email: user.email || 'n/a',
+                        role: UserRole.SALESPERSON // Default role
+                    };
+                    await setDoc(doc(db, "users", user.uid), profileData);
+                }
+                setUserProfile(profileData);
+
+                const isSalesperson = profileData.role === UserRole.SALESPERSON;
+
+                const clientsQuery = isSalesperson ? query(collection(db, 'clients'), where('userId', '==', user.uid)) : collection(db, 'clients');
+                const budgetsQuery = isSalesperson ? query(collection(db, 'budgets'), where('userId', '==', user.uid)) : collection(db, 'budgets');
+                const prospectsQuery = isSalesperson ? query(collection(db, 'prospects'), where('userId', '==', user.uid)) : collection(db, 'prospects');
+                
                 const [
                     clientsSnapshot,
                     contactsSnapshot,
                     budgetsSnapshot,
                     prospectsSnapshot,
                     stagesSnapshot,
-                    profileDoc,
+                    allUsersSnapshot
                 ] = await Promise.all([
-                    getDocs(collection(db, 'clients')),
-                    getDocs(collection(db, 'contacts')),
-                    getDocs(collection(db, 'budgets')),
-                    getDocs(collection(db, 'prospects')),
+                    getDocs(clientsQuery),
+                    getDocs(collection(db, 'contacts')), // Contacts are linked via clients, fetch all for now
+                    getDocs(budgetsQuery),
+                    getDocs(prospectsQuery),
                     getDocs(collection(db, 'prospecting_stages')),
-                    getDoc(doc(db, "users", user.uid)),
+                    profileData.role === UserRole.ADMIN ? getDocs(collection(db, 'users')) : Promise.resolve(null)
                 ]);
 
                 const clientsData = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Client[];
@@ -120,25 +147,14 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
                 const budgetsData = budgetsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Budget[];
                 const prospectsData = prospectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Prospect[];
                 const stagesData = stagesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as ProspectingStage[];
+                const allUsersData = allUsersSnapshot ? allUsersSnapshot.docs.map(doc => ({ ...(doc.data() as UserProfile), id: doc.id })) : [];
                 
-                let profileData: UserProfile;
-                if (profileDoc.exists()) {
-                    profileData = profileDoc.data() as UserProfile;
-                } else {
-                    console.warn(`Profile for user ${user.uid} not found. Using defaults from auth object.`);
-                    profileData = {
-                        name: user.displayName || 'Novo Usuário',
-                        matricula: 'N/A',
-                        email: user.email || 'n/a'
-                    };
-                }
-
                 setClients(clientsData);
                 setContacts(contactsData);
                 setBudgets(budgetsData);
                 setProspects(prospectsData);
                 setProspectingStages(stagesData.sort((a,b) => a.order - b.order));
-                setUserProfile(profileData);
+                setAllUsers(allUsersData);
 
             } catch (error) {
                 console.error("Failed to fetch data from Firebase", error);
@@ -198,8 +214,8 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
     }, [budgets, clientMap]);
 
     const handleAddBudget = useCallback(async (
-        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId'>,
-        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id'> },
+        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'clientId' | 'contactId' | 'userId'>,
+        clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId'> },
         contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId'> }
     ) => {
         let finalClientId = clientInfo.existingId;
@@ -207,9 +223,9 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
 
         try {
             if (!finalClientId && clientInfo.newClientData) {
-                const newClientRef = await addDoc(collection(db, 'clients'), clientInfo.newClientData);
+                const newClientRef = await addDoc(collection(db, 'clients'), { ...clientInfo.newClientData, userId: user.uid });
                 finalClientId = newClientRef.id;
-                const newClient: Client = { id: finalClientId, ...clientInfo.newClientData };
+                const newClient: Client = { id: finalClientId, userId: user.uid, ...clientInfo.newClientData };
                 setClients(prev => [...prev, newClient]);
             }
             
@@ -227,6 +243,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
             
             const budgetToInsert = {
                 ...budgetData,
+                userId: user.uid,
                 clientId: finalClientId,
                 contactId: finalContactId,
                 status: BudgetStatus.SENT,
@@ -245,7 +262,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
             console.error("Error saving budget:", error);
             alert("Falha ao salvar o orçamento.");
         }
-    }, []);
+    }, [user.uid]);
     
     const handleUpdateBudgetStatus = useCallback(async (budgetId: string, newStatus: BudgetStatus) => {
         const budget = budgets.find(b => b.id === budgetId);
@@ -275,8 +292,6 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
         try {
             const budgetRef = doc(db, 'budgets', budgetId);
 
-            // Create a sanitized version of the follow-ups array for Firestore.
-            // This ensures only plain data is sent, preventing circular structure errors during serialization.
             const plainFollowUps = updatedFollowUps.map(f => ({
                 id: f.id,
                 date: f.date,
@@ -304,7 +319,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
         }
     }, [handleUpdateBudgetStatus]);
 
-    const handleAddProspect = useCallback(async (prospectData: Omit<Prospect, 'id' | 'stageId'>) => {
+    const handleAddProspect = useCallback(async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId'>) => {
         const firstStage = prospectingStages.find(s => s.order === 0);
         if (!firstStage) {
             alert("Crie uma etapa no funil de prospecção primeiro.");
@@ -312,6 +327,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
         }
         const prospectToInsert = {
             ...prospectData,
+            userId: user.uid,
             stageId: firstStage.id,
         };
         try {
@@ -322,7 +338,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
             console.error("Error adding prospect:", error);
             alert("Falha ao adicionar prospect.");
         }
-    }, [prospectingStages]);
+    }, [prospectingStages, user.uid]);
 
     const handleUpdateProspectStage = useCallback(async (prospectId: string, newStageId: string) => {
         try {
@@ -381,16 +397,16 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
         }
     }, [prospects]);
 
-    const handleUpdateProfile = async (newProfile: UserProfile) => {
+    const handleUpdateProfile = async (newProfileData: Omit<UserProfile, 'role'>) => {
         try {
             const profileRef = doc(db, 'users', user.uid);
             const dataToUpdate = {
-                name: newProfile.name,
-                matricula: newProfile.matricula,
-                email: newProfile.email,
+                name: newProfileData.name,
+                matricula: newProfileData.matricula,
+                email: newProfileData.email,
             };
             await updateDoc(profileRef, dataToUpdate);
-            setUserProfile(newProfile);
+            setUserProfile(prev => prev ? { ...prev, ...newProfileData } : null);
             setProfileModalOpen(false);
         } catch(error) {
             console.error("Error updating profile:", error);
@@ -409,12 +425,13 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
 
 
     const handleAddClient = useCallback(async (
-        clientData: Omit<Client, 'id'>,
+        clientData: Omit<Client, 'id' | 'userId'>,
         contactData?: Omit<Contact, 'id' | 'clientId'>
     ) => {
         try {
-            const newClientRef = await addDoc(collection(db, 'clients'), clientData);
-            const newClient: Client = { ...clientData, id: newClientRef.id };
+            const clientToInsert = { ...clientData, userId: user.uid };
+            const newClientRef = await addDoc(collection(db, 'clients'), clientToInsert);
+            const newClient: Client = { ...clientToInsert, id: newClientRef.id };
             setClients(prev => [...prev, newClient]);
 
             if (contactData && contactData.name) {
@@ -428,7 +445,69 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
              console.error("Error adding client:", error);
              alert("Falha ao adicionar novo cliente.");
         }
-    }, []);
+    }, [user.uid]);
+    
+    const handleUpdateUserRole = async (userIdToUpdate: string, newRole: UserRole) => {
+        if (userProfile?.role !== UserRole.ADMIN) {
+            alert("Você não tem permissão para realizar esta ação.");
+            return;
+        }
+        try {
+            const userRef = doc(db, 'users', userIdToUpdate);
+            await updateDoc(userRef, { role: newRole });
+            setAllUsers(prev => prev.map(u => u.id === userIdToUpdate ? { ...u, role: newRole } : u));
+            if (userIdToUpdate === user.uid) {
+                setUserProfile(prev => prev ? { ...prev, role: newRole } : null);
+            }
+        } catch (error) {
+            console.error("Error updating user role:", error);
+            alert("Falha ao atualizar o cargo do usuário.");
+        }
+    };
+    
+    const handleGenerateSelectionReport = (selectedIds: string[]) => {
+        if (!userProfile) return;
+        const reportTitle = "Relatório de Follow-ups Selecionados";
+        // FIX: Add explicit types to Map constructors to aid TypeScript's type inference.
+        const clientMap: Map<string, Client> = new Map(clients.map(c => [c.id, c]));
+        const contactMap: Map<string, Contact> = new Map(contacts.map(c => [c.id, c]));
+
+        const reportData = selectedIds.map(id => {
+            const budget = budgets.find(b => b.id === id);
+            if (!budget) return null;
+            const client = clientMap.get(budget.clientId);
+            const contact = contactMap.get(budget.contactId || '');
+            if (!client || !contact) return null;
+            return { budget, client, contact, followUps: budget.followUps || [] };
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+        
+        generateFollowUpReport(reportTitle, reportData, userProfile);
+    };
+
+    const handleGenerateDailyReport = () => {
+        if (!userProfile) return;
+        const reportTitle = "Relatório de Follow-ups do Dia";
+        const todayStr = new Date().toISOString().split('T')[0];
+        // FIX: Add explicit types to Map constructors for consistency and to prevent potential type inference issues.
+        const clientMap: Map<string, Client> = new Map(clients.map(c => [c.id, c]));
+        const contactMap: Map<string, Contact> = new Map(contacts.map(c => [c.id, c]));
+
+        const reportData = budgets.map(budget => {
+            const todayFollowUps = (budget.followUps || []).filter(f => f.date.startsWith(todayStr));
+            if (todayFollowUps.length === 0) return null;
+            const client = clientMap.get(budget.clientId);
+            const contact = contactMap.get(budget.contactId || '');
+            if (!client || !contact) return null;
+            return { budget, client, contact, followUps: todayFollowUps };
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+        
+        if (reportData.length === 0) {
+            alert("Nenhum follow-up registrado hoje.");
+            return;
+        }
+
+        generateFollowUpReport(reportTitle, reportData, userProfile);
+    };
 
     const selectedBudget = budgets.find(b => b.id === selectedBudgetId);
     const selectedClient = clients.find(c => c.id === selectedBudget?.clientId);
@@ -468,7 +547,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
             case 'prospecting':
                 return <ProspectingView prospects={prospects} stages={prospectingStages} onAddProspectClick={openAddProspectModal} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateProspectingStages} onConvertProspect={handleConvertProspect} />;
             case 'budgeting':
-                return <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={setSelectedBudgetId} />;
+                return <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={setSelectedBudgetId} onGenerateReport={handleGenerateSelectionReport} />;
             case 'deals':
                 return <DealsView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} onUpdateStatus={handleUpdateBudgetStatus} />;
             case 'tasks':
@@ -476,11 +555,13 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
             case 'clients':
                 return <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={setSelectedClientForDetail} onAddClientClick={() => setAddClientModalOpen(true)} />;
             case 'reports':
-                return <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} />;
+                return <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />;
             case 'calendar':
                 return <CalendarView budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
             case 'map':
                 return <MapView clients={clients} />;
+            case 'users':
+                return userProfile.role === UserRole.ADMIN ? <UsersView users={allUsers} onUpdateRole={handleUpdateUserRole} /> : <p>Acesso negado.</p>;
             default:
                 return <Dashboard budgets={budgets} clients={clients} onSelectBudget={setSelectedBudgetId} />;
         }
@@ -494,7 +575,7 @@ const MainLayout: React.FC<{ user: User }> = ({ user }) => {
                     onClick={() => setSidebarOpen(false)}
                 ></div>
             )}
-            <Sidebar activeView={activeView} setActiveView={handleViewChange} isOpen={isSidebarOpen} />
+            <Sidebar activeView={activeView} setActiveView={handleViewChange} isOpen={isSidebarOpen} userProfile={userProfile}/>
             <div className="flex-1 flex flex-col min-w-0">
                 <Header 
                     onAddBudget={openAddBudgetModal} 

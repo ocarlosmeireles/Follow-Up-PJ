@@ -14,33 +14,30 @@ interface BudgetDetailModalProps {
     onChangeStatus: (budgetId: string, status: BudgetStatus) => void;
 }
 
-const formatFollowUpTimestamp = (dateString: string) => {
+const formatDisplayDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    if (dateString.includes('T')) {
-        // It's a full ISO string, format with time
-        return date.toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'America/Sao_Paulo',
-        }).replace(',', ' às');
-    } else {
-        // It's just a date string 'YYYY-MM-DD'
-        const [year, month, day] = dateString.split('-').map(Number);
-        // To prevent timezone issues with new Date('YYYY-MM-DD')
-        const utcDate = new Date(Date.UTC(year, month - 1, day));
-        return utcDate.toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Data inválida';
+
+        // Check if time is specified (not midnight) or if 'T' is in the original string
+        const hasTime = dateString.includes('T');
+
+        if (hasTime) {
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                timeZone: 'America/Sao_Paulo' // Be explicit to avoid browser inconsistencies
+            }).replace(',', ' às');
+        } else {
+            // Handles 'YYYY-MM-DD' correctly by treating it as UTC to avoid timezone shifts
+            const [year, month, day] = dateString.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(year, month - 1, day));
+            return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        }
+    } catch (e) {
+        return 'Data inválida';
     }
-};
-
-
-const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
 };
 
 const formatCurrency = (value: number) => {
@@ -60,8 +57,8 @@ const today = new Date().toISOString().split('T')[0];
 
 const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus }) => {
     const [notes, setNotes] = useState('');
-    const [nextDate, setNextDate] = useState('');
-    const [includeTime, setIncludeTime] = useState(true);
+    const [nextFollowUpDate, setNextFollowUpDate] = useState('');
+    const [nextFollowUpTime, setNextFollowUpTime] = useState('');
     
     // Audio recording state
     const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
@@ -78,7 +75,6 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
             if(audioUrl) URL.revokeObjectURL(audioUrl);
             setAudioUrl(null);
             setRecordingStatus('idle');
-            setIncludeTime(true);
         }
     }, [isOpen, audioUrl]);
 
@@ -125,21 +121,26 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
             return;
         }
 
-        const followUpDate = includeTime ? new Date().toISOString() : new Date().toISOString().split('T')[0];
+        const followUpDate = new Date().toISOString();
         const followUpData: Omit<FollowUp, 'id'> = { date: followUpDate, notes };
 
         if (audioUrl) {
             followUpData.audioUrl = audioUrl;
         }
 
-        onAddFollowUp(budget.id, followUpData, nextDate || null);
+        let combinedNextDate: string | null = nextFollowUpDate || null;
+        if (combinedNextDate && nextFollowUpTime) {
+            combinedNextDate = `${nextFollowUpDate}T${nextFollowUpTime}`;
+        }
+
+        onAddFollowUp(budget.id, followUpData, combinedNextDate);
         
         // Reset state
         setNotes('');
-        setNextDate('');
+        setNextFollowUpDate('');
+        setNextFollowUpTime('');
         setAudioUrl(null);
         setRecordingStatus('idle');
-        setIncludeTime(true);
     };
 
     const handleGenerateEmail = async () => {
@@ -153,7 +154,7 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
             const history = budget.followUps.length > 0
-                ? budget.followUps.map(f => `- ${formatFollowUpTimestamp(f.date)}: ${f.notes}`).join('\n')
+                ? budget.followUps.map(f => `- ${formatDisplayDate(f.date)}: ${f.notes}`).join('\n')
                 : 'Nenhum contato anterior registrado.';
     
             const prompt = `Gere um e-mail de follow-up para o orçamento '${budget.title}' no valor de ${formatCurrency(budget.value)}, enviado para ${contact.name} da empresa ${client.name}.
@@ -235,11 +236,11 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                         </div>
                          <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
                             <p className="text-sm text-gray-500 dark:text-slate-400">Enviado em</p>
-                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDate(budget.dateSent)}</p>
+                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDisplayDate(budget.dateSent)}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
                             <p className="text-sm text-gray-500 dark:text-slate-400">Próximo Contato</p>
-                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDate(budget.nextFollowUpDate || '')}</p>
+                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDisplayDate(budget.nextFollowUpDate)}</p>
                         </div>
                     </div>
 
@@ -257,7 +258,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                         <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                             {budget.followUps.length > 0 ? budget.followUps.slice().reverse().map(fu => (
                                 <div key={fu.id} className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg border border-gray-200 dark:border-slate-600">
-                                    <p className="font-semibold text-sm text-gray-600 dark:text-slate-400">{formatFollowUpTimestamp(fu.date)}</p>
+                                    <p className="font-semibold text-sm text-gray-600 dark:text-slate-400">{formatDisplayDate(fu.date)}</p>
                                     {fu.notes && <p className="text-gray-700 dark:text-slate-300">{fu.notes}</p>}
                                     {fu.audioUrl && <audio controls src={fu.audioUrl} className="w-full mt-2 h-10"></audio>}
                                 </div>
@@ -318,30 +319,35 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                  <p className="text-xs text-center text-gray-500 dark:text-slate-500 -mt-2">IA pode cometer erros. Verifique fatos importantes.</p>
 
 
-                                <div className="flex flex-col sm:flex-row gap-4 items-end">
-                                     <div className="flex-grow">
+                                <div className="flex flex-wrap items-end gap-4">
+                                    <div className="flex-grow min-w-[150px]">
                                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Próximo Follow-up</label>
                                         <input 
                                             type="date" 
-                                            value={nextDate} 
-                                            onChange={e => setNextDate(e.target.value)}
+                                            value={nextFollowUpDate} 
+                                            onChange={e => {
+                                                setNextFollowUpDate(e.target.value);
+                                                if (e.target.value && !nextFollowUpTime) {
+                                                    setNextFollowUpTime('09:00');
+                                                } else if (!e.target.value) {
+                                                    setNextFollowUpTime('');
+                                                }
+                                            }}
                                             min={today}
                                             className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500 dark:[color-scheme:dark]"
                                         />
                                     </div>
-                                    <div className="flex items-center mb-2">
-                                        <input
-                                            type="checkbox"
-                                            id="includeTime"
-                                            checked={includeTime}
-                                            onChange={(e) => setIncludeTime(e.target.checked)}
-                                            className="h-4 w-4 rounded border-gray-300 dark:border-slate-500 text-blue-600 focus:ring-blue-500"
+                                    <div className="flex-grow min-w-[120px]">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Horário</label>
+                                        <input 
+                                            type="time" 
+                                            value={nextFollowUpTime} 
+                                            onChange={e => setNextFollowUpTime(e.target.value)}
+                                            disabled={!nextFollowUpDate}
+                                            className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500 dark:[color-scheme:dark] disabled:bg-gray-100 disabled:dark:bg-slate-800"
                                         />
-                                        <label htmlFor="includeTime" className="ml-2 block text-sm text-gray-700 dark:text-slate-300">
-                                            Incluir horário
-                                        </label>
                                     </div>
-                                    <div className="w-full sm:w-auto">
+                                    <div className="flex-shrink-0">
                                         <button onClick={handleAddFollowUp} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Registrar</button>
                                     </div>
                                 </div>

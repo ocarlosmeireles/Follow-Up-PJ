@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, UserIcon } from './icons';
+import { MagnifyingGlassIcon, UserIcon, PrinterIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
   clients: Client[];
   contacts: Contact[];
   onSelectBudget: (id: string) => void;
+  onGenerateReport: (selectedIds: string[]) => void;
 }
 
 const getStatusBadgeColor = (status: BudgetStatus) => {
@@ -36,17 +37,29 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    // Handles date format yyyy-mm-dd
-    const date = new Date(dateString);
-    // Adjust for timezone offset
-    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-    const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
-    return new Intl.DateTimeFormat('pt-BR').format(adjustedDate);
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Data inválida';
+        const hasTime = dateString.includes('T');
+        if (hasTime) {
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
+            }).replace(',', ' às');
+        } else {
+            const [year, month, day] = dateString.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(year, month - 1, day));
+            return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        }
+    } catch (e) {
+        return 'Data inválida';
+    }
 };
 
-const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget }) => {
+const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget, onGenerateReport }) => {
     const [filter, setFilter] = useState<BudgetStatus | 'ALL' | 'OVERDUE'>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
     const contactMap = useMemo(() => new Map(contacts.map(c => [c.id, c])), [contacts]);
@@ -83,6 +96,28 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
             .sort((a, b) => new Date(b.dateSent).getTime() - new Date(a.dateSent).getTime());
     }, [budgets, clientMap, contactMap, filter, searchTerm]);
 
+    const handleSelect = (id: string, isSelected: boolean) => {
+        setSelectedBudgetIds(prev => {
+            const newSet = new Set(prev);
+            if (isSelected) {
+                newSet.add(id);
+            } else {
+                newSet.delete(id);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = (isChecked: boolean) => {
+        if (isChecked) {
+            setSelectedBudgetIds(new Set(filteredAndSortedBudgets.map(b => b.id)));
+        } else {
+            setSelectedBudgetIds(new Set());
+        }
+    };
+
+    const isAllSelected = filteredAndSortedBudgets.length > 0 && selectedBudgetIds.size === filteredAndSortedBudgets.length;
+
     return (
         <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -91,6 +126,15 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     <p className="text-gray-500 dark:text-gray-400">Visualize, filtre e gerencie todas as suas propostas.</p>
                 </div>
                 <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4">
+                     {selectedBudgetIds.size > 0 && (
+                        <button
+                            onClick={() => onGenerateReport(Array.from(selectedBudgetIds))}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm"
+                        >
+                            <PrinterIcon className="w-5 h-5" />
+                            Gerar Relatório ({selectedBudgetIds.size})
+                        </button>
+                    )}
                     <div className="relative w-full sm:w-64">
                          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                             <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
@@ -123,6 +167,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     <table className="w-full text-left">
                         <thead className="border-b-2 border-gray-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 uppercase text-xs">
                             <tr>
+                                <th className="p-3 w-4"><input type="checkbox" checked={isAllSelected} onChange={(e) => handleSelectAll(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></th>
                                 <th className="p-3">Título</th>
                                 <th className="p-3">Cliente / CNPJ</th>
                                 <th className="p-3">Comprador</th>
@@ -135,22 +180,24 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                             {filteredAndSortedBudgets.map(budget => (
                                 <tr 
                                     key={budget.id}
-                                    onClick={() => onSelectBudget(budget.id)}
-                                    className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors duration-200"
+                                    className={`border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors duration-200 ${selectedBudgetIds.has(budget.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                                 >
-                                    <td className="p-3 text-gray-800 dark:text-slate-100 font-semibold">{budget.title}</td>
-                                    <td className="p-3">
+                                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                                        <input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={(e) => handleSelect(budget.id, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                                    </td>
+                                    <td className="p-3 text-gray-800 dark:text-slate-100 font-semibold" onClick={() => onSelectBudget(budget.id)}>{budget.title}</td>
+                                    <td className="p-3" onClick={() => onSelectBudget(budget.id)}>
                                         <p className="font-medium text-blue-600 dark:text-blue-400">{budget.client?.name || ''}</p>
                                         <p className="text-xs text-gray-500 dark:text-slate-400">{budget.client?.cnpj || 'N/A'}</p>
                                     </td>
-                                    <td className="p-3 text-gray-600 dark:text-slate-300">{budget.contact?.name || ''}</td>
-                                    <td className="p-3 text-right text-gray-700 dark:text-slate-200 font-semibold">{formatCurrency(budget.value)}</td>
-                                    <td className="p-3 text-center">
+                                    <td className="p-3 text-gray-600 dark:text-slate-300" onClick={() => onSelectBudget(budget.id)}>{budget.contact?.name || ''}</td>
+                                    <td className="p-3 text-right text-gray-700 dark:text-slate-200 font-semibold" onClick={() => onSelectBudget(budget.id)}>{formatCurrency(budget.value)}</td>
+                                    <td className="p-3 text-center" onClick={() => onSelectBudget(budget.id)}>
                                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusBadgeColor(budget.status)}`}>
                                             {budget.status}
                                         </span>
                                     </td>
-                                    <td className={`p-3 text-center font-medium ${budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < new Date() && (budget.status === BudgetStatus.SENT || budget.status === BudgetStatus.FOLLOWING_UP) ? 'text-red-500 dark:text-red-400 animate-pulse' : 'text-gray-600 dark:text-slate-400'}`}>
+                                    <td className={`p-3 text-center font-medium ${budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < new Date() && (budget.status === BudgetStatus.SENT || budget.status === BudgetStatus.FOLLOWING_UP) ? 'text-red-500 dark:text-red-400 animate-pulse' : 'text-gray-600 dark:text-slate-400'}`} onClick={() => onSelectBudget(budget.id)}>
                                         {formatDate(budget.nextFollowUpDate)}
                                     </td>
                                 </tr>
@@ -164,25 +211,29 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     {filteredAndSortedBudgets.map(budget => (
                         <div 
                             key={budget.id}
-                            onClick={() => onSelectBudget(budget.id)}
-                            className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow border border-gray-200 dark:border-slate-700 space-y-2 cursor-pointer active:bg-gray-100 dark:active:bg-slate-700"
+                            className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow border border-gray-200 dark:border-slate-700 space-y-2 cursor-pointer active:bg-gray-100 dark:active:bg-slate-700 relative ${selectedBudgetIds.has(budget.id) ? 'border-blue-500 ring-2 ring-blue-500' : ''}`}
                         >
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-bold text-gray-800 dark:text-slate-100">{budget.title}</p>
-                                    <p className="text-sm text-blue-600 dark:text-blue-400">{budget.client?.name || ''}</p>
-                                    <p className="text-xs text-gray-500 dark:text-slate-400">{budget.client?.cnpj || 'N/A'}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1"><UserIcon className="w-3 h-3"/> {budget.contact?.name || ''}</p>
-                                </div>
-                                <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${getStatusBadgeColor(budget.status)}`}>
-                                    {budget.status}
-                                </span>
+                            <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={(e) => handleSelect(budget.id, e.target.checked)} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                             </div>
-                            <div className="flex justify-between items-end text-sm pt-2 border-t border-gray-100 dark:border-slate-700">
-                                <p className="text-blue-600 dark:text-blue-400 font-semibold">{formatCurrency(budget.value)}</p>
-                                <div className={`font-medium text-right ${budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < new Date() && (budget.status === BudgetStatus.SENT || budget.status === BudgetStatus.FOLLOWING_UP) ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-slate-300'}`}>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Próx. Contato</p>
-                                    <p>{formatDate(budget.nextFollowUpDate)}</p>
+                            <div onClick={() => onSelectBudget(budget.id)}>
+                                <div className="flex justify-between items-start pr-8">
+                                    <div>
+                                        <p className="font-bold text-gray-800 dark:text-slate-100">{budget.title}</p>
+                                        <p className="text-sm text-blue-600 dark:text-blue-400">{budget.client?.name || ''}</p>
+                                        <p className="text-xs text-gray-500 dark:text-slate-400">{budget.client?.cnpj || 'N/A'}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1"><UserIcon className="w-3 h-3"/> {budget.contact?.name || ''}</p>
+                                    </div>
+                                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${getStatusBadgeColor(budget.status)}`}>
+                                        {budget.status}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-end text-sm pt-2 border-t border-gray-100 dark:border-slate-700">
+                                    <p className="text-blue-600 dark:text-blue-400 font-semibold">{formatCurrency(budget.value)}</p>
+                                    <div className={`font-medium text-right ${budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < new Date() && (budget.status === BudgetStatus.SENT || budget.status === BudgetStatus.FOLLOWING_UP) ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-slate-300'}`}>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Próx. Contato</p>
+                                        <p>{formatDate(budget.nextFollowUpDate)}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

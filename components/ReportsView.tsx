@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import type { Budget, Client, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
-import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon } from './icons';
+import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon, CalendarIcon } from './icons';
 
 interface ReportsViewProps {
   budgets: Budget[];
   clients: Client[];
   userProfile: UserProfile;
+  onGenerateDailyReport: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -28,7 +29,7 @@ const MetricCard = ({ title, value, icon }: { title: string, value: string | num
     </div>
 );
 
-const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile, onGenerateDailyReport }) => {
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
     
     const metrics = useMemo(() => {
@@ -231,8 +232,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                     className="bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center transition-colors duration-200 shadow-sm"
                 >
                     <ClipboardDocumentListIcon className="w-5 h-5 mr-2" />
-                    Exportar Relatório
+                    Exportar Relatório Geral
                 </button>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4">Relatórios Rápidos</h2>
+                <div className="flex flex-wrap gap-4">
+                    <button
+                        onClick={onGenerateDailyReport}
+                        className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center transition-colors duration-200"
+                    >
+                        <CalendarIcon className="w-5 h-5 mr-2" />
+                        Relatório de Follow-ups do Dia
+                    </button>
+                </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

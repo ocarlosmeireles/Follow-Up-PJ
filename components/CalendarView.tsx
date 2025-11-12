@@ -118,8 +118,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, onSelectB
     
     const renderEventModal = () => {
         if (!selectedDate) return null;
+        
+        const formatEventTime = (dateString: string | null) => {
+            if (!dateString || !dateString.includes('T')) return null;
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return null;
+                return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+            } catch (e) {
+                return null;
+            }
+        };
 
-        const events = budgetsByDate.get(selectedDate.toDateString()) || [];
+        const events = (budgetsByDate.get(selectedDate.toDateString()) || [])
+            .sort((a, b) => {
+                const dateA = a.nextFollowUpDate ? new Date(a.nextFollowUpDate).getTime() : 0;
+                const dateB = b.nextFollowUpDate ? new Date(b.nextFollowUpDate).getTime() : 0;
+                return dateA - dateB;
+            });
+        
         const dayFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long' });
 
         return (
@@ -127,13 +144,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, onSelectB
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4" onClick={(e) => e.stopPropagation()}>
                     <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-slate-100">Atividades para {dayFormat.format(selectedDate)}</h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                        {events.map(budget => (
-                            <div key={budget.id} onClick={() => { onSelectBudget(budget.id); setSelectedDate(null); }} className="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600">
-                                <p className="font-bold text-gray-800 dark:text-slate-100">{budget.title}</p>
-                                <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold">{clientMap.get(budget.clientId)}</p>
-                                <p className="text-sm font-semibold mt-1 text-gray-600 dark:text-slate-300">{formatCurrency(budget.value)}</p>
-                            </div>
-                        ))}
+                        {events.map(budget => {
+                            const eventTime = formatEventTime(budget.nextFollowUpDate);
+                            return (
+                                <div key={budget.id} onClick={() => { onSelectBudget(budget.id); setSelectedDate(null); }} className="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-grow">
+                                            <p className="font-bold text-gray-800 dark:text-slate-100">{budget.title}</p>
+                                            <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold">{clientMap.get(budget.clientId)}</p>
+                                        </div>
+                                        {eventTime && <span className="text-xs font-semibold text-gray-700 dark:text-slate-300 bg-gray-200 dark:bg-slate-600 px-2 py-0.5 rounded-md flex-shrink-0">{eventTime}</span>}
+                                    </div>
+                                    <p className="text-sm font-semibold mt-1 text-gray-600 dark:text-slate-300">{formatCurrency(budget.value)}</p>
+                                </div>
+                            )
+                        })}
                     </div>
                      <button onClick={() => setSelectedDate(null)} className="mt-4 w-full bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg">
                         Fechar

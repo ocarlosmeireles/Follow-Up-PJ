@@ -43,6 +43,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
     const [showClientSuggestions, setShowClientSuggestions] = useState(false);
     const [newClientAddress, setNewClientAddress] = useState('');
     const [newClientCnpj, setNewClientCnpj] = useState('');
+    const [newClientNotes, setNewClientNotes] = useState('');
     const isNewClient = !selectedClientId && clientSearch.length > 0;
 
     // Contact fields
@@ -62,7 +63,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
 
     const resetForm = useCallback(() => {
         setTitle(''); setValue(''); setDateSent(today); setObservations('');
-        setClientSearch(''); setSelectedClientId(''); setNewClientAddress(''); setNewClientCnpj('');
+        setClientSearch(''); setSelectedClientId(''); setNewClientAddress(''); setNewClientCnpj(''); setNewClientNotes('');
         setSelectedContactId(null); setShowNewContactForm(false);
         setNewContactName(''); setNewContactEmail(''); setNewContactPhone('');
         setIsFetchingCnpj(false); setCnpjError(null); setCompanyIsFromApi(false);
@@ -172,7 +173,7 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
         
         const clientInfo = {
             existingId: selectedClientId || undefined,
-            newClientData: isNewClient ? { name: clientSearch, address: newClientAddress, cnpj: newClientCnpj } : undefined
+            newClientData: isNewClient ? { name: clientSearch, address: newClientAddress, cnpj: newClientCnpj, notes: newClientNotes } : undefined
         };
         
         const contactInfo = {
@@ -287,6 +288,15 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
                                 {cnpjError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{cnpjError}</p>}
                             </div>
                             <div><input type="text" value={newClientAddress} onChange={e => setNewClientAddress(e.target.value)} placeholder="Endereço (Opcional)" className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100" /></div>
+                             <div>
+                                <textarea 
+                                    value={newClientNotes} 
+                                    onChange={e => setNewClientNotes(e.target.value)} 
+                                    placeholder="Anotações Iniciais (Opcional)"
+                                    rows={2}
+                                    className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100"
+                                ></textarea>
+                            </div>
                         </div>
                     )}
 

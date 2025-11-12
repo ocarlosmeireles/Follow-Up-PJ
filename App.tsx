@@ -111,21 +111,20 @@ const App: React.FC = () => {
             if (currentUser) {
                 setLoadingMessage('Carregando perfil...');
                 
-                // Impersonation Check
                 const impersonationData = sessionStorage.getItem('impersonation');
                 if (impersonationData) {
-                    const { originalProfile, targetOrg } = JSON.parse(impersonationData);
-                    const targetAdmin = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
-                    
-                    if (targetAdmin) {
-                        setUser(currentUser); // Keep the auth user
-                        setUserProfile(targetAdmin);
-                        setOriginalUserProfile(originalProfile);
-                        setImpersonatingOrg(targetOrg);
-                        setLoading(false);
-                        return; // Skip normal flow
-                    } else {
-                        // Could not find admin to impersonate, clear session
+                    try {
+                        const { originalProfile, targetOrg, impersonatedProfile } = JSON.parse(impersonationData);
+                        if (impersonatedProfile) {
+                            setUser(currentUser); // Keep the auth user (Super Admin)
+                            setUserProfile(impersonatedProfile); // But display the impersonated profile
+                            setOriginalUserProfile(originalProfile);
+                            setImpersonatingOrg(targetOrg);
+                            setLoading(false); // Stop loading early
+                            return; // Skip normal user profile fetching
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse impersonation data:", error);
                         sessionStorage.removeItem('impersonation');
                     }
                 }
@@ -163,7 +162,7 @@ const App: React.FC = () => {
             }
         });
         return () => unsubscribe();
-    }, [allUsers]); // Re-run when allUsers is populated for impersonation
+    }, []);
 
     const fetchOrganizationData = useCallback(async () => {
         if (!user || !userProfile) return;
@@ -440,7 +439,17 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
-            const newFollowUp = { ...followUp, id: crypto.randomUUID() };
+            // FIX: Explicitly construct the newFollowUp object with the FollowUp type to ensure type safety.
+            const newFollowUp: FollowUp = { 
+                id: crypto.randomUUID(),
+// Fix: Cast properties to string to satisfy type checker, which may be incorrectly inferring 'unknown'.
+                date: followUp.date as string,
+// Fix: Cast properties to string to satisfy type checker, which may be incorrectly inferring 'unknown'.
+                notes: followUp.notes as string,
+            };
+            if (followUp.audioUrl) {
+                newFollowUp.audioUrl = followUp.audioUrl;
+            }
             const updatedFollowUps = [...budgetData.followUps, newFollowUp];
             await updateDoc(budgetRef, {
                 followUps: updatedFollowUps,
@@ -531,6 +540,12 @@ const App: React.FC = () => {
         }
     };
 
+    const handleSaveClientNotes = async (clientId: string, notes: string) => {
+        const clientRef = doc(db, 'clients', clientId);
+        await updateDoc(clientRef, { notes });
+        await fetchOrganizationData();
+    };
+
     // Super Admin Actions
     const handleImpersonate = (targetOrg: Organization) => {
         if (!userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
@@ -539,7 +554,11 @@ const App: React.FC = () => {
             alert('Não foi possível encontrar um administrador para esta organização.');
             return;
         }
-        sessionStorage.setItem('impersonation', JSON.stringify({ originalProfile: userProfile, targetOrg }));
+        sessionStorage.setItem('impersonation', JSON.stringify({ 
+            originalProfile: userProfile, 
+            targetOrg,
+            impersonatedProfile: targetAdmin
+        }));
         window.location.reload();
     };
     
@@ -713,6 +732,7 @@ const App: React.FC = () => {
                         setInitialClientIdForBudget(client.id);
                         setAddBudgetModalOpen(true);
                     }}
+                    onSaveNotes={handleSaveClientNotes}
                 />
             )}
             <ProfileModal

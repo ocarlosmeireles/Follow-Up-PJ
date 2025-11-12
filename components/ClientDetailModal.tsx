@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { XMarkIcon, BriefcaseIcon, UserGroupIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, PlusIcon, WhatsAppIcon } from './icons';
+import { XMarkIcon, BriefcaseIcon, UserGroupIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, PlusIcon, WhatsAppIcon, ClipboardDocumentListIcon, PencilIcon, CheckCircleIcon } from './icons';
 
 interface ClientDetailModalProps {
     isOpen: boolean;
@@ -11,6 +11,7 @@ interface ClientDetailModalProps {
     budgets: Budget[];
     onSelectBudget: (budgetId: string) => void;
     onAddBudgetForClient: (client: Client) => void;
+    onSaveNotes: (clientId: string, notes: string) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -46,7 +47,27 @@ const KPICard = ({ title, value, icon }: { title: string, value: string | number
 );
 
 
-const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, client, contacts, budgets, onSelectBudget, onAddBudgetForClient }) => {
+const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, client, contacts, budgets, onSelectBudget, onAddBudgetForClient, onSaveNotes }) => {
+    const [notes, setNotes] = useState(client.notes || '');
+    const [isEditingNotes, setIsEditingNotes] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setNotes(client.notes || '');
+            setIsEditingNotes(false);
+        }
+    }, [isOpen, client.notes]);
+    
+    const handleSaveNotes = () => {
+        onSaveNotes(client.id, notes);
+        setIsEditingNotes(false);
+    };
+
+    const handleCancelEditNotes = () => {
+        setNotes(client.notes || '');
+        setIsEditingNotes(false);
+    };
+
     if (!isOpen) return null;
 
     // --- KPI Calculations ---
@@ -140,6 +161,37 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                         )}
                                     </div>
                                 )) : <p className="text-gray-400 dark:text-slate-500 italic col-span-full">Nenhum contato cadastrado.</p>}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 flex items-center">
+                                    <ClipboardDocumentListIcon className="w-5 h-5 mr-2 text-blue-500 dark:text-blue-400"/> Anotações Gerais
+                                </h3>
+                                {!isEditingNotes ? (
+                                    <button onClick={() => setIsEditingNotes(true)} className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+                                        <PencilIcon className="w-4 h-4" /> Editar
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={handleCancelEditNotes} className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 font-semibold hover:underline">
+                                            Cancelar
+                                        </button>
+                                        <button onClick={handleSaveNotes} className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-semibold bg-green-100 dark:bg-green-900/50 px-3 py-1 rounded-md hover:bg-green-200 dark:hover:bg-green-800">
+                                            <CheckCircleIcon className="w-4 h-4" /> Salvar
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="bg-yellow-50/70 dark:bg-yellow-900/40 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50">
+                                <textarea
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    readOnly={!isEditingNotes}
+                                    placeholder={isEditingNotes ? "Adicione anotações sobre o cliente aqui..." : "Nenhuma anotação."}
+                                    rows={5}
+                                    className={`w-full bg-transparent text-yellow-800 dark:text-yellow-200 text-sm focus:outline-none resize-y ${isEditingNotes ? 'ring-1 ring-yellow-400 rounded-md p-1' : 'cursor-default'}`}
+                                />
                             </div>
                         </div>
                         <div>

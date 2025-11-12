@@ -23,6 +23,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
     const [name, setName] = useState('');
     const [cnpj, setCnpj] = useState('');
     const [address, setAddress] = useState('');
+    const [notes, setNotes] = useState('');
     
     // Contact fields
     const [addContact, setAddContact] = useState(false);
@@ -37,7 +38,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
     const debounceTimeoutRef = useRef<number | null>(null);
 
     const resetForm = useCallback(() => {
-        setName(''); setCnpj(''); setAddress('');
+        setName(''); setCnpj(''); setAddress(''); setNotes('');
         setAddContact(false);
         setContactName(''); setContactEmail(''); setContactPhone('');
         setIsFetchingCnpj(false); setCnpjError(null); setCompanyIsFromApi(false);
@@ -84,7 +85,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         if (!name.trim()) return alert('O nome do cliente é obrigatório.');
         if (addContact && !contactName.trim()) return alert('O nome do contato é obrigatório.');
 
-        const clientData = { name, cnpj, address };
+        const clientData = { name, cnpj, address, notes };
         const contactData = addContact ? { name: contactName, email: contactEmail, phone: contactPhone } : undefined;
 
         onSave(clientData, contactData);
@@ -121,6 +122,10 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                      <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Endereço (Opcional)</label>
                         <input type="text" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100" />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Anotações Iniciais (Opcional)</label>
+                        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100" placeholder="Informações importantes sobre o cliente..."></textarea>
                     </div>
 
                     <div className="pt-4 border-t border-gray-200 dark:border-slate-700">

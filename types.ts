@@ -43,6 +43,7 @@ export interface Client {
   name: string;
   address?: string;
   cnpj?: string;
+  notes?: string;
 }
 
 export interface FollowUp {

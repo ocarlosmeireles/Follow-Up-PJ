@@ -23,8 +23,9 @@ const StageSettingsModal: React.FC<StageSettingsModalProps> = ({ isOpen, onClose
     };
 
     const handleAddStage = () => {
+        // FIX: Replaced `crypto.randomUUID()` with a compatible unique ID generator for consistency and to prevent potential type errors.
         const newStage: ProspectingStage = {
-            id: crypto.randomUUID(),
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             name: 'Nova Etapa',
             organizationId: stages.length > 0 ? stages[0].organizationId : '',
             order: localStages.length > 0 ? Math.max(...localStages.map(s => s.order)) + 1 : 0

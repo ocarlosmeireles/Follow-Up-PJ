@@ -17,6 +17,8 @@ export interface Organization {
   id: string;
   name: string;
   status: 'active' | 'suspended';
+  logoUrl?: string;
+  companyInfo?: string; // Could be used for address, phone, etc.
 }
 
 export interface Invite {
@@ -107,3 +109,7 @@ export interface UserProfile {
 export interface UserData extends UserProfile {
   id: string;
 }
+
+export type ThemeVariant = 'classic' | 'vibrant';
+// FIX: Moved Theme type here to be accessible globally and fix import errors.
+export type Theme = 'light' | 'dark';

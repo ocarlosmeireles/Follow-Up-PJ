@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization } from './types';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -21,8 +22,9 @@ import BudgetingView from './components/BudgetingView';
 import AddProspectModal from './components/AddProspectModal';
 import ClientDetailModal from './components/ClientDetailModal';
 import ProfileModal from './components/ProfileModal';
+import SettingsModal from './components/SettingsModal';
 import AddClientModal from './components/AddClientModal';
-import { auth, db } from './lib/firebase';
+import { auth, db, storage } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
@@ -41,8 +43,6 @@ export type ActiveView =
     | 'users'
     | 'organizations';
 
-export type Theme = 'light' | 'dark';
-
 const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
      <div className="h-screen w-screen flex justify-center items-center bg-slate-100 dark:bg-slate-900">
         <div className="text-center">
@@ -60,9 +60,11 @@ type ReportDataItem = { budget: Budget; client: Client; contact: Contact; follow
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [organization, setOrganization] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState('Autenticando...');
     const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+    const [viewKey, setViewKey] = useState(0); // Used to re-trigger animations
     
     // Data states for regular users
     const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -85,6 +87,7 @@ const App: React.FC = () => {
     // UI states
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
+    const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'classic');
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
     const [isBudgetDetailModalOpen, setBudgetDetailModalOpen] = useState(false);
@@ -94,6 +97,7 @@ const App: React.FC = () => {
     const [isClientDetailModalOpen, setClientDetailModalOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isProfileModalOpen, setProfileModalOpen] = useState(false);
+    const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
     const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
@@ -103,8 +107,18 @@ const App: React.FC = () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
     }, [theme]);
+    
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', themeVariant);
+        localStorage.setItem('themeVariant', themeVariant);
+    }, [themeVariant]);
 
     const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+    
+    const handleSetView = (view: ActiveView) => {
+        setActiveView(view);
+        setViewKey(prev => prev + 1); // Increment key to force re-render with animation
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -143,6 +157,7 @@ const App: React.FC = () => {
                             await signOut(auth);
                             return;
                         }
+                        setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
                     }
 
                     setUser(currentUser);
@@ -155,6 +170,7 @@ const App: React.FC = () => {
             } else {
                 setUser(null);
                 setUserProfile(null);
+                setOrganization(null);
                 setOriginalUserProfile(null);
                 setImpersonatingOrg(null);
                 sessionStorage.removeItem('impersonation');
@@ -171,6 +187,13 @@ const App: React.FC = () => {
 
         try {
             const { organizationId } = userProfile;
+
+            // Fetch organization details
+            const orgDocRef = doc(db, 'organizations', organizationId);
+            const orgDocSnap = await getDoc(orgDocRef);
+            if (orgDocSnap.exists()) {
+                setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
+            }
 
             const collectionsToFetch = {
                 clients: collection(db, 'clients'),
@@ -439,11 +462,12 @@ const App: React.FC = () => {
         const budgetDoc = await getDoc(budgetRef);
         if (budgetDoc.exists()) {
             const budgetData = budgetDoc.data() as Budget;
+            // FIX: Replaced `crypto.randomUUID()` with a more compatible unique ID generator.
+            // The original `crypto.randomUUID()` can return type `unknown` if the TS environment
+            // is not configured for modern DOM APIs, causing the type errors reported on lines 326 and 328.
             const newFollowUp: FollowUp = { 
-                id: crypto.randomUUID(),
-// Fix: The function signature correctly types `followUp.date` as string, so no cast is necessary.
+                id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 date: followUp.date,
-// Fix: The function signature correctly types `followUp.notes` as string, so no cast is necessary.
                 notes: followUp.notes,
             };
             if (followUp.audioUrl) {
@@ -487,6 +511,28 @@ const App: React.FC = () => {
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, profileUpdate);
         setUserProfile(prev => prev ? { ...prev, ...profileUpdate } : null);
+    };
+    
+     const handleUpdateOrganizationData = async (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => {
+        if (!organization) return;
+
+        let logoUrl = organization.logoUrl;
+        if (logoFile) {
+            const logoRef = ref(storage, `organizations/${organization.id}/logo`);
+            await uploadBytes(logoRef, logoFile);
+            logoUrl = await getDownloadURL(logoRef);
+        }
+
+        const finalUpdate: Partial<Organization> = {
+            ...orgUpdate,
+            logoUrl,
+        };
+        
+        const orgRef = doc(db, 'organizations', organization.id);
+        await updateDoc(orgRef, finalUpdate);
+        
+        // Optimistically update local state for immediate feedback
+        setOrganization(prev => prev ? { ...prev, ...finalUpdate } : null);
     };
 
     const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
@@ -633,10 +679,10 @@ const App: React.FC = () => {
     const selectedBudgetContact = contacts.find(c => c.id === selectedBudget?.contactId);
 
     return (
-        <div className="flex h-screen bg-slate-100 dark:bg-slate-900">
+        <div className="flex h-screen bg-[var(--background-primary)]">
              {/* Sidebar backdrop for mobile */}
             {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 md:hidden"></div>}
-            <Sidebar activeView={activeView} setActiveView={setActiveView} isOpen={isSidebarOpen} userProfile={userProfile} />
+            <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} userProfile={userProfile} organization={organization}/>
             <div className="flex-1 flex flex-col h-screen">
                  {impersonatingOrg && originalUserProfile && (
                     <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
@@ -657,9 +703,10 @@ const App: React.FC = () => {
                     onNotificationClick={handleSelectBudget}
                     userProfile={userProfile}
                     onEditProfile={() => setProfileModalOpen(true)}
+                    onSettings={() => setSettingsModalOpen(true)}
                     onLogout={handleLogout}
                 />
-                <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+                <main key={viewKey} className="flex-1 p-4 sm:p-6 overflow-y-auto fade-in">
                     {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
                         <SuperAdminView 
                             organizations={allOrganizations} 
@@ -742,6 +789,17 @@ const App: React.FC = () => {
                     setProfileModalOpen(false);
                 }}
                 userProfile={userProfile}
+            />
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setSettingsModalOpen(false)}
+                currentTheme={theme}
+                currentThemeVariant={themeVariant}
+                setTheme={setTheme}
+                setThemeVariant={setThemeVariant}
+                userProfile={userProfile}
+                organization={organization}
+                onSaveOrganization={handleUpdateOrganizationData}
             />
             <AddClientModal
                 isOpen={isAddClientModalOpen}

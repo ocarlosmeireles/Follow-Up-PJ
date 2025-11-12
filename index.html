@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="classic">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,40 +22,130 @@
 }
 </script>
 <script>
-  // Script para evitar flash de tema claro em modo escuro
-  if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  // Script para evitar flash de tema
+  const theme = localStorage.getItem('theme') || 'light';
+  const themeVariant = localStorage.getItem('themeVariant') || 'classic';
+  
+  if (theme === 'dark') {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
   }
+  document.documentElement.setAttribute('data-theme', themeVariant);
 </script>
 <style>
+/* Definição de Cores com Variáveis CSS para Temas */
+:root[data-theme="classic"] {
+  --background-primary: #F1F5F9; /* slate-100 */
+  --background-secondary: #FFFFFF; /* white */
+  --background-secondary-hover: #F8FAFC; /* slate-50 */
+  --background-tertiary: #F1F5F9; /* slate-100 */
+  --background-tertiary-hover: #E2E8F0; /* slate-200 */
+  --background-accent-subtle: #EFF6FF; /* blue-50 */
+
+  --text-primary: #1E293B; /* slate-800 */
+  --text-secondary: #475569; /* slate-600 */
+  --text-tertiary: #94A3B8; /* slate-400 */
+  --text-accent: #2563EB; /* blue-600 */
+  --text-on-accent: #FFFFFF;
+
+  --border-primary: #E2E8F0; /* slate-200 */
+  --border-secondary: #CBD5E1; /* slate-300 */
+
+  --accent-primary: #3B82F6; /* blue-500 */
+  --accent-primary-hover: #2563EB; /* blue-600 */
+}
+
+.dark[data-theme="classic"] {
+  --background-primary: #0F172A; /* slate-900 */
+  --background-secondary: #1E293B; /* slate-800 */
+  --background-secondary-hover: #334155; /* slate-700/50 */
+  --background-tertiary: #334155; /* slate-700 */
+  --background-tertiary-hover: #475569; /* slate-600 */
+  --background-accent-subtle: #1E3A8A; /* blue-900/50 */
+
+  --text-primary: #F1F5F9; /* slate-100 */
+  --text-secondary: #94A3B8; /* slate-400 */
+  --text-tertiary: #475569; /* slate-600 */
+  --text-accent: #60A5FA; /* blue-400 */
+  --text-on-accent: #FFFFFF;
+
+  --border-primary: #334155; /* slate-700 */
+  --border-secondary: #475569; /* slate-600 */
+
+  --accent-primary: #3B82F6; /* blue-500 */
+  --accent-primary-hover: #60A5FA; /* blue-400 */
+}
+
+:root[data-theme="vibrant"] {
+  --background-primary: #F9FAFB; /* gray-50 */
+  --background-secondary: #FFFFFF; /* white */
+  --background-secondary-hover: #F9FAFB; /* gray-50 */
+  --background-tertiary: #F3F4F6; /* gray-100 */
+  --background-tertiary-hover: #E5E7EB; /* gray-200 */
+  --background-accent-subtle: #EEF2FF; /* indigo-50 */
+
+  --text-primary: #111827; /* gray-900 */
+  --text-secondary: #4B5563; /* gray-600 */
+  --text-tertiary: #9CA3AF; /* gray-400 */
+  --text-accent: #4F46E5; /* indigo-600 */
+  --text-on-accent: #FFFFFF;
+
+  --border-primary: #E5E7EB; /* gray-200 */
+  --border-secondary: #D1D5DB; /* gray-300 */
+  
+  --accent-primary: #4F46E5; /* indigo-600 */
+  --accent-primary-hover: #4338CA; /* indigo-700 */
+}
+
+.dark[data-theme="vibrant"] {
+  --background-primary: #111827; /* gray-900 */
+  --background-secondary: #1F2937; /* gray-800 */
+  --background-secondary-hover: #374151; /* gray-700 */
+  --background-tertiary: #374151; /* gray-700 */
+  --background-tertiary-hover: #4B5563; /* gray-600 */
+  --background-accent-subtle: #3730A3; /* indigo-900 */
+
+  --text-primary: #F9FAFB; /* gray-50 */
+  --text-secondary: #9CA3AF; /* gray-400 */
+  --text-tertiary: #4B5563; /* gray-600 */
+  --text-accent: #818CF8; /* indigo-400 */
+  --text-on-accent: #FFFFFF;
+
+  --border-primary: #374151; /* gray-700 */
+  --border-secondary: #4B5563; /* gray-600 */
+
+  --accent-primary: #6366F1; /* indigo-500 */
+  --accent-primary-hover: #818CF8; /* indigo-400 */
+}
+
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9; /* slate-100 */
+  background: var(--background-tertiary);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #94a3b8; /* slate-400 */
+  background: var(--border-secondary);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #64748b; /* slate-500 */
+  background: var(--text-secondary);
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-track {
-  background: #1e293b; /* slate-800 */
+/* Page transition animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #475569; /* slate-600 */
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
 }
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #64748b; /* slate-500 */
-}
+
 </style>
 </head>
-<body class="bg-slate-100 text-gray-800 antialiased dark:bg-slate-900 dark:text-slate-200">
+<body class="bg-[var(--background-primary)] text-[var(--text-primary)] antialiased transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

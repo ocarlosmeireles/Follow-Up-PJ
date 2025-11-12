@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ActiveView } from '../App';
-import type { UserProfile } from '../types';
+import type { UserProfile, Organization } from '../types';
 import { UserRole } from '../types';
 import { 
     ChartPieIcon as DashboardIcon, 
@@ -21,6 +21,7 @@ interface SidebarProps {
     setActiveView: (view: ActiveView) => void;
     isOpen: boolean;
     userProfile: UserProfile | null;
+    organization: Organization | null;
 }
 
 const NavLink: React.FC<{
@@ -33,8 +34,8 @@ const NavLink: React.FC<{
         onClick={onClick}
         className={`w-full flex items-center p-3 rounded-lg text-left transition-colors duration-200 ${
             isActive 
-            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' 
-            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-slate-200'
+            ? 'bg-[var(--background-accent-subtle)] text-[var(--text-accent)]' 
+            : 'text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--text-primary)]'
         }`}
     >
         {icon}
@@ -44,7 +45,7 @@ const NavLink: React.FC<{
 
 const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="mt-6">
-        <h3 className="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{title}</h3>
+        <h3 className="px-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">{title}</h3>
         <div className="mt-2 space-y-1">
             {children}
         </div>
@@ -52,11 +53,18 @@ const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ ti
 );
 
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, userProfile }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, userProfile, organization }) => {
     return (
-        <aside className={`w-64 bg-white dark:bg-slate-800 p-4 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-slate-700 fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-            <div className="text-2xl font-bold text-blue-600 mb-8 px-2">
-                Follow-up CRM
+        <aside className={`w-64 bg-[var(--background-secondary)] p-4 flex-shrink-0 flex flex-col border-r border-[var(--border-primary)] fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+            <div className="flex items-center gap-3 mb-8 px-2">
+                {organization?.logoUrl ? (
+                    <img src={organization.logoUrl} alt={`${organization.name} logo`} className="w-10 h-10 rounded-full object-contain" />
+                ) : (
+                    <div className="w-10 h-10 bg-[var(--background-accent-subtle)] rounded-full flex items-center justify-center text-[var(--text-accent)] font-bold">
+                        {organization?.name.charAt(0).toUpperCase()}
+                    </div>
+                )}
+                <span className="text-xl font-bold text-[var(--text-accent)]">{organization?.name || "Follow-up CRM"}</span>
             </div>
 
             <nav className="flex-grow overflow-y-auto custom-scrollbar">
@@ -150,7 +158,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                 )}
             </nav>
 
-            <div className="mt-auto text-center text-xs text-gray-400 dark:text-gray-500 pt-4">
+            <div className="mt-auto text-center text-xs text-[var(--text-tertiary)] pt-4">
                 <p>&copy; 2024 Follow-up CRM</p>
                 <p>Todos os direitos reservados.</p>
             </div>

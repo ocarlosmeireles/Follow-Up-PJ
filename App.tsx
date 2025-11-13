@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -33,6 +35,7 @@ import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
 import ReminderNotification from './components/ReminderNotification';
 import { ExclamationTriangleIcon } from './components/icons';
+import EditReminderModal from './components/EditReminderModal';
 
 export type ActiveView = 
     | 'dashboard'
@@ -107,6 +110,8 @@ const App: React.FC = () => {
     const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
     const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
+    const [isEditReminderModalOpen, setEditReminderModalOpen] = useState(false);
+    const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
 
 
     useEffect(() => {
@@ -405,8 +410,8 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Cast DocumentReference id to string to resolve type error.
-                finalClientId = newClientRef.id as string;
+                // FIX: Replaced `as string` cast with `String()` to correctly handle potential 'unknown' type from Firebase DocumentReference id.
+                finalClientId = String(newClientRef.id);
             }
 
             if (!finalClientId) {
@@ -420,8 +425,8 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Cast DocumentReference id to string to resolve type error.
-                finalContactId = newContactRef.id as string;
+                // FIX: Replaced `as string` cast with `String()` to correctly handle potential 'unknown' type from Firebase DocumentReference id.
+                finalContactId = String(newContactRef.id);
             }
             
             const newBudget: Omit<Budget, 'id'> = {
@@ -629,6 +634,20 @@ const App: React.FC = () => {
             isDismissed: false,
             isCompleted: false,
         });
+        await fetchOrganizationData();
+    };
+
+    const handleSelectReminder = useCallback((reminderId: string) => {
+        const reminder = reminders.find(r => r.id === reminderId);
+        if (reminder) {
+            setSelectedReminder(reminder);
+            setEditReminderModalOpen(true);
+        }
+    }, [reminders]);
+
+    const handleUpdateReminder = async (reminderId: string, updates: { title: string; reminderDateTime: string }) => {
+        const reminderRef = doc(db, 'reminders', reminderId);
+        await updateDoc(reminderRef, updates);
         await fetchOrganizationData();
     };
 
@@ -843,7 +862,7 @@ const App: React.FC = () => {
                                 {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
                                 {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
                                 {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
-                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />}
+                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} onSelectReminder={handleSelectReminder} />}
                                 {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />}
                                 {activeView === 'map' && <MapView clients={clients} />}
                                 {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
@@ -945,6 +964,13 @@ const App: React.FC = () => {
                     onInvite={handleInviteUser}
                 />
             )}
+             <EditReminderModal
+                isOpen={isEditReminderModalOpen}
+                onClose={() => setEditReminderModalOpen(false)}
+                reminder={selectedReminder}
+                onUpdate={handleUpdateReminder}
+                onDelete={handleDeleteReminder}
+            />
         </div>
     );
 };

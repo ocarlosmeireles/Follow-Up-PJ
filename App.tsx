@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -194,9 +195,13 @@ const App: React.FC = () => {
             setContacts(contactData);
             setProspects(prospectData);
             setStages(stageData.length > 0 ? stageData : [
-                { id: '1', name: 'Qualificação', order: 0, organizationId: profile.organizationId },
-                { id: '2', name: 'Proposta', order: 1, organizationId: profile.organizationId },
-                { id: '3', name: 'Negociação', order: 2, organizationId: profile.organizationId },
+                { id: 'stage-1', name: 'Prospect Frio', order: 0, organizationId: profile.organizationId },
+                { id: 'stage-2', name: 'Primeiro Contato', order: 1, organizationId: profile.organizationId },
+                { id: 'stage-3', name: 'Contato Respondido', order: 2, organizationId: profile.organizationId },
+                { id: 'stage-4', name: 'Reunião Agendada', order: 3, organizationId: profile.organizationId },
+                { id: 'stage-5', name: 'Proposta Enviada', order: 4, organizationId: profile.organizationId },
+                { id: 'stage-6', name: 'Negociação', order: 5, organizationId: profile.organizationId },
+                { id: 'stage-7', name: 'Perdido', order: 6, organizationId: profile.organizationId },
             ]);
             setUsers(userData);
             setReminders(reminderData);

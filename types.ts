@@ -101,6 +101,7 @@ export interface Prospect {
   stageId: string;
   source?: string;
   createdAt: string;
+  nextContactDate?: string | null;
 }
 
 export interface Notification {

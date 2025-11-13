@@ -26,6 +26,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
     const [phone, setPhone] = useState('');
     const [notes, setNotes] = useState('');
     const [source, setSource] = useState('');
+    const [nextContactDate, setNextContactDate] = useState('');
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
     const [cnpjError, setCnpjError] = useState<string | null>(null);
@@ -41,6 +42,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
         setPhone('');
         setNotes('');
         setSource('');
+        setNextContactDate('');
         setCnpjError(null);
         setIsFetchingCnpj(false);
         setCompanyIsFromApi(false);
@@ -97,7 +99,7 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
             return;
         }
         
-        onSave({ name, company, cnpj, email, phone, notes, source });
+        onSave({ name, company, cnpj, email, phone, notes, source, nextContactDate });
         resetForm();
         onClose();
     };
@@ -138,9 +140,15 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Nome do Contato</label>
                         <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" placeholder="Pessoa de referência na empresa" />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Origem (Opcional)</label>
-                        <input type="text" value={source} onChange={e => setSource(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" placeholder="Indicação, Site, Evento..." />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Origem (Opcional)</label>
+                            <input type="text" value={source} onChange={e => setSource(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" placeholder="Indicação, Site, Evento..." />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Próximo Contato (Opcional)</label>
+                             <input type="date" value={nextContactDate} onChange={e => setNextContactDate(e.target.value)} className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500 dark:[color-scheme:dark]" />
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>

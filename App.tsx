@@ -2,6 +2,9 @@
 
 
 
+
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -410,8 +413,8 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Replaced `as string` cast with `String()` to correctly handle potential 'unknown' type from Firebase DocumentReference id.
-                finalClientId = String(newClientRef.id);
+                // FIX: Type 'unknown' is not assignable to type 'string'. Cast document reference ID to string.
+                finalClientId = newClientRef.id as string;
             }
 
             if (!finalClientId) {
@@ -425,8 +428,8 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Replaced `as string` cast with `String()` to correctly handle potential 'unknown' type from Firebase DocumentReference id.
-                finalContactId = String(newContactRef.id);
+                // FIX: Type 'unknown' is not assignable to type 'string'. Cast document reference ID to string.
+                finalContactId = newContactRef.id as string;
             }
             
             const newBudget: Omit<Budget, 'id'> = {
@@ -529,6 +532,23 @@ const App: React.FC = () => {
     const handleChangeStatus = async (budgetId: string, status: BudgetStatus) => {
         const budgetRef = doc(db, 'budgets', budgetId);
         await updateDoc(budgetRef, { status });
+        await fetchOrganizationData();
+    };
+
+    const handleUpdateBudget = async (budgetId: string, updates: Partial<Budget>) => {
+        const budgetRef = doc(db, 'budgets', budgetId);
+        await updateDoc(budgetRef, updates);
+        await fetchOrganizationData();
+    };
+
+    const handleBulkUpdateStatus = async (budgetIds: string[], status: BudgetStatus) => {
+        if (budgetIds.length === 0) return;
+        const batch = writeBatch(db);
+        budgetIds.forEach(id => {
+            const budgetRef = doc(db, 'budgets', id);
+            batch.update(budgetRef, { status });
+        });
+        await batch.commit();
         await fetchOrganizationData();
     };
 
@@ -647,7 +667,7 @@ const App: React.FC = () => {
 
     const handleUpdateReminder = async (reminderId: string, updates: { title: string; reminderDateTime: string }) => {
         const reminderRef = doc(db, 'reminders', reminderId);
-        await updateDoc(reminderRef, updates);
+        await updateDoc(reminderRef, { ...updates, isDismissed: false });
         await fetchOrganizationData();
     };
 
@@ -861,7 +881,7 @@ const App: React.FC = () => {
                                 {activeView === 'dashboard' && <Dashboard userProfile={userProfile} budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
                                 {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
                                 {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
-                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
+                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport} onBulkUpdateStatus={handleBulkUpdateStatus} />}
                                 {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} onSelectReminder={handleSelectReminder} />}
                                 {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />}
                                 {activeView === 'map' && <MapView clients={clients} />}
@@ -906,6 +926,7 @@ const App: React.FC = () => {
                     contact={selectedBudgetContact}
                     onAddFollowUp={handleAddFollowUp}
                     onChangeStatus={handleChangeStatus}
+                    onUpdateBudget={handleUpdateBudget}
                 />
             )}
              <AddProspectModal 

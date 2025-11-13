@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon } from './icons';
+import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon, CurrencyDollarIcon } from './icons';
 
 interface BudgetDetailModalProps {
     isOpen: boolean;
@@ -12,6 +12,7 @@ interface BudgetDetailModalProps {
     contact?: Contact;
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
     onChangeStatus: (budgetId: string, status: BudgetStatus) => void;
+    onUpdateBudget: (budgetId: string, updates: Partial<Budget>) => void;
 }
 
 const formatDisplayDate = (dateString: string | null | undefined): string => {
@@ -68,7 +69,7 @@ const getStatusPill = (status: BudgetStatus) => {
     [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
     [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
   }
-  return <span className={`px-3 py-1 text-sm font-bold rounded-full ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
+  return <span className={`px-3 py-1 text-sm font-bold rounded-full whitespace-nowrap ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
 }
 
 const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
@@ -81,10 +82,12 @@ const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}>
     </div>
 );
 
-const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus }) => {
+const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onUpdateBudget }) => {
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
     const [nextFollowUpTime, setNextFollowUpTime] = useState('');
+    const [isEditingValue, setIsEditingValue] = useState(false);
+    const [editableValue, setEditableValue] = useState(String(budget.value));
     
     // Audio recording state
     const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
@@ -101,8 +104,11 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
             if(audioUrl) URL.revokeObjectURL(audioUrl);
             setAudioUrl(null);
             setRecordingStatus('idle');
+            setIsEditingValue(false);
+        } else {
+             setEditableValue(formatInputCurrency(String(budget.value * 100)));
         }
-    }, [isOpen, audioUrl]);
+    }, [isOpen, audioUrl, budget.value]);
 
     const startRecording = async () => {
         try {
@@ -209,6 +215,32 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
         } finally {
             setIsGeneratingEmail(false);
         }
+    };
+
+    const unmaskCurrency = (maskedValue: string): number => {
+        if (!maskedValue) return 0;
+        const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
+        return parseFloat(numericString);
+    };
+
+    const formatInputCurrency = (value: string): string => {
+        if (!value) return '';
+        const numberValue = parseFloat(value.replace(/\D/g, '')) / 100;
+        if (isNaN(numberValue)) return '';
+        return new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(numberValue);
+    };
+
+    const handleSaveValue = () => {
+        const newValue = unmaskCurrency(editableValue);
+        if (isNaN(newValue) || newValue < 0) {
+            alert('Por favor, insira um valor válido.');
+            return;
+        }
+        onUpdateBudget(budget.id, { value: newValue });
+        setIsEditingValue(false);
     };
     
     const isFinalStatus = [BudgetStatus.INVOICED, BudgetStatus.LOST].includes(budget.status);
@@ -366,7 +398,34 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                   <InfoPill label="Valor" value={`R$ ${formatCurrency(budget.value)}`} />
+                                   <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                        <div className="flex items-center justify-between text-sm text-[var(--text-secondary)] mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <CurrencyDollarIcon className="w-4 h-4"/>
+                                                <span>Valor</span>
+                                            </div>
+                                            {!isEditingValue && !isFinalStatus && (
+                                                <button onClick={() => setIsEditingValue(true)} className="p-1 rounded-full hover:bg-[var(--background-secondary)]">
+                                                    <PencilIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {isEditingValue ? (
+                                            <div className="flex items-center gap-2">
+                                                <input 
+                                                    type="text"
+                                                    value={editableValue}
+                                                    onChange={(e) => setEditableValue(formatInputCurrency(e.target.value))}
+                                                    className="w-full bg-[var(--background-secondary)] border border-[var(--border-primary)] rounded-md p-1 font-semibold text-lg text-[var(--text-primary)]"
+                                                    autoFocus
+                                                />
+                                                <button onClick={handleSaveValue} className="p-1 text-green-500"><CheckCircleIcon className="w-5 h-5"/></button>
+                                                <button onClick={() => setIsEditingValue(false)} className="p-1 text-red-500"><XCircleIcon className="w-5 h-5"/></button>
+                                            </div>
+                                        ) : (
+                                            <p className="font-semibold text-lg text-[var(--text-primary)]">{formatCurrency(budget.value)}</p>
+                                        )}
+                                    </div>
                                    <InfoPill label="Enviado em" value={formatDisplayDate(budget.dateSent)} />
                                    <InfoPill label="Próximo Contato" value={formatDisplayDate(budget.nextFollowUpDate)} />
                                 </div>

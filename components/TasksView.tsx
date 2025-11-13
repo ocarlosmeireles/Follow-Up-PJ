@@ -81,7 +81,13 @@ const FocusOfTheDay: React.FC = () => {
     );
 };
 
-const GoalsPanel: React.FC<{ tasks: any, budgets: Budget[] }> = ({ tasks, budgets }) => {
+interface GoalsPanelTasks {
+    today: UnifiedTask[];
+    overdue: UnifiedTask[];
+    potentialValue: number;
+}
+
+const GoalsPanel: React.FC<{ tasks: GoalsPanelTasks, budgets: Budget[] }> = ({ tasks, budgets }) => {
     const weeklyNewBudgets = useMemo(() => {
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -167,6 +173,10 @@ const AIPriorityActions: React.FC<{ budgets: Budget[], clients: Client[], onSele
                 }
             });
             const deals = JSON.parse(response.text || '[]');
+            if (!Array.isArray(deals)) {
+                console.error("AI response is not an array:", deals);
+                throw new Error("Formato de resposta da IA inválido.");
+            }
             setActions(deals);
             cache.current = { data: deals, timestamp: Date.now() };
             setIsAnalyzed(true);

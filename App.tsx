@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -38,7 +33,6 @@ import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
 import ReminderNotification from './components/ReminderNotification';
 import { ExclamationTriangleIcon } from './components/icons';
-import EditReminderModal from './components/EditReminderModal';
 
 export type ActiveView = 
     | 'dashboard'
@@ -66,6 +60,14 @@ const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
 );
 
 type ReportDataItem = { budget: Budget; client: Client; contact: Contact; followUps: FollowUp[] };
+
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+};
 
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
@@ -113,8 +115,6 @@ const App: React.FC = () => {
     const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
     const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
-    const [isEditReminderModalOpen, setEditReminderModalOpen] = useState(false);
-    const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
 
 
     useEffect(() => {
@@ -413,8 +413,8 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Type 'unknown' is not assignable to type 'string'. Cast document reference ID to string.
-                finalClientId = newClientRef.id as string;
+                // FIX: Cast the document ID to string to resolve a potential type inference issue where `id` is treated as `unknown`.
+                finalClientId = String(newClientRef.id);
             }
 
             if (!finalClientId) {
@@ -428,8 +428,8 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: Type 'unknown' is not assignable to type 'string'. Cast document reference ID to string.
-                finalContactId = newContactRef.id as string;
+                // FIX: Cast the document ID to string to resolve a potential type inference issue where `id` is treated as `unknown`.
+                finalContactId = String(newContactRef.id);
             }
             
             const newBudget: Omit<Budget, 'id'> = {
@@ -535,19 +535,48 @@ const App: React.FC = () => {
         await fetchOrganizationData();
     };
 
-    const handleUpdateBudget = async (budgetId: string, updates: Partial<Budget>) => {
+    const handlePartialSale = async (budgetId: string, partialValue: number) => {
+        if (!userProfile) return;
         const budgetRef = doc(db, 'budgets', budgetId);
-        await updateDoc(budgetRef, updates);
-        await fetchOrganizationData();
-    };
+        const budgetDoc = await getDoc(budgetRef);
+        if (!budgetDoc.exists()) return;
 
-    const handleBulkUpdateStatus = async (budgetIds: string[], status: BudgetStatus) => {
-        if (budgetIds.length === 0) return;
+        const originalBudget = budgetDoc.data() as Budget;
+        const originalValue = originalBudget.value;
+        
+        if (partialValue <= 0 || partialValue >= originalValue) {
+            alert("O valor parcial deve ser maior que zero e menor que o valor total do orçamento.");
+            return;
+        }
+
+        const lostValue = originalValue - partialValue;
+
+        const lostBudget: Omit<Budget, 'id'> = {
+            ...originalBudget,
+            title: `${originalBudget.title} - Saldo Perdido`,
+            value: lostValue,
+            status: BudgetStatus.LOST,
+            observations: `Este é o saldo perdido de uma venda parcial do orçamento original. Valor original: R$ ${formatCurrency(originalValue)}.`,
+            nextFollowUpDate: null,
+            followUps: [], // Do not carry over follow-ups to the lost part
+        };
+
         const batch = writeBatch(db);
-        budgetIds.forEach(id => {
-            const budgetRef = doc(db, 'budgets', id);
-            batch.update(budgetRef, { status });
+        
+        // 1. Create new "lost" budget
+        const newLostBudgetRef = doc(collection(db, 'budgets'));
+        batch.set(newLostBudgetRef, lostBudget);
+        
+        // 2. Update original budget
+        const updatedObservation = `${originalBudget.observations || ''}\n\nVenda parcial de R$ ${formatCurrency(partialValue)} registrada em ${new Date().toLocaleDateString()}. Valor original: R$ ${formatCurrency(originalValue)}.`.trim();
+        
+        batch.update(budgetRef, {
+            value: partialValue,
+            status: BudgetStatus.INVOICED,
+            observations: updatedObservation,
+            nextFollowUpDate: null,
         });
+
         await batch.commit();
         await fetchOrganizationData();
     };
@@ -654,20 +683,6 @@ const App: React.FC = () => {
             isDismissed: false,
             isCompleted: false,
         });
-        await fetchOrganizationData();
-    };
-
-    const handleSelectReminder = useCallback((reminderId: string) => {
-        const reminder = reminders.find(r => r.id === reminderId);
-        if (reminder) {
-            setSelectedReminder(reminder);
-            setEditReminderModalOpen(true);
-        }
-    }, [reminders]);
-
-    const handleUpdateReminder = async (reminderId: string, updates: { title: string; reminderDateTime: string }) => {
-        const reminderRef = doc(db, 'reminders', reminderId);
-        await updateDoc(reminderRef, { ...updates, isDismissed: false });
         await fetchOrganizationData();
     };
 
@@ -805,6 +820,15 @@ const App: React.FC = () => {
             alert('Nenhum follow-up agendado para hoje.');
         }
     };
+    
+    const handleScheduleFollowUp = async (budgetId: string, date: Date) => {
+        const budgetRef = doc(db, 'budgets', budgetId);
+        await updateDoc(budgetRef, {
+            nextFollowUpDate: date.toISOString().split('T')[0], // Store as YYYY-MM-DD
+            status: BudgetStatus.FOLLOWING_UP
+        });
+        await fetchOrganizationData();
+    };
 
 
     if (loading) return <FullScreenLoader message={loadingMessage} />;
@@ -836,8 +860,8 @@ const App: React.FC = () => {
                 themeVariant={themeVariant}
             />
 
-            <div className={`flex-1 flex flex-col h-screen ${isDashboardTheme ? 'p-4 sm:p-6' : ''}`}>
-                 <div className={`flex flex-col h-full w-full ${isDashboardTheme ? 'bg-[var(--background-secondary)] rounded-2xl shadow-lg' : ''}`}>
+            <div className={`flex-1 flex flex-col h-screen ${isDashboardTheme ? 'p-0 sm:p-4' : ''}`}>
+                 <div className={`flex flex-col h-full w-full ${isDashboardTheme ? 'bg-[var(--background-secondary)] rounded-none sm:rounded-2xl shadow-lg' : ''}`}>
                      {impersonatingOrg && originalUserProfile && (
                         <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
                             <ExclamationTriangleIcon className="w-5 h-5" />
@@ -879,10 +903,10 @@ const App: React.FC = () => {
                         ) : (
                             <>
                                 {activeView === 'dashboard' && <Dashboard userProfile={userProfile} budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
-                                {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
+                                {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} onScheduleFollowUp={handleScheduleFollowUp} />}
                                 {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
-                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport} onBulkUpdateStatus={handleBulkUpdateStatus} />}
-                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} onSelectReminder={handleSelectReminder} />}
+                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
+                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />}
                                 {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />}
                                 {activeView === 'map' && <MapView clients={clients} />}
                                 {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
@@ -926,7 +950,7 @@ const App: React.FC = () => {
                     contact={selectedBudgetContact}
                     onAddFollowUp={handleAddFollowUp}
                     onChangeStatus={handleChangeStatus}
-                    onUpdateBudget={handleUpdateBudget}
+                    onPartialSale={handlePartialSale}
                 />
             )}
              <AddProspectModal 
@@ -985,13 +1009,6 @@ const App: React.FC = () => {
                     onInvite={handleInviteUser}
                 />
             )}
-             <EditReminderModal
-                isOpen={isEditReminderModalOpen}
-                onClose={() => setEditReminderModalOpen(false)}
-                reminder={selectedReminder}
-                onUpdate={handleUpdateReminder}
-                onDelete={handleDeleteReminder}
-            />
         </div>
     );
 };

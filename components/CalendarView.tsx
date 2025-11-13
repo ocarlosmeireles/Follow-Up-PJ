@@ -76,10 +76,9 @@ interface CalendarViewProps {
   reminders: Reminder[];
   onSelectBudget: (id: string) => void;
   onAddReminder: (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => void;
-  onSelectReminder: (reminderId: string) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders, onSelectBudget, onAddReminder, onSelectReminder }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders, onSelectBudget, onAddReminder }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'agenda'>('month');
     const [addModalState, setAddModalState] = useState<{isOpen: boolean, date: Date | null}>({isOpen: false, date: null});
@@ -131,14 +130,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
         setAddModalState({isOpen: false, date: null});
     };
 
-    const handleEventClick = (event: CalendarEvent) => {
-        if (event.type === 'follow-up') {
-            onSelectBudget((event.data as Budget).id);
-        } else {
-            onSelectReminder((event.data as Reminder).id);
-        }
-    };
-
     const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
     const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
     const handleToday = () => setCurrentDate(new Date());
@@ -184,7 +175,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
                     </div>
                     <div className="mt-1 flex-grow space-y-1 overflow-y-auto">
                         {events.slice(0, 3).map(event => (
-                            <div key={event.id} onClick={() => handleEventClick(event)} className={`text-xs p-1 rounded-md truncate cursor-pointer ${event.type === 'follow-up' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'}`}>
+                            <div key={event.id} onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} className={`text-xs p-1 rounded-md truncate cursor-pointer ${event.type === 'follow-up' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'}`}>
                                 {event.title}
                             </div>
                         ))}
@@ -195,7 +186,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
             day.setDate(day.getDate() + 1);
         }
         return <div className="grid grid-cols-7 gap-1 mt-2">{cells}</div>;
-    }, [currentDate, eventsByDate, handleEventClick]);
+    }, [currentDate, eventsByDate, onSelectBudget]);
     
     const renderAgenda = () => {
         const upcomingEvents = allEvents.filter(e => e.date >= new Date(new Date().toDateString()));
@@ -213,7 +204,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
                         <h3 className="font-bold text-gray-800 dark:text-slate-200 capitalize mb-2 border-b-2 border-slate-200 dark:border-slate-700 pb-1">{new Date(dateStr).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
                         <div className="space-y-3">
                             {(events as CalendarEvent[]).map(event => (
-                                 <div key={event.id} onClick={() => handleEventClick(event)} className={`p-3 rounded-lg border-l-4 cursor-pointer ${event.type === 'follow-up' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'}`}>
+                                 <div key={event.id} onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} className={`p-3 rounded-lg border-l-4 ${event.type === 'follow-up' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer' : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'}`}>
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="font-semibold text-gray-800 dark:text-slate-100">{event.title}</p>

@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, UserIcon, PrinterIcon, ChevronDownIcon } from './icons';
+import { MagnifyingGlassIcon, UserIcon, PrinterIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
@@ -9,7 +9,6 @@ interface BudgetingViewProps {
   contacts: Contact[];
   onSelectBudget: (id: string) => void;
   onGenerateReport: (selectedIds: string[]) => void;
-  onBulkUpdateStatus: (selectedIds: string[], status: BudgetStatus) => void;
 }
 
 const getStatusBadgeColor = (status: BudgetStatus) => {
@@ -59,22 +58,10 @@ const formatDate = (dateString: string | null) => {
     }
 };
 
-const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget, onGenerateReport, onBulkUpdateStatus }) => {
+const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget, onGenerateReport }) => {
     const [filter, setFilter] = useState<BudgetStatus | 'ALL' | 'OVERDUE'>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
-    const [isBulkMenuOpen, setBulkMenuOpen] = useState(false);
-    const bulkMenuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (bulkMenuRef.current && !bulkMenuRef.current.contains(event.target as Node)) {
-                setBulkMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
     const contactMap = useMemo(() => new Map(contacts.map(c => [c.id, c])), [contacts]);
@@ -130,14 +117,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
             setSelectedBudgetIds(new Set());
         }
     };
-    
-    const handleBulkAction = (status: BudgetStatus) => {
-        if (window.confirm(`Tem certeza que deseja alterar o status de ${selectedBudgetIds.size} orçamentos para "${status}"?`)) {
-            onBulkUpdateStatus(Array.from(selectedBudgetIds), status);
-            setSelectedBudgetIds(new Set());
-        }
-        setBulkMenuOpen(false);
-    };
 
     const isAllSelected = filteredAndSortedBudgets.length > 0 && selectedBudgetIds.size === filteredAndSortedBudgets.length;
 
@@ -149,38 +128,15 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     <p className="text-gray-500 dark:text-gray-400">Visualize, filtre e gerencie todas as suas propostas.</p>
                 </div>
                 <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4">
-                     <div className="flex items-center gap-2">
-                         {selectedBudgetIds.size > 0 && (
-                            <>
-                                <button
-                                    onClick={() => onGenerateReport(Array.from(selectedBudgetIds))}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm"
-                                >
-                                    <PrinterIcon className="w-5 h-5" />
-                                    Relatório ({selectedBudgetIds.size})
-                                </button>
-                                <div className="relative" ref={bulkMenuRef}>
-                                    <button
-                                        onClick={() => setBulkMenuOpen(prev => !prev)}
-                                        className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm"
-                                    >
-                                        Ações em Massa
-                                        <ChevronDownIcon className={`w-4 h-4 transition-transform ${isBulkMenuOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-                                    {isBulkMenuOpen && (
-                                        <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 dark:border-slate-600 z-10">
-                                            <div className="p-1">
-                                                <p className="px-3 py-1 text-xs font-semibold text-gray-400">Alterar Status para:</p>
-                                                <button onClick={() => handleBulkAction(BudgetStatus.FOLLOWING_UP)} className="w-full text-left p-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Em Follow-up</button>
-                                                <button onClick={() => handleBulkAction(BudgetStatus.ON_HOLD)} className="w-full text-left p-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Congelado</button>
-                                                <button onClick={() => handleBulkAction(BudgetStatus.LOST)} className="w-full text-left p-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30">Perdido</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                     {selectedBudgetIds.size > 0 && (
+                        <button
+                            onClick={() => onGenerateReport(Array.from(selectedBudgetIds))}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm"
+                        >
+                            <PrinterIcon className="w-5 h-5" />
+                            Gerar Relatório ({selectedBudgetIds.size})
+                        </button>
+                    )}
                     <div className="relative w-full sm:w-64">
                          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                             <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />

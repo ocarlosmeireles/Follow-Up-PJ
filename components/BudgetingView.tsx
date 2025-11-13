@@ -167,7 +167,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         }
     };
 
-    const isAllSelected = selectedBudgetIds.size === filteredAndSortedBudgets.length && filteredAndSortedBudgets.length > 0;
+    const isAllSelected = selectedBudgetIds.size > 0 && selectedBudgetIds.size === filteredAndSortedBudgets.length;
 
     return (
         <div className="space-y-6">
@@ -183,33 +183,40 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
             </div>
             
             <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '400ms' }}>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                    <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg self-start md:self-center">
+                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                    <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg self-start w-full md:w-auto overflow-x-auto">
                         {(['all', 'active', 'won', 'lost'] as const).map(filter => (
-                            <button key={filter} onClick={() => setStatusFilter(filter)} className={`px-3 py-1 text-sm font-semibold rounded-md transition capitalize ${statusFilter === filter ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>{
+                            <button key={filter} onClick={() => setStatusFilter(filter)} className={`px-3 py-1 text-sm font-semibold rounded-md transition whitespace-nowrap ${statusFilter === filter ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>{
                                 {all: 'Todos', active: 'Ativos', won: 'Ganhos', lost: 'Perdidos'}[filter]
                             }</button>
                         ))}
                     </div>
-                     <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 self-stretch md:self-center">
-                         {selectedBudgetIds.size > 0 && (
-                            <button onClick={() => onGenerateReport(Array.from(selectedBudgetIds))} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm order-1 sm:order-2">
-                                <PrinterIcon className="w-5 h-5" />
-                                Gerar Relatório ({selectedBudgetIds.size})
-                            </button>
-                        )}
-                        <div className="relative w-full sm:w-64 order-2 sm:order-1">
+                     <div className="w-full md:w-auto flex flex-col sm:flex-row items-center gap-4 self-stretch md:self-center">
+                        <div className="relative w-full sm:w-64">
                              <span className="absolute inset-y-0 left-0 flex items-center pl-3"><MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></span>
-                            <input type="text" placeholder="Buscar por título, ID, cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg p-2 pl-10 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"/>
+                            <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg p-2 pl-10 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"/>
+                        </div>
+                        <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                             <div className="flex items-center gap-2">
+                                <input type="checkbox" id="select-all-budgets" checked={isAllSelected} onChange={handleSelectAll} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                                <label htmlFor="select-all-budgets" className="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">Sel. Todos</label>
+                            </div>
+                            {selectedBudgetIds.size > 0 && (
+                                <button onClick={() => onGenerateReport(Array.from(selectedBudgetIds))} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm">
+                                    <PrinterIcon className="w-5 h-5" />
+                                    <span className="hidden sm:inline">Relatório</span> ({selectedBudgetIds.size})
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* --- TABLE VIEW for md+ screens --- */}
+                <div className="overflow-x-auto hidden md:block">
                      <table className="w-full text-left text-sm">
                         <thead className="bg-[var(--background-tertiary)] text-[var(--text-secondary)] uppercase text-xs">
                             <tr>
-                                <th className="p-3 w-10"><input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></th>
+                                <th className="p-3 w-10"></th>
                                 <SortableHeader label="Orçamento" sortKey="title" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Cliente" sortKey="client.name" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Valor" sortKey="value" sortConfig={sortConfig} requestSort={requestSort} className="text-right" />
@@ -244,6 +251,42 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                         </tbody>
                     </table>
                 </div>
+
+                {/* --- CARD VIEW for small screens --- */}
+                <div className="space-y-3 md:hidden">
+                    {filteredAndSortedBudgets.map((budget, index) => (
+                        <div key={budget.id} className={`bg-[var(--background-secondary-hover)] p-3 rounded-lg border-l-4 animated-item ${getStatusStyles(budget.status).bar}`} style={{ animationDelay: `${index * 30}ms`}}>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                    <input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                                    <div>
+                                        <p 
+                                            className="font-bold text-[var(--text-primary)] hover:text-[var(--text-accent)] cursor-pointer"
+                                            onClick={() => onSelectBudget(budget.id)}
+                                        >
+                                            {budget.title}
+                                        </p>
+                                        <p className="text-sm font-semibold text-[var(--text-secondary)]">{budget.client?.name || 'Cliente'}</p>
+                                    </div>
+                                </div>
+                                <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${getStatusStyles(budget.status).pill}`}>
+                                    {budget.status}
+                                </span>
+                            </div>
+                            <div className="mt-3 flex justify-between items-end">
+                                <div className="text-sm text-[var(--text-secondary)]">
+                                    <p>Enviado em:</p>
+                                    <p className="font-semibold">{new Date(budget.dateSent).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-bold text-[var(--text-primary)] text-right">R$ {formatCurrency(budget.value)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+
                 {filteredAndSortedBudgets.length === 0 && (
                     <div className="text-center py-16 text-[var(--text-tertiary)]">
                         <p className="font-semibold">Nenhum orçamento encontrado.</p>

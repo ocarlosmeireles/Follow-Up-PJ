@@ -9,6 +9,9 @@ type CalendarEvent = {
   title: string;
   type: 'follow-up' | 'reminder';
   data: Budget | Reminder;
+  isOverdue: boolean;
+  isToday: boolean;
+  isCompleted?: boolean;
   clientName?: string;
 };
 
@@ -21,7 +24,7 @@ const AddEventModal: React.FC<{
 }> = ({ isOpen, onClose, onSave, selectedDate }) => {
     const [title, setTitle] = useState('');
     const [time, setTime] = useState('09:00');
-// FIX: Imported useEffect from React to resolve 'Cannot find name' error.
+
     useEffect(() => {
         if (isOpen) {
             setTitle('');
@@ -47,12 +50,12 @@ const AddEventModal: React.FC<{
         <div className="fixed inset-0 bg-gray-900/50 flex justify-center items-center z-50 p-4" onClick={onClose}>
             <div className="bg-[var(--background-secondary)] rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-[var(--text-primary)]">Adicionar Evento em {selectedDate.toLocaleDateString('pt-BR')}</h2>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">Adicionar Tarefa em {selectedDate.toLocaleDateString('pt-BR')}</h2>
                     <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-[var(--text-tertiary)]"/></button>
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <label className="text-sm font-medium text-[var(--text-secondary)]">Título</label>
+                        <label className="text-sm font-medium text-[var(--text-secondary)]">Título da Tarefa</label>
                         <input type="text" value={title} onChange={e => setTitle(e.target.value)} autoFocus className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2"/>
                     </div>
                      <div>
@@ -62,7 +65,7 @@ const AddEventModal: React.FC<{
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
                     <button onClick={onClose} className="bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600">Cancelar</button>
-                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Evento</button>
+                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Tarefa</button>
                 </div>
             </div>
         </div>
@@ -84,29 +87,52 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
     const [addModalState, setAddModalState] = useState<{isOpen: boolean, date: Date | null}>({isOpen: false, date: null});
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
-
+    
     const allEvents = useMemo<CalendarEvent[]>(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         const followUpEvents: CalendarEvent[] = budgets
             .filter(b => b.nextFollowUpDate)
-            .map(b => ({
-                id: `budget-${b.id}`,
-                date: new Date(b.nextFollowUpDate!),
-                title: b.title,
-                type: 'follow-up',
-                data: b,
-                clientName: clientMap.get(b.clientId) || 'Cliente'
-            }));
+            .map(b => {
+                const eventDate = new Date(b.nextFollowUpDate!);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return {
+                    id: `budget-${b.id}`,
+                    date: eventDate,
+                    title: b.title,
+                    type: 'follow-up',
+                    data: b,
+                    isOverdue: eventDateOnly < today,
+                    isToday: eventDateOnly.getTime() === today.getTime(),
+                    clientName: clientMap.get(b.clientId) || 'Cliente'
+                };
+            });
 
         const reminderEvents: CalendarEvent[] = reminders
-            .map(r => ({
-                id: `reminder-${r.id}`,
-                date: new Date(r.reminderDateTime),
-                title: r.title,
-                type: 'reminder',
-                data: r,
-            }));
+            .filter(r => !r.isDismissed)
+            .map(r => {
+                 const eventDate = new Date(r.reminderDateTime);
+                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return {
+                    id: `reminder-${r.id}`,
+                    date: eventDate,
+                    title: r.title,
+                    type: 'reminder',
+                    data: r,
+                    isOverdue: !r.isCompleted && eventDateOnly < today,
+                    isToday: eventDateOnly.getTime() === today.getTime(),
+                    isCompleted: r.isCompleted,
+                };
+            });
             
-        return [...followUpEvents, ...reminderEvents].sort((a, b) => a.date.getTime() - b.date.getTime());
+        return [...followUpEvents, ...reminderEvents].sort((a, b) => {
+             // Sort by completion status first (uncompleted first), then by date
+            if (a.isCompleted !== b.isCompleted) {
+                return a.isCompleted ? 1 : -1;
+            }
+            return a.date.getTime() - b.date.getTime();
+        });
     }, [budgets, reminders, clientMap]);
 
     const eventsByDate = useMemo(() => {
@@ -168,14 +194,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
             
             const cellDate = new Date(day);
             cells.push(
-                <div key={day.toString()} className={`min-h-[120px] p-2 border border-gray-200 dark:border-slate-700 flex flex-col overflow-hidden transition-colors duration-200 rounded-md group ${isCurrentMonth ? 'bg-white dark:bg-slate-800' : 'bg-gray-50 dark:bg-slate-800/20'}`}>
+                <div key={day.toString()} className={`min-h-[120px] p-2 border border-gray-200 dark:border-slate-700 flex flex-col overflow-hidden transition-colors duration-200 group ${isCurrentMonth ? 'bg-white dark:bg-slate-800' : 'bg-gray-50 dark:bg-slate-800/50'}`}>
                     <div className="flex justify-between items-center">
                         <span className={`text-sm font-semibold ${isToday ? 'bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center' : (isCurrentMonth ? '' : 'text-gray-400 dark:text-gray-500')}`}>{day.getDate()}</span>
                         <button onClick={() => handleAddEventClick(cellDate)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"><PlusIcon className="w-4 h-4 text-slate-500 dark:text-slate-300"/></button>
                     </div>
-                    <div className="mt-1 flex-grow space-y-1 overflow-y-auto">
+                    <div className="mt-1 flex-grow space-y-1 overflow-y-auto custom-scrollbar pr-1">
                         {events.slice(0, 3).map(event => (
-                            <div key={event.id} onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} className={`text-xs p-1 rounded-md truncate cursor-pointer ${event.type === 'follow-up' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'}`}>
+                            <div 
+                                key={event.id} 
+                                onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} 
+                                className={`text-xs p-1.5 rounded-md truncate ${event.type === 'follow-up' ? 'cursor-pointer' : ''} ${
+                                    event.isCompleted ? 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500 line-through' :
+                                    event.isOverdue ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' :
+                                    event.isToday ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' :
+                                    event.type === 'follow-up' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' : 
+                                    'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'
+                                }`}
+                            >
+                                {event.isOverdue && <span className="font-bold">Atrasado! </span>}
                                 {event.title}
                             </div>
                         ))}
@@ -189,8 +226,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
     }, [currentDate, eventsByDate, onSelectBudget]);
     
     const renderAgenda = () => {
-        const upcomingEvents = allEvents.filter(e => e.date >= new Date(new Date().toDateString()));
-        const groupedByDay = upcomingEvents.reduce((acc, event) => {
+        const futureEvents = allEvents.filter(e => {
+            const eventDateOnly = new Date(e.date.getFullYear(), e.date.getMonth(), e.date.getDate());
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            return eventDateOnly >= today || e.isOverdue;
+        });
+
+        const groupedByDay = futureEvents.reduce((acc, event) => {
             const dayKey = event.date.toDateString();
             if(!acc[dayKey]) acc[dayKey] = [];
             acc[dayKey].push(event);
@@ -204,13 +247,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ budgets, clients, reminders
                         <h3 className="font-bold text-gray-800 dark:text-slate-200 capitalize mb-2 border-b-2 border-slate-200 dark:border-slate-700 pb-1">{new Date(dateStr).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
                         <div className="space-y-3">
                             {(events as CalendarEvent[]).map(event => (
-                                 <div key={event.id} onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} className={`p-3 rounded-lg border-l-4 ${event.type === 'follow-up' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer' : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'}`}>
-                                    <div className="flex justify-between items-start">
+                                 <div 
+                                    key={event.id} 
+                                    onClick={() => event.type === 'follow-up' && onSelectBudget((event.data as Budget).id)} 
+                                    className={`p-3 rounded-lg border-l-4 ${
+                                        event.isCompleted ? 'border-gray-300 bg-gray-50 dark:bg-slate-700/50' :
+                                        event.isOverdue ? 'border-red-500 bg-red-50 dark:bg-red-900/30' : 
+                                        event.isToday ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30' :
+                                        event.type === 'follow-up' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer' : 
+                                        'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start gap-4">
                                         <div>
-                                            <p className="font-semibold text-gray-800 dark:text-slate-100">{event.title}</p>
+                                            <p className={`font-semibold text-gray-800 dark:text-slate-100 ${event.isCompleted ? 'line-through text-gray-400 dark:text-slate-500' : ''}`}>{event.title}</p>
                                             {event.clientName && <p className="text-sm text-blue-600 dark:text-blue-400">{event.clientName}</p>}
+                                            {event.isOverdue && <p className="text-xs font-bold text-red-600 dark:text-red-400">ATRASADO!</p>}
                                         </div>
-                                        <div className="text-sm font-semibold text-gray-700 dark:text-slate-300">{event.date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>
+                                        <div className="text-sm font-semibold text-gray-700 dark:text-slate-300 flex-shrink-0">{event.date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>
                                     </div>
                                 </div>
                             ))}

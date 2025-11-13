@@ -150,18 +150,22 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
             .filter((item): item is { deal: PriorityDeal; budget: Budget } => item !== null);
     }, [priorityDeals, budgets]);
 
+    if (!isOpen) {
+        return null;
+    }
 
     return (
         <div 
-            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-labelledby="focus-modal-title"
         >
-            <div className="fixed inset-0 bg-black/60"></div>
+            <div className="fixed inset-0 bg-black/60 fade-in" style={{ animationDuration: '0.3s' }}></div>
             <div 
-                className={`bg-[var(--background-secondary)] rounded-xl shadow-2xl w-full max-w-3xl transform transition-all duration-300 ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+                className="bg-[var(--background-secondary)] rounded-xl shadow-2xl w-full max-w-3xl transform fade-in"
+                style={{ animationDuration: '0.3s' }}
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center p-4 border-b border-[var(--border-primary)]">
@@ -189,14 +193,15 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
                     {!isLoadingAI && !aiError && priorityBudgetsData.length === 0 && <p className="text-center text-gray-500 dark:text-slate-400 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">Nenhum negócio ativo para priorizar no momento.</p>}
                     {!isLoadingAI && (
                         <div className="space-y-4">
-                            {priorityBudgetsData.map(({ deal, budget }) => (
-                                <FocusCard 
-                                    key={deal.budgetId} 
-                                    deal={deal} 
-                                    budget={budget} 
-                                    clientName={clientMap.get(budget.clientId) || 'Cliente'} 
-                                    onSelect={() => onSelectBudget(budget.id)} 
-                                />
+                            {priorityBudgetsData.map(({ deal, budget }, index) => (
+                                <div key={deal.budgetId} className="animated-item" style={{animationDelay: `${index * 80}ms`}}>
+                                    <FocusCard 
+                                        deal={deal} 
+                                        budget={budget} 
+                                        clientName={clientMap.get(budget.clientId) || 'Cliente'} 
+                                        onSelect={() => onSelectBudget(budget.id)} 
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}

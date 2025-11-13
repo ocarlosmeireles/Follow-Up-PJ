@@ -12,6 +12,7 @@ interface BudgetDetailModalProps {
     contact?: Contact;
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
     onChangeStatus: (budgetId: string, status: BudgetStatus) => void;
+    onConfirmWin: (budgetId: string, closingValue: number) => void;
 }
 
 const formatDisplayDate = (dateString: string | null | undefined): string => {
@@ -39,6 +40,21 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
         return 'Data inválida';
     }
 };
+
+const formatCurrencyForInput = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+};
+
+const unmaskCurrency = (maskedValue: string): number => {
+    if (!maskedValue) return 0;
+    const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
+    return parseFloat(numericString) || 0;
+};
+
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -68,7 +84,7 @@ const getStatusPill = (status: BudgetStatus) => {
     [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
     [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
   }
-  return <span className={`px-3 py-1 text-sm font-bold rounded-full ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
+  return <span className={`px-3 py-1 text-sm font-bold rounded-full whitespace-nowrap ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
 }
 
 const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
@@ -81,10 +97,12 @@ const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}>
     </div>
 );
 
-const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus }) => {
+const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onConfirmWin }) => {
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
     const [nextFollowUpTime, setNextFollowUpTime] = useState('');
+    const [showWinPrompt, setShowWinPrompt] = useState(false);
+    const [winValue, setWinValue] = useState('');
     
     // Audio recording state
     const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
@@ -96,11 +114,13 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
     const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
 
     useEffect(() => {
-        // Cleanup audio URL on close
+        // Cleanup on open/close
         if (!isOpen) {
             if(audioUrl) URL.revokeObjectURL(audioUrl);
             setAudioUrl(null);
             setRecordingStatus('idle');
+            setShowWinPrompt(false);
+            setWinValue('');
         }
     }, [isOpen, audioUrl]);
 
@@ -225,6 +245,17 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
         
         window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     };
+
+    const handleConfirmWinClick = () => {
+        const finalValue = unmaskCurrency(winValue);
+        if (isNaN(finalValue) || finalValue <= 0) {
+            alert("Por favor, insira um valor de fechamento válido.");
+            return;
+        }
+        onConfirmWin(budget.id, finalValue);
+        onClose();
+    };
+
 
     return (
         <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-4">
@@ -398,17 +429,36 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                         )}
                         
                         <div className="space-y-2 pt-4 border-t border-[var(--border-primary)]">
-                            <button onClick={() => onChangeStatus(budget.id, BudgetStatus.INVOICED)} className="w-full flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
-                                <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
-                            </button>
-                            <div className="flex gap-2">
-                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
-                                    <XCircleIcon className="w-5 h-5 mr-2" /> Perdido
-                                </button>
-                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex-1 flex items-center justify-center bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg">
-                                    <PauseCircleIcon className="w-5 h-5 mr-2" /> Congelar
-                                </button>
-                            </div>
+                             {showWinPrompt ? (
+                                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                    <label className="block text-sm font-medium text-emerald-800 dark:text-emerald-200 mb-2">Qual o valor final do fechamento?</label>
+                                    <input
+                                        type="text"
+                                        value={winValue}
+                                        onChange={e => setWinValue(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-emerald-500 focus:border-emerald-500"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-2 mt-3">
+                                        <button onClick={handleConfirmWinClick} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Confirmar Ganho</button>
+                                        <button onClick={() => setShowWinPrompt(false)} className="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 text-sm">Cancelar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button onClick={() => { setShowWinPrompt(true); setWinValue(formatCurrencyForInput(budget.value)); }} className="w-full flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
+                                        <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
+                                    </button>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                                            <XCircleIcon className="w-5 h-5 mr-2" /> Perdido
+                                        </button>
+                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex-1 flex items-center justify-center bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg">
+                                            <PauseCircleIcon className="w-5 h-5 mr-2" /> Congelar
+                                        </button>
+                                    </div>
+                                </>
+                             )}
                         </div>
                     </div>
                 </div>

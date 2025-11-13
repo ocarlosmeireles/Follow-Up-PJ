@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Prospect, ProspectingStage } from '../types';
-import { PlusIcon, Cog6ToothIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, EllipsisVerticalIcon, ClockIcon, ExclamationCircleIcon } from './icons';
+import { PlusIcon, Cog6ToothIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, EllipsisVerticalIcon, ClockIcon, ExclamationCircleIcon, SparklesIcon } from './icons';
 import StageSettingsModal from './StageSettingsModal';
 import ProspectAIModal from './ProspectAIModal';
 
@@ -31,7 +31,7 @@ const timeSince = (date: string): string => {
 const ProspectCard: React.FC<{ 
     prospect: Prospect; 
     onConvert: (id: string) => void; 
-    onOpenAiModal: (prospect: Prospect, mode: 'research' | 'icebreaker') => void;
+    onOpenAiModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
     isDragging: boolean; 
 }> = ({ prospect, onConvert, onOpenAiModal, isDragging }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
@@ -68,6 +68,7 @@ const ProspectCard: React.FC<{
                         <div className="absolute top-full right-0 mt-1 w-48 bg-[var(--background-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] z-10 p-1">
                              <button onClick={() => { onOpenAiModal(prospect, 'research'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] rounded-md"><AcademicCapIcon className="w-4 h-4"/>Pesquisar</button>
                              <button onClick={() => { onOpenAiModal(prospect, 'icebreaker'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] rounded-md"><ChatBubbleLeftRightIcon className="w-4 h-4"/>Sugerir</button>
+                             <button onClick={() => { onOpenAiModal(prospect, 'strategy'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] rounded-md"><SparklesIcon className="w-4 h-4"/>Estratégia</button>
                              <div className="my-1 h-px bg-[var(--border-primary)]"></div>
                              <button onClick={() => { onConvert(prospect.id); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-md">Converter</button>
                         </div>
@@ -94,7 +95,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
     const [draggingOverColumn, setDraggingOverColumn] = useState<string | null>(null);
     const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
-    const [aiModalState, setAiModalState] = useState<{ isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | null }>({ isOpen: false, prospect: null, mode: null });
+    const [aiModalState, setAiModalState] = useState<{ isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | 'strategy' | null }>({ isOpen: false, prospect: null, mode: null });
 
     const prospectsByStage = useMemo(() => {
         const grouped: { [key: string]: Prospect[] } = {};
@@ -114,7 +115,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
     
     const sortedStages = useMemo(() => [...stages].sort((a,b) => a.order - b.order), [stages]);
     
-    const handleOpenAiModal = (prospect: Prospect, mode: 'research' | 'icebreaker') => setAiModalState({ isOpen: true, prospect, mode });
+    const handleOpenAiModal = (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => setAiModalState({ isOpen: true, prospect, mode });
     const handleCloseAiModal = () => setAiModalState({ isOpen: false, prospect: null, mode: null });
 
     return (

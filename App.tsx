@@ -121,894 +121,613 @@ const App: React.FC = () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
     }, [theme]);
-    
+
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', themeVariant);
         localStorage.setItem('themeVariant', themeVariant);
     }, [themeVariant]);
 
-    const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-    
-    const handleSetView = (view: ActiveView) => {
+    const changeView = (view: ActiveView) => {
         setActiveView(view);
-        setViewKey(prev => prev + 1); // Increment key to force re-render with animation
+        setViewKey(prev => prev + 1); // Trigger animation on view change
     };
 
+    const fetchData = useCallback(async (uid: string, profile: UserProfile) => {
+        setLoadingMessage('Carregando dados...');
+        if (!profile.organizationId) {
+            console.error("User has no organization ID.");
+            setLoading(false);
+            return;
+        }
+
+        const isSuperAdmin = profile.role === UserRole.SUPER_ADMIN;
+
+        // Fetch Organization Info
+        if (!isSuperAdmin) {
+             const orgDoc = await getDoc(doc(db, "organizations", profile.organizationId));
+             if (orgDoc.exists()) {
+                setOrganization({ id: orgDoc.id, ...orgDoc.data() } as Organization);
+             }
+        }
+       
+        // Define queries
+        const budgetsQuery = isSuperAdmin ? collection(db, 'budgets') : query(collection(db, 'budgets'), where('organizationId', '==', profile.organizationId));
+        const clientsQuery = isSuperAdmin ? collection(db, 'clients') : query(collection(db, 'clients'), where('organizationId', '==', profile.organizationId));
+        const contactsQuery = isSuperAdmin ? collection(db, 'contacts') : query(collection(db, 'contacts'), where('organizationId', '==', profile.organizationId));
+        const prospectsQuery = isSuperAdmin ? collection(db, 'prospects') : query(collection(db, 'prospects'), where('organizationId', '==', profile.organizationId));
+        const stagesQuery = isSuperAdmin ? collection(db, 'prospectingStages') : query(collection(db, 'prospectingStages'), where('organizationId', '==', profile.organizationId));
+        const usersQuery = isSuperAdmin ? collection(db, 'users') : query(collection(db, 'users'), where('organizationId', '==', profile.organizationId));
+        const remindersQuery = isSuperAdmin ? collection(db, 'reminders') : query(collection(db, 'reminders'), where('organizationId', '==', profile.organizationId));
+        const organizationsQuery = isSuperAdmin ? collection(db, 'organizations') : null;
+
+        const [budgetsSnap, clientsSnap, contactsSnap, prospectsSnap, stagesSnap, usersSnap, remindersSnap, orgsSnap] = await Promise.all([
+            getDocs(budgetsQuery),
+            getDocs(clientsQuery),
+            getDocs(contactsQuery),
+            getDocs(prospectsQuery),
+            // FIX: Corrected variable from stagesSnap to stagesQuery to prevent using a variable before declaration.
+            getDocs(stagesQuery),
+            getDocs(usersQuery),
+            getDocs(remindersQuery),
+            organizationsQuery ? getDocs(organizationsQuery) : Promise.resolve(null),
+        ]);
+
+        const budgetData = budgetsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
+        const clientData = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+        const contactData = contactsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact));
+        const prospectData = prospectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect));
+        const stageData = stagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProspectingStage));
+        const userData = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData));
+        const reminderData = remindersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reminder));
+        
+        if (isSuperAdmin) {
+            setAllBudgets(budgetData);
+            setAllClients(clientData);
+            setAllUsers(userData);
+            if (orgsSnap) {
+                setAllOrganizations(orgsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Organization)));
+            }
+        } else {
+            setBudgets(budgetData);
+            setClients(clientData);
+            setContacts(contactData);
+            setProspects(prospectData);
+            setStages(stageData.length > 0 ? stageData : [
+                { id: '1', name: 'Qualificação', order: 0, organizationId: profile.organizationId },
+                { id: '2', name: 'Proposta', order: 1, organizationId: profile.organizationId },
+                { id: '3', name: 'Negociação', order: 2, organizationId: profile.organizationId },
+            ]);
+            setUsers(userData);
+            setReminders(reminderData);
+        }
+
+    }, []);
+
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setLoadingMessage('Carregando perfil...');
-                
-                const impersonationData = sessionStorage.getItem('impersonation');
-                if (impersonationData) {
-                    try {
-                        const { originalProfile, targetOrg, impersonatedProfile } = JSON.parse(impersonationData);
-                        if (impersonatedProfile) {
-                            setUser(currentUser); // Keep the auth user (Super Admin)
-                            setUserProfile(impersonatedProfile); // But display the impersonated profile
-                            setOriginalUserProfile(originalProfile);
-                            setImpersonatingOrg(targetOrg);
-                            setLoading(false); // Stop loading early
-                            return; // Skip normal user profile fetching
-                        }
-                    } catch (error) {
-                        console.error("Failed to parse impersonation data:", error);
-                        sessionStorage.removeItem('impersonation');
-                    }
-                }
-                
-                const userDocRef = doc(db, 'users', currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-
-                if (userDocSnap.exists()) {
-                    const profile = userDocSnap.data() as UserProfile;
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setUser(user);
+                setLoadingMessage('Verificando perfil...');
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    const profile = userDoc.data() as UserProfile;
                     
-                     if (profile.role !== UserRole.SUPER_ADMIN) {
-                        const orgDocRef = doc(db, 'organizations', profile.organizationId);
-                        const orgDocSnap = await getDoc(orgDocRef);
-                        if (!orgDocSnap.exists() || orgDocSnap.data().status === 'suspended') {
-                            alert('Sua organização está suspensa ou foi removida. Contate o suporte.');
-                            await signOut(auth);
-                            return;
-                        }
-                        setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
+                    if (profile.role === UserRole.SUPER_ADMIN && !originalUserProfile) {
+                        setUserProfile(profile);
+                    } else if (impersonatingOrg && originalUserProfile) {
+                         const impersonatedProfile = {
+                            ...originalUserProfile,
+                            role: UserRole.ADMIN, // Impersonate as admin
+                            organizationId: impersonatingOrg.id,
+                        };
+                        setUserProfile(impersonatedProfile);
+                        setOrganization(impersonatingOrg);
+                    } else {
+                         setUserProfile(profile);
                     }
 
-                    setUser(currentUser);
-                    setUserProfile(profile);
-                    setActiveView(profile.role === UserRole.SUPER_ADMIN ? 'organizations' : 'dashboard');
+                    if (userProfile) { // Check if userProfile is set
+                       await fetchData(user.uid, userProfile);
+                    }
                 } else {
-                    console.error("User profile not found in Firestore.");
+                    console.log("No user profile found, logging out.");
                     await signOut(auth);
                 }
             } else {
                 setUser(null);
                 setUserProfile(null);
                 setOrganization(null);
-                setOriginalUserProfile(null);
-                setImpersonatingOrg(null);
-                sessionStorage.removeItem('impersonation');
                 setLoading(false);
             }
+            setLoading(false);
         });
+
         return () => unsubscribe();
-    }, []);
-
-    const fetchOrganizationData = useCallback(async () => {
-        if (!user || !userProfile) return;
-        setLoading(true);
-        setLoadingMessage('Carregando dados da organização...');
-
-        try {
-            const { organizationId } = userProfile;
-
-            // Fetch organization details
-            const orgDocRef = doc(db, 'organizations', organizationId);
-            const orgDocSnap = await getDoc(orgDocRef);
-            if (orgDocSnap.exists()) {
-                setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
-            }
-
-            const collectionsToFetch = {
-                clients: collection(db, 'clients'),
-                budgets: collection(db, 'budgets'),
-                prospects: collection(db, 'prospects'),
-                prospectingStages: collection(db, 'prospectingStages'),
-                contacts: collection(db, 'contacts'),
-                users: collection(db, 'users'),
-                reminders: collection(db, 'reminders'),
-            };
-
-            const queries = Object.fromEntries(
-                Object.entries(collectionsToFetch).map(([key, coll]) => [
-                    key,
-                    query(coll, where('organizationId', '==', organizationId))
-                ])
-            );
-
-            const [
-                clientsSnapshot, 
-                budgetsSnapshot, 
-                prospectsSnapshot, 
-                stagesSnapshot,
-                contactsSnapshot,
-                usersSnapshot,
-                remindersSnapshot
-            ] = await Promise.all([
-                getDocs(queries.clients),
-                getDocs(queries.budgets),
-                getDocs(queries.prospects),
-                getDocs(queries.prospectingStages),
-                getDocs(queries.contacts),
-                getDocs(queries.users),
-                getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid))),
-            ]);
-
-            const clientsData = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-            setClients(clientsData);
-
-            const budgetsData = budgetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
-            setBudgets(budgetsData);
-
-            const prospectsData = prospectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect));
-            setProspects(prospectsData);
-            
-            if (stagesSnapshot.empty) {
-                const defaultStages = [
-                    { name: 'Qualificação', order: 0 }, { name: 'Contato Inicial', order: 1 },
-                    { name: 'Apresentação', order: 2 }, { name: 'Negociação', order: 3 },
-                ];
-                const batch = writeBatch(db);
-                const createdStages: ProspectingStage[] = [];
-                defaultStages.forEach(stage => {
-                    const newStageRef = doc(collection(db, 'prospectingStages'));
-                    const newStageData = { ...stage, id: newStageRef.id, organizationId };
-                    batch.set(newStageRef, newStageData);
-                    createdStages.push(newStageData);
-                });
-                await batch.commit();
-                setStages(createdStages);
-            } else {
-                 setStages(stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProspectingStage)));
-            }
-
-            setContacts(contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
-            setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData)));
-            setReminders(remindersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reminder)));
-
-        } catch (error) {
-            console.error("Error fetching data: ", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [user, userProfile]);
-
-    const fetchSuperAdminData = useCallback(async () => {
-        if (!user || !userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
-        setLoading(true);
-        setLoadingMessage('Carregando dados da plataforma...');
+    }, [fetchData, impersonatingOrg, originalUserProfile, userProfile]);
     
-        try {
-            const [
-                orgsSnapshot,
-                usersSnapshot,
-                clientsSnapshot,
-                budgetsSnapshot
-            ] = await Promise.all([
-                getDocs(collection(db, 'organizations')),
-                getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'clients')),
-                getDocs(collection(db, 'budgets'))
-            ]);
-    
-            setAllOrganizations(orgsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Organization)));
-            setAllUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData)));
-            setAllClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-            setAllBudgets(budgetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget)));
-    
-        } catch (error) {
-            console.error("Error fetching super admin data: ", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [user, userProfile]);
-
+    // Check for upcoming reminders
     useEffect(() => {
-        if (userProfile) {
-            if (userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg) {
-                fetchSuperAdminData();
-            } else {
-                fetchOrganizationData();
-            }
-        }
-    }, [userProfile, fetchOrganizationData, fetchSuperAdminData, impersonatingOrg]);
-
-    // FIX: This useEffect hook keeps the selectedBudget state in sync with the main budgets list.
-    // When budgets are refetched (e.g., after a status change), this ensures the modal
-    // receives the updated budget data, fixing the bug where the status pill wouldn't update.
-    useEffect(() => {
-        if (selectedBudget) {
-            const updatedBudget = budgets.find(b => b.id === selectedBudget.id) || null;
-            setSelectedBudget(updatedBudget);
-        }
-    }, [budgets, selectedBudget]);
-
-    useEffect(() => {
-        if (userProfile?.role === UserRole.SUPER_ADMIN) {
-            setNotifications([]);
-            return;
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const clientMap = new Map(clients.map(c => [c.id, c.name]));
-        const newNotifications: Notification[] = [];
-        budgets.forEach(b => {
-            if (b.nextFollowUpDate && (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)) {
-                const followUpDate = new Date(b.nextFollowUpDate);
-                const clientName = clientMap.get(b.clientId) || 'Cliente Desconhecido';
-                if (followUpDate < today) {
-                    newNotifications.push({ id: `${b.id}-overdue`, type: 'overdue', message: 'Follow-up atrasado!', budgetId: b.id, clientName });
-                } else if (followUpDate.toDateString() === today.toDateString()) {
-                    newNotifications.push({ id: `${b.id}-today`, type: 'today', message: 'Follow-up para hoje.', budgetId: b.id, clientName });
-                }
-            }
+        const now = new Date();
+        const upcomingReminder = reminders.find(r => {
+            if (r.isDismissed || r.isCompleted) return false;
+            const reminderTime = new Date(r.reminderDateTime);
+            return reminderTime <= now;
         });
-        setNotifications(newNotifications);
-    }, [budgets, clients, userProfile]);
 
-    // Reminder check effect
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (activeReminder) return; // Don't show a new one if one is already active
-
-            const now = new Date();
-            const dueReminder = reminders.find(r => 
-                !r.isDismissed && new Date(r.reminderDateTime) <= now
-            );
-
-            if (dueReminder) {
-                setActiveReminder(dueReminder);
-            }
-        }, 15000); // Check every 15 seconds
-
-        return () => clearInterval(interval);
+        if (upcomingReminder && !activeReminder) {
+            setActiveReminder(upcomingReminder);
+        }
     }, [reminders, activeReminder]);
-
-    const handleLogout = async () => {
-        await signOut(auth);
-        setBudgets([]); setClients([]); setContacts([]); setProspects([]); setStages([]); setUsers([]);
-        setAllOrganizations([]); setAllUsers([]); setAllClients([]); setAllBudgets([]);
-        setActiveView('dashboard');
-    };
-
-    const handleSelectBudget = useCallback((budgetId: string) => {
-        const budget = budgets.find(b => b.id === budgetId);
-        if (budget) {
-            setSelectedBudget(budget);
-            setBudgetDetailModalOpen(true);
-        }
-    }, [budgets]);
     
-     const handleSelectClient = useCallback((clientId: string) => {
-        const client = clients.find(c => c.id === clientId);
-        if (client) {
-            setSelectedClient(client);
-            setClientDetailModalOpen(true);
+    // Check for notifications
+    useEffect(() => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+  
+      const newNotifications: Notification[] = [];
+  
+      budgets.forEach(b => {
+        if (!b.nextFollowUpDate || ![BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status)) return;
+  
+        const followUpDate = new Date(b.nextFollowUpDate);
+        followUpDate.setHours(0, 0, 0, 0); // Ignore time part for date comparison
+  
+        const clientName = clients.find(c => c.id === b.clientId)?.name || 'Cliente desconhecido';
+  
+        if (followUpDate < today) {
+          newNotifications.push({
+            id: `${b.id}-overdue`,
+            type: 'overdue',
+            message: `Follow-up atrasado!`,
+            budgetId: b.id,
+            clientName
+          });
+        } else if (followUpDate.getTime() === today.getTime()) {
+          newNotifications.push({
+            id: `${b.id}-today`,
+            type: 'today',
+            message: `Follow-up para hoje.`,
+            budgetId: b.id,
+            clientName
+          });
         }
-    }, [clients]);
+      });
+  
+      setNotifications(newNotifications);
+    }, [budgets, clients]);
 
-    const handleAddBudget = useCallback(async (
+
+    // Data handling functions
+    const handleAddBudget = async (
         budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
         clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
         contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'> }
     ) => {
         if (!user || !userProfile) return;
-        try {
-            let finalClientId = clientInfo.existingId;
-            if (clientInfo.newClientData) {
-                const newClientRef = await addDoc(collection(db, 'clients'), { 
-                    ...clientInfo.newClientData, 
-                    userId: user.uid,
-                    organizationId: userProfile.organizationId
-                });
-                // FIX: Explicitly cast the document ID to a string to prevent type errors.
-                finalClientId = String(newClientRef.id);
-            }
 
-            if (!finalClientId) {
-                throw new Error("Client ID is missing.");
-            }
-
-            let finalContactId: string | null = contactInfo.existingId || null;
-            if (contactInfo.newContactData) {
-                const newContactRef = await addDoc(collection(db, 'contacts'), {
-                    ...contactInfo.newContactData,
-                    clientId: finalClientId,
-                    organizationId: userProfile.organizationId
-                });
-                // FIX: Explicitly cast the document ID to a string to prevent type errors.
-                finalContactId = String(newContactRef.id);
-            }
-            
-            const newBudget: Omit<Budget, 'id'> = {
-                ...budgetData,
-                userId: user.uid,
-                organizationId: userProfile.organizationId,
-                clientId: finalClientId,
-                contactId: finalContactId,
-                status: BudgetStatus.SENT,
-                followUps: []
-            };
-            await addDoc(collection(db, 'budgets'), newBudget);
-            await fetchOrganizationData();
-            setAddBudgetModalOpen(false);
-        } catch (error) {
-            console.error("Error adding budget:", error);
+        let clientId = clientInfo.existingId;
+        if (clientInfo.newClientData) {
+            const newClient = { ...clientInfo.newClientData, userId: user.uid, organizationId: userProfile.organizationId };
+            const clientRef = await addDoc(collection(db, "clients"), newClient);
+            clientId = clientRef.id;
+            setClients(prev => [...prev, { id: clientId!, ...newClient }]);
         }
-    }, [user, userProfile, fetchOrganizationData]);
+
+        if (!clientId) return;
+
+        let contactId = contactInfo.existingId;
+        if (contactInfo.newContactData) {
+            const newContact = { ...contactInfo.newContactData, clientId, organizationId: userProfile.organizationId };
+            const contactRef = await addDoc(collection(db, "contacts"), newContact);
+            contactId = String(contactRef.id);
+            setContacts(prev => [...prev, { id: contactId!, ...newContact }]);
+        }
+
+        const newBudget: Omit<Budget, 'id'> = {
+            ...budgetData,
+            userId: user.uid,
+            organizationId: userProfile.organizationId,
+            clientId: String(clientId),
+            contactId: contactId || null,
+            status: BudgetStatus.SENT,
+            followUps: []
+        };
+
+        const docRef = await addDoc(collection(db, "budgets"), newBudget);
+        setBudgets(prev => [...prev, { id: docRef.id, ...newBudget }]);
+    };
+
+    const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
+        const budget = budgets.find(b => b.id === budgetId);
+        if (!budget) return;
+
+        const newFollowUp = { ...followUp, id: `${Date.now()}` };
+        const updatedFollowUps = [...budget.followUps, newFollowUp];
+        const updatedBudget: Partial<Budget> = { 
+            followUps: updatedFollowUps, 
+            status: BudgetStatus.FOLLOWING_UP,
+            nextFollowUpDate: nextFollowUpDate 
+        };
+
+        await updateDoc(doc(db, "budgets", budgetId), updatedBudget);
+        setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, ...updatedBudget } as Budget : b));
+    };
+    
+    const handleConfirmWin = async (budgetId: string, closingValue: number) => {
+        const budgetToWin = budgets.find(b => b.id === budgetId);
+        if (!budgetToWin || !userProfile) return;
+
+        const batch = writeBatch(db);
+
+        // Partial win logic
+        if (closingValue < budgetToWin.value) {
+            const lostValue = budgetToWin.value - closingValue;
+            
+            // Create a new "lost" budget for the remaining value
+            const lostPartBudget: Omit<Budget, 'id'> = {
+                ...budgetToWin,
+                title: `[Perda Parcial] ${budgetToWin.title}`,
+                value: lostValue,
+                status: BudgetStatus.LOST,
+                followUps: [...budgetToWin.followUps, {
+                    id: `${Date.now()}`,
+                    date: new Date().toISOString(),
+                    notes: `Orçamento perdido parcialmente. Valor ganho: ${formatCurrency(closingValue)}. Valor perdido: ${formatCurrency(lostValue)}.`
+                }]
+            };
+            const newLostDocRef = doc(collection(db, "budgets"));
+            batch.set(newLostDocRef, lostPartBudget);
+
+            // Update the original budget with the won value
+            const wonPartUpdate: Partial<Budget> = {
+                value: closingValue,
+                status: BudgetStatus.INVOICED,
+            };
+            const originalDocRef = doc(db, "budgets", budgetId);
+            batch.update(originalDocRef, wonPartUpdate);
+
+            await batch.commit();
+
+            // Update local state
+            setBudgets(prev => [
+                ...prev.map(b => b.id === budgetId ? { ...b, ...wonPartUpdate } as Budget : b),
+                { ...lostPartBudget, id: newLostDocRef.id }
+            ]);
+
+        } else {
+            // Full win or won for more than original value
+            const updatedBudget: Partial<Budget> = { status: BudgetStatus.INVOICED, value: closingValue };
+            await updateDoc(doc(db, "budgets", budgetId), updatedBudget);
+            setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, ...updatedBudget } as Budget : b));
+        }
+    };
+
+
+    const handleUpdateBudgetStatus = async (budgetId: string, status: BudgetStatus) => {
+        const updatedBudget: Partial<Budget> = { status };
+        await updateDoc(doc(db, "budgets", budgetId), updatedBudget);
+        setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, ...updatedBudget } as Budget : b));
+    };
 
     const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => {
         if (!user || !userProfile) return;
-        const firstStage = stages.find(s => s.order === 0);
-        if (!firstStage) {
-            alert("Nenhuma etapa de prospecção configurada. Configure as etapas primeiro.");
+        const initialStage = stages.find(s => s.order === 0);
+        if (!initialStage) {
+            alert("Nenhuma etapa inicial de prospecção configurada.");
             return;
         }
-        await addDoc(collection(db, 'prospects'), { 
-            ...prospectData, 
+
+        const newProspect: Omit<Prospect, 'id'> = {
+            ...prospectData,
             userId: user.uid,
             organizationId: userProfile.organizationId,
-            stageId: firstStage.id,
+            stageId: initialStage.id,
             createdAt: new Date().toISOString(),
-        });
-        await fetchOrganizationData();
+        };
+        const docRef = await addDoc(collection(db, "prospects"), newProspect);
+        setProspects(prev => [...prev, { id: docRef.id, ...newProspect }]);
     };
-
+    
     const handleUpdateProspectStage = async (prospectId: string, newStageId: string) => {
-        const prospectRef = doc(db, 'prospects', prospectId);
-        await updateDoc(prospectRef, { stageId: newStageId });
-        await fetchOrganizationData();
+        await updateDoc(doc(db, "prospects", prospectId), { stageId: newStageId });
+        setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, stageId: newStageId } : p));
     };
     
     const handleUpdateStages = async (updatedStages: ProspectingStage[]) => {
-        if (!userProfile) return;
-        const batch = writeBatch(db);
-        const stageCollection = collection(db, 'prospectingStages');
-        const existingStageIds = stages.map(s => s.id);
-        
-        updatedStages.forEach(stage => {
-            const stageRef = doc(stageCollection, stage.id);
-            batch.set(stageRef, { ...stage, organizationId: userProfile.organizationId }, { merge: true });
-        });
-
-        // Delete removed stages
-        existingStageIds.forEach(id => {
-            if (!updatedStages.some(s => s.id === id)) {
-                const stageRef = doc(stageCollection, id);
-                batch.delete(stageRef);
-            }
-        });
-
-        await batch.commit();
-        await fetchOrganizationData();
+         const batch = writeBatch(db);
+         updatedStages.forEach(stage => {
+            const stageRef = doc(db, "prospectingStages", stage.id);
+            batch.set(stageRef, stage, { merge: true });
+         });
+         await batch.commit();
+         setStages(updatedStages);
     };
 
     const handleConvertProspect = async (prospectId: string) => {
-        const prospectToConvert = prospects.find(p => p.id === prospectId);
-        if (prospectToConvert) {
-            setProspectToConvert(prospectToConvert);
-            setAddBudgetModalOpen(true);
-            const prospectRef = doc(db, 'prospects', prospectId);
-            await deleteDoc(prospectRef);
-            await fetchOrganizationData();
-        }
+        const prospect = prospects.find(p => p.id === prospectId);
+        if(!prospect) return;
+        
+        setProspectToConvert(prospect);
+        setAddBudgetModalOpen(true);
+        
+        // After budget is created (or not), remove the prospect
+        await deleteDoc(doc(db, "prospects", prospectId));
+        setProspects(prev => prev.filter(p => p.id !== prospectId));
     };
     
-    const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
-        const budgetRef = doc(db, 'budgets', budgetId);
-        const budgetDoc = await getDoc(budgetRef);
-        if (budgetDoc.exists()) {
-            const budgetData = budgetDoc.data() as Budget;
-            const newFollowUp: FollowUp = { 
-                id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                date: followUp.date,
-                notes: followUp.notes,
-            };
-            if (followUp.audioUrl) {
-                newFollowUp.audioUrl = followUp.audioUrl;
-            }
-            const updatedFollowUps = [...budgetData.followUps, newFollowUp];
-            await updateDoc(budgetRef, {
-                followUps: updatedFollowUps,
-                status: BudgetStatus.FOLLOWING_UP,
-                nextFollowUpDate: nextFollowUpDate
-            });
-            await fetchOrganizationData();
-        }
-    };
-
-    const handleChangeStatus = async (budgetId: string, status: BudgetStatus) => {
-        const budgetRef = doc(db, 'budgets', budgetId);
-        await updateDoc(budgetRef, { status });
-        await fetchOrganizationData();
-    };
-
-    const handlePartialSale = async (budgetId: string, partialValue: number) => {
-        if (!userProfile) return;
-        const budgetRef = doc(db, 'budgets', budgetId);
-        const budgetDoc = await getDoc(budgetRef);
-        if (!budgetDoc.exists()) return;
-
-        const originalBudget = budgetDoc.data() as Budget;
-        const originalValue = originalBudget.value;
-        
-        if (partialValue <= 0 || partialValue >= originalValue) {
-            alert("O valor parcial deve ser maior que zero e menor que o valor total do orçamento.");
-            return;
-        }
-
-        const lostValue = originalValue - partialValue;
-
-        const lostBudget: Omit<Budget, 'id'> = {
-            ...originalBudget,
-            title: `${originalBudget.title} - Saldo Perdido`,
-            value: lostValue,
-            status: BudgetStatus.LOST,
-            observations: `Este é o saldo perdido de uma venda parcial do orçamento original. Valor original: R$ ${formatCurrency(originalValue)}.`,
-            nextFollowUpDate: null,
-            followUps: [], // Do not carry over follow-ups to the lost part
-        };
-
+    const handleAddClient = async (
+        clientData: Omit<Client, 'id' | 'userId' | 'organizationId'>,
+        contactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>
+    ) => {
+        if (!user || !userProfile) return;
         const batch = writeBatch(db);
-        
-        // 1. Create new "lost" budget
-        const newLostBudgetRef = doc(collection(db, 'budgets'));
-        batch.set(newLostBudgetRef, lostBudget);
-        
-        // 2. Update original budget
-        const updatedObservation = `${originalBudget.observations || ''}\n\nVenda parcial de R$ ${formatCurrency(partialValue)} registrada em ${new Date().toLocaleDateString()}. Valor original: R$ ${formatCurrency(originalValue)}.`.trim();
-        
-        batch.update(budgetRef, {
-            value: partialValue,
-            status: BudgetStatus.INVOICED,
-            observations: updatedObservation,
-            nextFollowUpDate: null,
-        });
 
+        const newClient = { ...clientData, userId: user.uid, organizationId: userProfile.organizationId };
+        const newClientRef = doc(collection(db, "clients"));
+        batch.set(newClientRef, newClient);
+        setClients(prev => [...prev, { id: newClientRef.id, ...newClient }]);
+        
+        if(contactData) {
+            const newContact = { ...contactData, clientId: newClientRef.id, organizationId: userProfile.organizationId };
+            const newContactRef = doc(collection(db, "contacts"));
+            batch.set(newContactRef, newContact);
+            setContacts(prev => [...prev, { id: String(newContactRef.id), ...newContact }]);
+        }
+        
         await batch.commit();
-        await fetchOrganizationData();
-    };
-
-    const handleAddClient = async (clientData: Omit<Client, 'id' | 'userId' | 'organizationId'>, contactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>) => {
-        if (!user || !userProfile) return;
-        const clientRef = await addDoc(collection(db, 'clients'), {
-            ...clientData,
-            userId: user.uid,
-            organizationId: userProfile.organizationId,
-        });
-        if (contactData) {
-            await addDoc(collection(db, 'contacts'), {
-                ...contactData,
-                clientId: clientRef.id,
-                organizationId: userProfile.organizationId
-            });
-        }
-        await fetchOrganizationData();
     };
     
-    const handleUpdateUserProfile = async (profileUpdate: Partial<UserProfile>) => {
-        if (!user) return;
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, profileUpdate);
-        setUserProfile(prev => prev ? { ...prev, ...profileUpdate } : null);
-    };
-    
-     const handleUpdateOrganizationData = async (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => {
-        if (!organization) return;
+    const handleUpdateClient = async (clientId: string, updates: Partial<Client>, logoFile?: File) => {
+        if(!user || !userProfile) return;
+        
+        let logoUrl = clients.find(c => c.id === clientId)?.logoUrl;
 
-        let logoUrl = organization.logoUrl;
-        if (logoFile) {
-            const logoRef = ref(storage, `organizations/${organization.id}/logo`);
-            await uploadBytes(logoRef, logoFile);
-            logoUrl = await getDownloadURL(logoRef);
+        if(logoFile) {
+            const storageRef = ref(storage, `organizations/${userProfile.organizationId}/clients/${clientId}/logo.png`);
+            const snapshot = await uploadBytes(storageRef, logoFile);
+            logoUrl = await getDownloadURL(snapshot.ref);
         }
 
-        const finalUpdate: Partial<Organization> = {
-            ...orgUpdate,
-            logoUrl,
-        };
+        const finalUpdates = { ...updates, logoUrl };
         
-        const orgRef = doc(db, 'organizations', organization.id);
-        await updateDoc(orgRef, finalUpdate);
-        
-        // Optimistically update local state for immediate feedback
-        setOrganization(prev => prev ? { ...prev, ...finalUpdate } : null);
+        await updateDoc(doc(db, "clients", clientId), finalUpdates);
+        setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...finalUpdates } as Client : c));
     };
 
-    const handleUpdateClientData = async (clientId: string, clientUpdate: Partial<Client>, logoFile?: File) => {
-        const clientRef = doc(db, 'clients', clientId);
-        const currentClient = clients.find(c => c.id === clientId);
-        if (!currentClient) return;
-    
-        let finalUpdate: Partial<Client> & { [key: string]: any } = { ...clientUpdate };
-    
-        if (logoFile) {
-            const logoRef = ref(storage, `clients/${clientId}/logo`);
-            await uploadBytes(logoRef, logoFile);
-            const logoUrl = await getDownloadURL(logoRef);
-            finalUpdate.logoUrl = logoUrl;
-        }
-    
-        await updateDoc(clientRef, finalUpdate);
-        await fetchOrganizationData();
-    };
 
-    const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, { role: newRole });
-        await fetchOrganizationData();
-    };
-
-    const handleInviteUser = async (email: string, role: UserRole) => {
-        if (!userProfile) return;
-        
-        const usersQuery = query(collection(db, 'users'), where('email', '==', email), where('organizationId', '==', userProfile.organizationId));
-        const invitesQuery = query(collection(db, 'invites'), where('email', '==', email), where('organizationId', '==', userProfile.organizationId));
-        
-        const [usersSnap, invitesSnap] = await Promise.all([getDocs(usersQuery), getDocs(invitesQuery)]);
-
-        if (!usersSnap.empty || !invitesSnap.empty) {
-            alert('Um usuário ou convite com este e-mail já existe nesta organização.');
-            return;
-        }
-
-        await addDoc(collection(db, 'invites'), {
-            email,
-            role,
-            organizationId: userProfile.organizationId,
-            status: 'pending'
-        });
-        alert(`Convite enviado para ${email}!`);
-        setAddUserModalOpen(false);
-    };
-
-    const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => {
-        if (!user || !userProfile) return;
-        await addDoc(collection(db, 'reminders'), {
-            ...reminderData,
-            userId: user.uid,
-            organizationId: userProfile.organizationId,
-            isDismissed: false,
-            isCompleted: false,
-        });
-        await fetchOrganizationData();
-    };
-
-    const handleToggleReminderStatus = async (reminderId: string) => {
-        const reminder = reminders.find(r => r.id === reminderId);
-        if (reminder) {
-            const reminderRef = doc(db, 'reminders', reminderId);
-            await updateDoc(reminderRef, { isCompleted: !reminder.isCompleted });
-            await fetchOrganizationData();
+    // UI functions
+    const handleSelectBudget = (budgetId: string) => {
+        const budget = budgets.find(b => b.id === budgetId);
+        if (budget) {
+            setSelectedBudget(budget);
+            setBudgetDetailModalOpen(true);
         }
     };
-
-    const handleDeleteReminder = async (reminderId: string) => {
-        await deleteDoc(doc(db, 'reminders', reminderId));
-        await fetchOrganizationData();
+    
+    const handleSelectClient = (clientId: string) => {
+        const client = clients.find(c => c.id === clientId);
+        if(client) {
+            setSelectedClient(client);
+            setClientDetailModalOpen(true);
+        }
     };
     
-    const handleDismissReminder = async (reminderId: string) => {
-        const reminderRef = doc(db, 'reminders', reminderId);
-        await updateDoc(reminderRef, { isDismissed: true });
-        setActiveReminder(null); // Hide notification immediately
-        await fetchOrganizationData(); // Refresh state
+    const handleAddBudgetForClient = (client: Client) => {
+        setInitialClientIdForBudget(client.id);
+        setClientDetailModalOpen(false);
+        setAddBudgetModalOpen(true);
     };
-
-    const handleGenerateSelectionReport = (selectedIds: string[]) => {
-        if (!userProfile) return;
-        
-        const reportData = selectedIds
-            .map(id => {
-                const budget = budgets.find(b => b.id === id);
-                if (!budget) return null;
+    
+     const handleGenerateReport = (selectedIds: string[]) => {
+        const reportItems: ReportDataItem[] = [];
+        selectedIds.forEach(id => {
+            const budget = budgets.find(b => b.id === id);
+            if (budget) {
                 const client = clients.find(c => c.id === budget.clientId);
-                if (!client) return null;
                 const contact = contacts.find(c => c.id === budget.contactId);
-                // Contact is required for the report.
-                if (!contact) return null;
-                return { budget, client, contact, followUps: budget.followUps };
-            })
-            .filter((item): item is ReportDataItem => item !== null);
-
-        if (reportData.length > 0) {
-            generateFollowUpReport('Relatório de Follow-Ups', reportData, userProfile, organization);
-        }
-    };
-
-    const handleSaveClientNotes = async (clientId: string, notes: string) => {
-        const clientRef = doc(db, 'clients', clientId);
-        await updateDoc(clientRef, { notes });
-        await fetchOrganizationData();
-    };
-
-    // Super Admin Actions
-    const handleImpersonate = (targetOrg: Organization) => {
-        if (!userProfile || userProfile.role !== UserRole.SUPER_ADMIN) return;
-
-        // Prioritize finding an Admin, but fall back to a Manager
-        let targetUser = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.ADMIN);
-        if (!targetUser) {
-            targetUser = allUsers.find(u => u.organizationId === targetOrg.id && u.role === UserRole.MANAGER);
-        }
-
-        if (!targetUser) {
-            alert('Não foi possível encontrar um administrador ou gerente para esta organização.');
-            return;
-        }
-
-        sessionStorage.setItem('impersonation', JSON.stringify({ 
-            originalProfile: userProfile, 
-            targetOrg,
-            impersonatedProfile: targetUser
-        }));
-        window.location.reload();
-    };
-    
-    const handleExitImpersonation = () => {
-        sessionStorage.removeItem('impersonation');
-        window.location.reload();
-    };
-
-    const handleToggleOrgStatus = async (orgId: string, currentStatus: 'active' | 'suspended') => {
-        const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-        if (window.confirm(`Tem certeza que deseja ${newStatus === 'active' ? 'reativar' : 'suspender'} esta organização?`)) {
-            await updateDoc(doc(db, 'organizations', orgId), { status: newStatus });
-            await fetchSuperAdminData();
-        }
-    };
-
-    const handleDeleteOrganization = async (orgId: string, orgName: string) => {
-        if (!window.confirm(`TEM CERTEZA?\n\nIsso excluirá permanentemente a organização "${orgName}" e TODOS os seus dados (usuários, clientes, orçamentos, etc.).\n\nEssa ação não pode ser desfeita.`)) return;
-
-        setLoading(true);
-        setLoadingMessage(`Excluindo ${orgName}...`);
-        try {
-            const collectionsToDelete = ['users', 'clients', 'budgets', 'contacts', 'prospects', 'prospectingStages', 'invites'];
-            const batch = writeBatch(db);
-
-            for (const coll of collectionsToDelete) {
-                const q = query(collection(db, coll), where('organizationId', '==', orgId));
-                const snapshot = await getDocs(q);
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                if (client && contact) {
+                    reportItems.push({ budget, client, contact, followUps: budget.followUps });
+                }
             }
+        });
 
-            const orgRef = doc(db, 'organizations', orgId);
-            batch.delete(orgRef);
-
-            await batch.commit();
-            await fetchSuperAdminData();
-        } catch (error) {
-            console.error("Error deleting organization:", error);
-            alert("Falha ao excluir organização. Verifique o console para mais detalhes.");
-        } finally {
-            setLoading(false);
+        if (reportItems.length > 0 && userProfile) {
+            generateFollowUpReport(`Relatório de Orçamentos`, reportItems, userProfile, organization);
+        } else {
+            alert('Não foi possível gerar o relatório. Dados de cliente ou contato ausentes para os orçamentos selecionados.');
         }
     };
 
     const handleGenerateDailyReport = () => {
         if (!userProfile) return;
-        const today = new Date().toDateString();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        const reportData = budgets
-            .filter(b => b.nextFollowUpDate && new Date(b.nextFollowUpDate).toDateString() === today)
-            .map(budget => {
-                const client = clients.find(c => c.id === budget.clientId);
-                if (!client) return null;
-                const contact = contacts.find(c => c.id === budget.contactId);
-                if (!contact) return null;
-                const todaysFollowUps = budget.followUps.filter(fu => new Date(fu.date).toDateString() === today);
-                return { budget, client, contact, followUps: todaysFollowUps };
-            })
-            .filter((item): item is ReportDataItem => item !== null);
+        const dailyBudgets = budgets.filter(b => b.nextFollowUpDate && new Date(b.nextFollowUpDate).toDateString() === today.toDateString());
         
-        if (reportData.length > 0) {
-            generateFollowUpReport('Relatório de Follow-ups do Dia', reportData, userProfile, organization);
+        const reportItems: ReportDataItem[] = [];
+        dailyBudgets.forEach(budget => {
+            const client = clients.find(c => c.id === budget.clientId);
+            const contact = contacts.find(c => c.id === budget.contactId);
+            if (client && contact) {
+                reportItems.push({ budget, client, contact, followUps: budget.followUps });
+            }
+        });
+
+        if (reportItems.length > 0) {
+            generateFollowUpReport(`Relatório de Follow-ups de Hoje`, reportItems, userProfile, organization);
         } else {
             alert('Nenhum follow-up agendado para hoje.');
         }
     };
-    
-    const handleScheduleFollowUp = async (budgetId: string, date: Date) => {
-        const budgetRef = doc(db, 'budgets', budgetId);
-        await updateDoc(budgetRef, {
-            nextFollowUpDate: date.toISOString().split('T')[0], // Store as YYYY-MM-DD
-            status: BudgetStatus.FOLLOWING_UP
-        });
-        await fetchOrganizationData();
-    };
-
 
     if (loading) return <FullScreenLoader message={loadingMessage} />;
-    if (!user || !userProfile) return <Auth />;
-    
-    // Gatekeeper logic for subscription
-    if (userProfile.role !== UserRole.SUPER_ADMIN && organization?.subscriptionStatus !== 'active') {
-        // Here we can also check for a 'trial' status in the future
-        // e.g., !['active', 'trial'].includes(organization?.subscriptionStatus)
+    if (!user) return <Auth />;
+    if (!userProfile) return <FullScreenLoader message="Carregando perfil..." />;
+    if (!organization && userProfile.role !== UserRole.SUPER_ADMIN) {
+         if (userProfile.organizationId) {
+             // Organization is being fetched, show loader
+             return <FullScreenLoader message="Carregando organização..." />;
+         }
+         // Org is invalid or not found, show subscription view
+         return <SubscriptionView organization={null} user={user} />;
+    }
+    if (organization && (organization.status === 'suspended' || organization.subscriptionStatus === 'past_due' || organization.subscriptionStatus === 'unpaid' || organization.subscriptionStatus === 'canceled') && userProfile.role !== UserRole.SUPER_ADMIN && !impersonatingOrg) {
         return <SubscriptionView organization={organization} user={user} />;
     }
-
-    const selectedBudgetClient = clients.find(c => c.id === selectedBudget?.clientId);
-    const selectedBudgetContact = contacts.find(c => c.id === selectedBudget?.contactId);
     
-    const isDashboardTheme = themeVariant === 'dashboard';
-
+    const selectedClientBudgets = selectedClient ? budgets.filter(b => b.clientId === selectedClient.id) : [];
+    const selectedClientContacts = selectedClient ? contacts.filter(c => c.clientId === selectedClient.id) : [];
+    
     return (
-        <div className={`flex h-screen ${isDashboardTheme ? 'bg-[var(--background-primary)]' : 'bg-[var(--background-primary)]'}`}>
-             {/* Sidebar backdrop for mobile */}
-            {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 md:hidden"></div>}
-            
-            <Sidebar 
-                activeView={activeView} 
-                setActiveView={handleSetView} 
-                isOpen={isSidebarOpen} 
-                userProfile={userProfile} 
-                organization={organization}
-                themeVariant={themeVariant}
-            />
+        <div className={`flex h-screen overflow-hidden ${themeVariant === 'dashboard' ? 'bg-[var(--background-primary)]' : 'bg-[var(--background-primary)]'}`}>
+            <Sidebar activeView={activeView} setActiveView={changeView} isOpen={isSidebarOpen} userProfile={userProfile} organization={organization} themeVariant={themeVariant}/>
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header 
+                    onAddBudget={() => setAddBudgetModalOpen(true)} 
+                    onAddProspect={() => setAddProspectModalOpen(true)}
+                    onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+                    theme={theme}
+                    toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                    notifications={notifications}
+                    onNotificationClick={handleSelectBudget}
+                    userProfile={userProfile}
+                    onEditProfile={() => setProfileModalOpen(true)}
+                    onSettings={() => setSettingsModalOpen(true)}
+                    onLogout={() => signOut(auth)}
+                    themeVariant={themeVariant}
+                    reminders={reminders}
+                    onAddReminder={async (reminderData) => {
+                        if(!user || !userProfile) return;
+                        const newReminder = { ...reminderData, userId: user.uid, organizationId: userProfile.organizationId, isDismissed: false, isCompleted: false };
+                        const docRef = await addDoc(collection(db, 'reminders'), newReminder);
+                        setReminders(prev => [...prev, {id: docRef.id, ...newReminder}]);
+                    }}
+                    onDeleteReminder={async (reminderId) => {
+                        await deleteDoc(doc(db, 'reminders', reminderId));
+                        setReminders(prev => prev.filter(r => r.id !== reminderId));
+                    }}
+                     onToggleReminderStatus={async (reminderId) => {
+                        const reminder = reminders.find(r => r.id === reminderId);
+                        if(reminder){
+                            await updateDoc(doc(db, 'reminders', reminderId), { isCompleted: !reminder.isCompleted });
+                            setReminders(prev => prev.map(r => r.id === reminderId ? {...r, isCompleted: !r.isCompleted} : r));
+                        }
+                    }}
+                />
+                 <main className={`flex-1 ${activeView === 'deals' ? 'overflow-hidden p-4 sm:p-6' : 'overflow-y-auto p-4 sm:p-6 lg:p-8'}`}>
+                    <div key={viewKey} className="fade-in">
+                        {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile}/>}
+                        {activeView === 'deals' && <DealsView budgets={budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status))} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={() => {}}/>}
+                        {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
+                        {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateReport}/>}
+                        {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)} />}
+                        {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport}/>}
+                        {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={async (reminderData) => {
+                            if(!user || !userProfile) return;
+                            const newReminder = { ...reminderData, userId: user.uid, organizationId: userProfile.organizationId, isDismissed: false, isCompleted: false };
+                            const docRef = await addDoc(collection(db, 'reminders'), newReminder);
+                            setReminders(prev => [...prev, {id: docRef.id, ...newReminder}]);
+                        }}/>}
+                        {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget}/>}
+                        {activeView === 'map' && <MapView clients={clients}/>}
+                        {activeView === 'users' && (userProfile.role === 'Admin' || userProfile.role === 'Manager') && <UsersView users={users} onUpdateRole={async (userId, newRole) => {
+                            await updateDoc(doc(db, "users", userId), { role: newRole });
+                            setUsers(prev => prev.map(u => u.id === userId ? {...u, role: newRole} : u));
+                        }} onInviteUserClick={() => setAddUserModalOpen(true)}/>}
+                        {activeView === 'organizations' && userProfile.role === 'Super Admin' && <SuperAdminView 
+                            organizations={allOrganizations} 
+                            users={allUsers} 
+                            clients={allClients}
+                            budgets={allBudgets}
+                            onImpersonate={(org) => {
+                                setOriginalUserProfile(userProfile);
+                                setImpersonatingOrg(org);
+                            }}
+                            onToggleStatus={async(orgId, currentStatus) => {
+                                const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+                                await updateDoc(doc(db, "organizations", orgId), { status: newStatus });
+                                setAllOrganizations(prev => prev.map(o => o.id === orgId ? {...o, status: newStatus} : o));
+                            }}
+                             onDelete={async (orgId, orgName) => {
+                                 if(window.confirm(`Tem certeza que deseja DELETAR a organização "${orgName}"? Esta ação é irreversível e removerá todos os dados associados.`)) {
+                                    // In a real app, you'd run a cloud function to delete all sub-collections.
+                                    // Here we just delete the org doc for simplicity.
+                                    await deleteDoc(doc(db, "organizations", orgId));
+                                    setAllOrganizations(prev => prev.filter(o => o.id !== orgId));
+                                 }
+                             }}
+                        />}
 
-            <div className={`flex-1 flex flex-col h-screen ${isDashboardTheme ? 'p-0 sm:p-4' : ''}`}>
-                 <div className={`flex flex-col h-full w-full ${isDashboardTheme ? 'bg-[var(--background-secondary)] rounded-none sm:rounded-2xl shadow-lg' : ''}`}>
-                     {impersonatingOrg && originalUserProfile && (
-                        <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
-                            <ExclamationTriangleIcon className="w-5 h-5" />
-                            Você está visualizando como {userProfile.name} da organização {impersonatingOrg.name}.
-                            <button onClick={handleExitImpersonation} className="ml-4 bg-black/20 hover:bg-black/40 text-white font-bold py-1 px-3 rounded-lg">
-                                Voltar ao Super Admin
-                            </button>
-                        </div>
-                    )}
-                    <Header 
-                        onAddBudget={() => setAddBudgetModalOpen(true)} 
-                        onAddProspect={() => setAddProspectModalOpen(true)}
-                        onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
-                        theme={theme}
-                        toggleTheme={toggleTheme}
-                        notifications={notifications}
-                        onNotificationClick={handleSelectBudget}
-                        userProfile={userProfile}
-                        onEditProfile={() => setProfileModalOpen(true)}
-                        onSettings={() => setSettingsModalOpen(true)}
-                        onLogout={handleLogout}
-                        themeVariant={themeVariant}
-                        reminders={reminders}
-                        onAddReminder={handleAddReminder}
-                        onDeleteReminder={handleDeleteReminder}
-                        onToggleReminderStatus={handleToggleReminderStatus}
+                    </div>
+                </main>
+                 {activeReminder && (
+                    <ReminderNotification 
+                        reminder={activeReminder}
+                        onDismiss={async () => {
+                             await updateDoc(doc(db, 'reminders', activeReminder.id), { isDismissed: true });
+                             setReminders(prev => prev.map(r => r.id === activeReminder.id ? {...r, isDismissed: true} : r));
+                             setActiveReminder(null);
+                        }}
                     />
-                    <main key={viewKey} className={`flex-1 overflow-y-auto fade-in ${isDashboardTheme ? 'p-4 sm:p-6' : 'p-4 sm:p-8'}`}>
-                        {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
-                            <SuperAdminView 
-                                organizations={allOrganizations} 
-                                users={allUsers} 
-                                clients={allClients} 
-                                budgets={allBudgets}
-                                onImpersonate={handleImpersonate}
-                                onToggleStatus={handleToggleOrgStatus}
-                                onDelete={handleDeleteOrganization}
-                            />
-                        ) : (
-                            <>
-                                {activeView === 'dashboard' && <Dashboard userProfile={userProfile} budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
-                                {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} onScheduleFollowUp={handleScheduleFollowUp} />}
-                                {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
-                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
-                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />}
-                                {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />}
-                                {activeView === 'map' && <MapView clients={clients} />}
-                                {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
-                                {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
-                                {(activeView === 'users' && (userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER)) && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
-                            </>
-                        )}
-                    </main>
-                </div>
+                )}
             </div>
             
-            {/* Reminder Notification */}
-            {activeReminder && (
-                <ReminderNotification 
-                    reminder={activeReminder}
-                    onDismiss={() => handleDismissReminder(activeReminder.id)}
-                />
-            )}
-
             {/* Modals */}
             <AddBudgetModal 
                 isOpen={isAddBudgetModalOpen} 
-                onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }}
-                onSave={handleAddBudget}
-                clients={clients}
+                onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }} 
+                onSave={handleAddBudget} 
+                clients={clients} 
                 contacts={contacts}
                 prospectData={prospectToConvert ? { 
                     clientName: prospectToConvert.company, 
-                    contactName: prospectToConvert.name,
+                    contactName: prospectToConvert.name, 
                     contactInfo: prospectToConvert.email || prospectToConvert.phone || '',
-                    clientCnpj: prospectToConvert.cnpj
+                    clientCnpj: prospectToConvert.cnpj 
                 } : null}
                 initialClientId={initialClientIdForBudget}
             />
-            {isBudgetDetailModalOpen && selectedBudget && selectedBudgetClient && (
-                <BudgetDetailModal 
-                    isOpen={isBudgetDetailModalOpen} 
-                    onClose={() => setBudgetDetailModalOpen(false)}
-                    budget={selectedBudget}
-                    client={selectedBudgetClient}
-                    contact={selectedBudgetContact}
-                    onAddFollowUp={handleAddFollowUp}
-                    onChangeStatus={handleChangeStatus}
-                    onPartialSale={handlePartialSale}
-                />
-            )}
-             <AddProspectModal 
-                isOpen={isAddProspectModalOpen} 
-                onClose={() => setAddProspectModalOpen(false)}
-                onSave={handleAddProspect}
-            />
-            {isClientDetailModalOpen && selectedClient && (
-                <ClientDetailModal
-                    isOpen={isClientDetailModalOpen}
-                    onClose={() => setClientDetailModalOpen(false)}
-                    client={selectedClient}
-                    contacts={contacts.filter(c => c.clientId === selectedClient.id)}
-                    budgets={budgets.filter(b => b.clientId === selectedClient.id)}
-                    onSelectBudget={handleSelectBudget}
-                    onAddBudgetForClient={(client) => {
-                        setClientDetailModalOpen(false);
-                        setInitialClientIdForBudget(client.id);
-                        setAddBudgetModalOpen(true);
-                    }}
-                    onUpdateClient={handleUpdateClientData}
-                />
-            )}
-            <ProfileModal
-                isOpen={isProfileModalOpen}
-                onClose={() => setProfileModalOpen(false)}
-                onSave={(profileUpdate) => {
-                    handleUpdateUserProfile(profileUpdate);
-                    setProfileModalOpen(false);
-                }}
-                userProfile={userProfile}
-            />
-            <SettingsModal
-                isOpen={isSettingsModalOpen}
-                onClose={() => setSettingsModalOpen(false)}
-                currentTheme={theme}
-                currentThemeVariant={themeVariant}
-                setTheme={setTheme}
-                setThemeVariant={setThemeVariant}
-                userProfile={userProfile}
-                organization={organization}
-                onSaveOrganization={handleUpdateOrganizationData}
-            />
-            <AddClientModal
-                isOpen={isAddClientModalOpen}
-                onClose={() => setAddClientModalOpen(false)}
-                onSave={(client, contact) => {
-                    handleAddClient(client, contact);
-                    setAddClientModalOpen(false);
-                }}
-            />
-             {(userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER) && (
-                <AddUserModal
-                    isOpen={isAddUserModalOpen}
-                    onClose={() => setAddUserModalOpen(false)}
-                    onInvite={handleInviteUser}
-                />
-            )}
+            {selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} />}
+            <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />
+            {selectedClient && <ClientDetailModal isOpen={isClientDetailModalOpen} onClose={() => setClientDetailModalOpen(false)} client={selectedClient} contacts={selectedClientContacts} budgets={selectedClientBudgets} onSelectBudget={handleSelectBudget} onAddBudgetForClient={handleAddBudgetForClient} onUpdateClient={handleUpdateClient} />}
+            {userProfile && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} userProfile={userProfile} onSave={async (profileUpdate) => {
+                if(!user) return;
+                await updateDoc(doc(db, "users", user.uid), profileUpdate as any);
+                setUserProfile(prev => ({...prev, ...profileUpdate} as UserProfile));
+                setProfileModalOpen(false);
+            }}/>}
+            <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} userProfile={userProfile} organization={organization} onSaveOrganization={async (orgUpdate, logoFile) => {
+                 if(!organization || !userProfile) return;
+        
+                let logoUrl = organization.logoUrl;
+
+                if(logoFile) {
+                    const storageRef = ref(storage, `organizations/${userProfile.organizationId}/logo.png`);
+                    const snapshot = await uploadBytes(storageRef, logoFile);
+                    logoUrl = await getDownloadURL(snapshot.ref);
+                }
+
+                const finalUpdate = { ...orgUpdate, logoUrl };
+                await updateDoc(doc(db, "organizations", organization.id), finalUpdate);
+                setOrganization(prev => ({...prev, ...finalUpdate } as Organization));
+            }}/>
+            <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />
+            <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onInvite={async(email, role) => {
+                if(!userProfile) return;
+                 const invitesRef = collection(db, "invites");
+                 const q = query(invitesRef, where("email", "==", email), where("organizationId", "==", userProfile.organizationId));
+                 const existingInvites = await getDocs(q);
+
+                 if(!existingInvites.empty) {
+                    alert('Um convite para este e-mail já foi enviado.');
+                    return;
+                 }
+
+                 await addDoc(invitesRef, { email, role, organizationId: userProfile.organizationId, status: 'pending' });
+                 alert(`Convite enviado para ${email}!`);
+                 setAddUserModalOpen(false);
+            }}/>
         </div>
     );
 };

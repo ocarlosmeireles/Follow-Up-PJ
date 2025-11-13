@@ -7,7 +7,7 @@ interface ProspectAIModalProps {
   isOpen: boolean;
   onClose: () => void;
   prospect: Prospect;
-  mode: 'research' | 'icebreaker';
+  mode: 'research' | 'icebreaker' | 'strategy';
 }
 
 const ProspectAIModal: React.FC<ProspectAIModalProps> = ({ isOpen, onClose, prospect, mode }) => {
@@ -37,8 +37,10 @@ A resposta deve ser em português do Brasil e formatada em tópicos (usando *).`
                 const icebreakerPrompt = `Crie uma curta e personalizada frase de abertura para um primeiro contato (e-mail ou mensagem) com ${prospect.name} da empresa ${prospect.company}. 
 Use as seguintes anotações sobre o prospect, se disponíveis: "${prospect.notes || 'Nenhuma'}".
 O tom deve ser profissional, mas amigável e direto ao ponto. Forneça apenas o texto da abordagem.`;
+                
+                const strategyPrompt = `Crie uma estratégia de prospecção simples em 3 passos para abordar ${prospect.name} da empresa ${prospect.company}. Considere as seguintes notas: "${prospect.notes || 'Nenhuma'}". A resposta deve ser concisa, em formato de lista numerada, prática e em português do Brasil.`;
 
-                const prompt = mode === 'research' ? researchPrompt : icebreakerPrompt;
+                const prompt = mode === 'research' ? researchPrompt : mode === 'icebreaker' ? icebreakerPrompt : strategyPrompt;
                 
                 const response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
@@ -68,6 +70,10 @@ O tom deve ser profissional, mas amigável e direto ao ponto. Forneça apenas o 
         icebreaker: {
             title: `Sugestão de Abordagem`,
             icon: <ChatBubbleLeftRightIcon className="w-6 h-6 text-violet-500" />
+        },
+        strategy: {
+            title: `Estratégia para ${prospect.company}`,
+            icon: <SparklesIcon className="w-6 h-6 text-emerald-500" />
         }
     };
 

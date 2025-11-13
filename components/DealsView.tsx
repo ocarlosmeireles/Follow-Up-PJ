@@ -52,21 +52,18 @@ const FocusCard: React.FC<{ deal: PriorityDeal, budget: Budget, clientName: stri
 // --- Modal de Foco (IA) ---
 
 interface FocusDealsModalProps {
-    isOpen: boolean;
     onClose: () => void;
     budgets: Budget[];
     clientMap: Map<string, string>;
     onSelectBudget: (id: string) => void;
 }
 
-const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ isOpen, onClose, budgets, clientMap, onSelectBudget }) => {
+const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ onClose, budgets, clientMap, onSelectBudget }) => {
     const [priorityDeals, setPriorityDeals] = useState<PriorityDeal[]>([]);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!isOpen) return;
-
         const fetchPriorityDeals = async () => {
             if (!budgets || budgets.length === 0) {
                 setIsLoadingAI(false);
@@ -138,7 +135,7 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
         };
 
         fetchPriorityDeals();
-    }, [isOpen, budgets]);
+    }, [budgets]);
 
     const priorityBudgetsData = useMemo(() => {
         return priorityDeals
@@ -149,10 +146,6 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
             })
             .filter((item): item is { deal: PriorityDeal; budget: Budget } => item !== null);
     }, [priorityDeals, budgets]);
-
-    if (!isOpen) {
-        return null;
-    }
 
     return (
         <div 
@@ -343,8 +336,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                 </div>
             </section>
 
-             <FocusDealsModal 
-                isOpen={isFocusModalOpen}
+             {isFocusModalOpen && <FocusDealsModal 
                 onClose={() => setIsFocusModalOpen(false)}
                 budgets={budgets}
                 clientMap={clientMap}
@@ -352,7 +344,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                     setIsFocusModalOpen(false); // Close focus modal
                     onSelectBudget(budgetId); // Open detail modal
                 }}
-            />
+            />}
         </div>
     );
 };

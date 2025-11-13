@@ -1,9 +1,10 @@
 
+
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client, Contact } from '../types'; // Assuming Contact might be needed, if not, can be removed.
+import type { Budget, Client } from '../types';
 import { BudgetStatus } from '../types';
 import { 
-    CalendarIcon, SparklesIcon, FireIcon, BuildingOffice2Icon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, ClockIcon, UserIcon, HashtagIcon
+    CalendarIcon, SparklesIcon, FireIcon, BuildingOffice2Icon, ClockIcon, HashtagIcon
 } from './icons';
 import BudgetAIAnalysisModal from './BudgetAIAnalysisModal';
 
@@ -66,7 +67,7 @@ const BudgetCard: React.FC<{
 
     return (
         <div 
-            className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm mb-3 cursor-pointer border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2 shadow-2xl' : 'hover:-translate-y-1'}`} 
+            className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-pointer border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2 shadow-2xl' : 'hover:-translate-y-1'}`} 
             onClick={() => onSelect(budget.id)}
         >
             <div className="flex justify-between items-start">
@@ -119,7 +120,9 @@ const KanbanColumn: React.FC<{
     isDraggingOver: boolean;
     draggingBudgetId: string | null;
     setDraggingBudgetId: (id: string | null) => void;
-}> = ({ title, budgets, clientMap, onSelectBudget, onOpenAiModal, onDragOver, onDrop, isDraggingOver, draggingBudgetId, setDraggingBudgetId }) => {
+    className?: string;
+    style?: React.CSSProperties;
+}> = ({ title, budgets, clientMap, onSelectBudget, onOpenAiModal, onDragOver, onDrop, isDraggingOver, draggingBudgetId, setDraggingBudgetId, className, style }) => {
     
     const totalValue = useMemo(() => budgets.reduce((sum, b) => sum + b.value, 0), [budgets]);
     
@@ -127,9 +130,8 @@ const KanbanColumn: React.FC<{
         <div 
             onDragOver={onDragOver} 
             onDrop={onDrop}
-            onDragLeave={(e) => e.currentTarget.classList.remove('bg-slate-200', 'dark:bg-slate-700')}
-            onDragEnter={(e) => e.currentTarget.classList.add('bg-slate-200', 'dark:bg-slate-700')}
-            className={`flex-1 min-w-[320px] w-full sm:w-1/5 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors duration-300 ease-in-out`}
+            className={`flex-1 min-w-[320px] bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors duration-300 ease-in-out ${className}`}
+            style={style}
         >
             <div className="flex justify-between items-center mb-1 flex-shrink-0 px-1">
                 <h3 className="font-semibold text-lg text-[var(--text-primary)]">{title}</h3>
@@ -140,7 +142,13 @@ const KanbanColumn: React.FC<{
             </div>
             <div className="overflow-y-auto pr-2 custom-scrollbar flex-grow">
                 {budgets.map(budget => (
-                    <div key={budget.id} draggable onDragStart={(e) => { e.dataTransfer.setData('budgetId', budget.id); setDraggingBudgetId(budget.id); }} onDragEnd={() => setDraggingBudgetId(null)}>
+                    <div 
+                        key={budget.id} 
+                        draggable 
+                        onDragStart={(e) => { e.dataTransfer.setData('budgetId', budget.id); setDraggingBudgetId(budget.id); }} 
+                        onDragEnd={() => setDraggingBudgetId(null)}
+                        className="mb-3"
+                    >
                         <BudgetCard
                             budget={budget}
                             clientName={clientMap.get(budget.clientId) || 'Cliente Desconhecido'}
@@ -253,7 +261,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                     <h2 className="text-3xl font-bold text-[var(--text-primary)]">Hub de Negócios</h2>
                     <p className="text-[var(--text-secondary)] mt-1">Arraste os negócios para atualizar seu pipeline.</p>
                 </div>
-                <div className="flex items-center gap-2 self-start sm:self-center">
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-center">
                    <FilterButton label="Todos" icon="✨" isActive={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
                    <FilterButton label="Hot" icon="🔥" isActive={activeFilter === 'hot'} onClick={() => setActiveFilter('hot')} />
                    <FilterButton label="Stale" icon="❄️" isActive={activeFilter === 'stale'} onClick={() => setActiveFilter('stale')} />
@@ -262,15 +270,15 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
             </div>
             
             {suggestedFollowUps.length > 0 && (
-                <div className="mb-6 bg-blue-50 dark:bg-blue-900/40 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 animated-item">
-                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/40 dark:to-purple-900/40 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 animated-item shadow-sm">
+                    <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-300 dark:to-purple-300 flex items-center gap-2">
                         <SparklesIcon className="w-5 h-5" />
-                        Assistente de Vendas
+                        Assistente de Vendas Proativo
                     </h3>
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">Estes negócios precisam de um próximo passo. Agende um follow-up para não perder a oportunidade.</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-300 mb-3">Estes negócios precisam de um próximo passo. Agende um follow-up para não perder a oportunidade.</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
                         {suggestedFollowUps.map(budget => (
-                            <div key={budget.id} className="bg-white dark:bg-slate-800 p-2 pl-3 rounded-md flex flex-wrap justify-between items-center shadow-sm gap-2">
+                            <div key={budget.id} className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm p-2 pl-3 rounded-md flex flex-wrap justify-between items-center shadow-sm gap-2 border border-black/5">
                                 <div>
                                     <p className="font-semibold text-gray-800 dark:text-slate-200">{budget.title}</p>
                                     <p className="text-sm text-blue-600 dark:text-blue-400">{clientMap.get(budget.clientId) || 'Cliente'}</p>
@@ -289,7 +297,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
             )}
             
             <div className="flex-1 flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-                {columns.map(status => (
+                {columns.map((status, index) => (
                     <KanbanColumn
                         key={status}
                         title={status}
@@ -302,6 +310,8 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                         isDraggingOver={draggingOverColumn === status}
                         draggingBudgetId={draggingBudgetId}
                         setDraggingBudgetId={setDraggingBudgetId}
+                        className="animated-item"
+                        style={{ animationDelay: `${index * 80}ms` }}
                     />
                 ))}
             </div>

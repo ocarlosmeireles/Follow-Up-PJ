@@ -413,8 +413,8 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: The type of `newClientRef.id` is inferred as `unknown`, causing a type error. Casting to `string` resolves this.
-                finalClientId = newClientRef.id as string;
+                // FIX: The type of `newClientRef.id` is inferred as `unknown`, causing a type error. Using String() to convert.
+                finalClientId = String(newClientRef.id);
             }
 
             if (!finalClientId) {
@@ -428,8 +428,8 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: The type of `newContactRef.id` is inferred as `unknown`, causing a type error. Casting to `string` resolves this.
-                finalContactId = newContactRef.id as string;
+                // FIX: The type of `newContactRef.id` is inferred as `unknown`, causing a type error. Using String() to convert.
+                finalContactId = String(newContactRef.id);
             }
             
             const newBudget: Omit<Budget, 'id'> = {

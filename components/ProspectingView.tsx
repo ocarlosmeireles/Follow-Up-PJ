@@ -28,7 +28,12 @@ const timeSince = (date: string): string => {
     return Math.floor(seconds) + "s";
 };
 
-const ProspectCard: React.FC<{ prospect: Prospect; onConvert: (id: string) => void; onOpenAiModal: (prospect: Prospect, mode: 'research' | 'icebreaker') => void; }> = ({ prospect, onConvert, onOpenAiModal }) => {
+const ProspectCard: React.FC<{ 
+    prospect: Prospect; 
+    onConvert: (id: string) => void; 
+    onOpenAiModal: (prospect: Prospect, mode: 'research' | 'icebreaker') => void;
+    isDragging: boolean; 
+}> = ({ prospect, onConvert, onOpenAiModal, isDragging }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -42,10 +47,6 @@ const ProspectCard: React.FC<{ prospect: Prospect; onConvert: (id: string) => vo
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-        e.dataTransfer.setData('prospectId', prospect.id);
-    };
-
     const isStale = useMemo(() => {
         const fifteenDaysAgo = new Date();
         fifteenDaysAgo.setDate(new Date().getDate() - 15);
@@ -53,7 +54,7 @@ const ProspectCard: React.FC<{ prospect: Prospect; onConvert: (id: string) => vo
     }, [prospect.createdAt]);
 
     return (
-        <div draggable onDragStart={handleDragStart} className="bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm mb-3 cursor-grab active:cursor-grabbing border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group">
+        <div className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-grab active:cursor-grabbing border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-3 shadow-xl' : 'hover:-translate-y-1'}`}>
             <div className="flex justify-between items-start">
                 <div className="flex-1 overflow-hidden">
                     <h4 className="font-bold text-[var(--text-primary)] text-base truncate" title={prospect.company}>{prospect.company}</h4>
@@ -91,6 +92,7 @@ const ProspectCard: React.FC<{ prospect: Prospect; onConvert: (id: string) => vo
 
 const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onUpdateStages, onConvertProspect }) => {
     const [draggingOverColumn, setDraggingOverColumn] = useState<string | null>(null);
+    const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [aiModalState, setAiModalState] = useState<{ isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | null }>({ isOpen: false, prospect: null, mode: null });
 
@@ -117,30 +119,63 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center mb-6 flex-shrink-0">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 flex-shrink-0 gap-4">
                 <div>
-                    <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Funil de Prospecção</h2>
+                    <h2 className="text-3xl font-bold text-[var(--text-primary)]">Funil de Prospecção</h2>
                     <p className="text-[var(--text-secondary)]">Arraste os prospects entre as etapas para avançar no funil.</p>
                 </div>
-                 <div className="flex gap-4">
+                 <div className="flex gap-4 self-start md:self-center">
                     <button onClick={() => setSettingsModalOpen(true)} className="bg-[var(--background-secondary)] hover:bg-[var(--background-secondary-hover)] text-[var(--text-secondary)] font-semibold py-2 px-4 rounded-lg border border-[var(--border-secondary)] flex items-center transition-colors duration-200 shadow-sm"><Cog6ToothIcon className="w-5 h-5 mr-2" />Configurar Etapas</button>
                     <button onClick={onAddProspectClick} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm"><PlusIcon className="w-5 h-5 mr-2" />Novo Prospect</button>
                 </div>
             </div>
-            <div className="flex gap-6 pb-4 flex-grow overflow-x-auto">
-                {sortedStages.map(stage => (
-                    <div key={stage.id} onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(stage.id); }} onDrop={(e) => handleDrop(e, stage.id)} onDragLeave={() => setDraggingOverColumn(null)} className={`flex-1 min-w-[280px] bg-[var(--background-tertiary)] rounded-lg p-3 border-t-4 border-[var(--accent-primary)] flex flex-col transition-colors duration-200 ${draggingOverColumn === stage.id ? 'bg-slate-200 dark:bg-slate-700' : ''}`}>
-                        <div className="flex justify-between items-center mb-4 flex-shrink-0 px-1">
-                            <h3 className="font-semibold text-lg text-[var(--text-primary)]">{stage.name}</h3>
-                            <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{prospectsByStage[stage.id]?.length || 0}</span>
+            <div className="flex gap-6 pb-4 flex-grow overflow-x-auto -mx-4 px-4">
+                {sortedStages.map((stage, index) => {
+                    const stageProspects = prospectsByStage[stage.id] || [];
+                    const totalProspectsInFunnel = prospects.length;
+                    const percentage = totalProspectsInFunnel > 0 ? (stageProspects.length / totalProspectsInFunnel) * 100 : 0;
+                    
+                    return (
+                        <div 
+                            key={stage.id} 
+                            onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(stage.id); }} 
+                            onDrop={(e) => handleDrop(e, stage.id)} 
+                            onDragLeave={() => setDraggingOverColumn(null)} 
+                            className="flex-1 min-w-[300px] bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors duration-200 animated-item"
+                            style={{ animationDelay: `${index * 80}ms` }}
+                        >
+                            <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
+                                <h3 className="font-semibold text-lg text-[var(--text-primary)]">{stage.name}</h3>
+                                <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{stageProspects.length}</span>
+                            </div>
+                            <div className="h-1.5 bg-[var(--background-secondary)] rounded-full mb-4 overflow-hidden" title={`${percentage.toFixed(0)}% de todos os prospects`}>
+                                <div className="h-1.5 bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${percentage}%` }}></div>
+                            </div>
+                            <div className="overflow-y-auto pr-2 custom-scrollbar flex-grow">
+                                {stageProspects.map(prospect => (
+                                    <div 
+                                        key={prospect.id} 
+                                        draggable 
+                                        onDragStart={(e) => { e.dataTransfer.setData('prospectId', prospect.id); setDraggingProspectId(prospect.id); }}
+                                        onDragEnd={() => setDraggingProspectId(null)}
+                                        className="mb-3"
+                                    >
+                                        <ProspectCard 
+                                            key={prospect.id} 
+                                            prospect={prospect} 
+                                            onConvert={onConvertProspect} 
+                                            onOpenAiModal={handleOpenAiModal}
+                                            isDragging={draggingProspectId === prospect.id}
+                                        />
+                                    </div>
+                                ))}
+                                {draggingOverColumn === stage.id && (
+                                    <div className="h-20 border-2 border-dashed border-[var(--border-secondary)] rounded-lg bg-[var(--background-tertiary-hover)]"></div>
+                                )}
+                            </div>
                         </div>
-                        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                            {(prospectsByStage[stage.id] || []).map(prospect => (
-                                <ProspectCard key={prospect.id} prospect={prospect} onConvert={onConvertProspect} onOpenAiModal={handleOpenAiModal} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
             <StageSettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} stages={stages} onSave={onUpdateStages} />
             {aiModalState.isOpen && aiModalState.prospect && <ProspectAIModal isOpen={aiModalState.isOpen} onClose={handleCloseAiModal} prospect={aiModalState.prospect} mode={aiModalState.mode!} />}

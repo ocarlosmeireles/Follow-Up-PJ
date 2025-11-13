@@ -1,10 +1,9 @@
 
-
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client } from '../types';
+import type { Budget, Client, Contact } from '../types'; // Assuming Contact might be needed, if not, can be removed.
 import { BudgetStatus } from '../types';
 import { 
-    CalendarIcon, SparklesIcon, FireIcon, BuildingOffice2Icon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon 
+    CalendarIcon, SparklesIcon, FireIcon, BuildingOffice2Icon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, ClockIcon, UserIcon, HashtagIcon
 } from './icons';
 import BudgetAIAnalysisModal from './BudgetAIAnalysisModal';
 
@@ -20,44 +19,90 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
 
+const timeSince = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+    let interval = seconds / 86400; // days
+    if (interval > 1) {
+      return `${Math.floor(interval)}d atrás`;
+    }
+    interval = seconds / 3600; // hours
+    if (interval > 1) {
+      return `${Math.floor(interval)}h atrás`;
+    }
+    interval = seconds / 60; // minutes
+    if (interval > 1) {
+      return `${Math.floor(interval)}min atrás`;
+    }
+    return 'agora';
+};
+
+
 const BudgetCard: React.FC<{
     budget: Budget;
     clientName: string;
     onSelect: (id: string) => void;
     onOpenAiModal: (budget: Budget) => void;
-    isExpanded: boolean;
-    onToggleExpand: (id: string) => void;
-}> = ({ budget, clientName, onSelect, onOpenAiModal, isExpanded, onToggleExpand }) => {
+    isDragging: boolean;
+}> = ({ budget, clientName, onSelect, onOpenAiModal, isDragging }) => {
+    const STALE_THRESHOLD_DAYS = 15;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const isOverdue = budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < today && [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(budget.status);
     
+    const lastActivityDate = useMemo(() => {
+        if (budget.followUps.length > 0) {
+            return new Date(Math.max(...budget.followUps.map(f => new Date(f.date).getTime())));
+        }
+        return new Date(budget.dateSent);
+    }, [budget.followUps, budget.dateSent]);
+    
+    const daysSinceLastActivity = Math.floor((today.getTime() - lastActivityDate.getTime()) / (1000 * 3600 * 24));
+    const isStale = daysSinceLastActivity > STALE_THRESHOLD_DAYS;
+
     return (
-        <div className="bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm mb-3 cursor-pointer border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group" onClick={() => onSelect(budget.id)}>
+        <div 
+            className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm mb-3 cursor-pointer border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2 shadow-2xl' : 'hover:-translate-y-1'}`} 
+            onClick={() => onSelect(budget.id)}
+        >
             <div className="flex justify-between items-start">
                 <h4 className="font-bold text-[var(--text-primary)] text-base pr-2">{budget.title}</h4>
-                <button onClick={(e) => { e.stopPropagation(); onOpenAiModal(budget); }} className="p-1 rounded-full text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/50 flex-shrink-0">
+                <button onClick={(e) => { e.stopPropagation(); onOpenAiModal(budget); }} className="p-1 rounded-full text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/50 flex-shrink-0" title="Análise com IA">
                     <SparklesIcon className="w-5 h-5"/>
                 </button>
             </div>
-            <p className="text-sm text-[var(--text-accent)] font-semibold mb-2 flex items-center gap-2"><BuildingOffice2Icon className="w-4 h-4"/>{clientName}</p>
-            
+            <p className="text-sm text-[var(--text-accent)] font-semibold mb-2 flex items-center gap-1.5" title={clientName}>
+                <BuildingOffice2Icon className="w-4 h-4 flex-shrink-0"/>
+                <span className="truncate">{clientName}</span>
+            </p>
+             <p className="text-xs text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-1.5" title={`ID: ${budget.id}`}>
+                <HashtagIcon className="w-4 h-4 flex-shrink-0"/>
+                <span className="truncate">{budget.id.substring(0, 8)}...</span>
+            </p>
+
             <div className="flex justify-between items-center text-sm font-semibold text-[var(--text-secondary)]">
-                <span>{formatCurrency(budget.value)}</span>
-                {isOverdue && <span className="text-red-500 animate-pulse font-bold text-xs">ATRASADO</span>}
+                <span className="font-bold text-lg text-[var(--text-primary)]">{formatCurrency(budget.value)}</span>
+                <div className="flex items-center gap-2">
+                    {isStale && <span title={`Parado há ${daysSinceLastActivity} dias`} className="text-sky-500 font-bold text-xs animate-pulse">❄️</span>}
+                    {isOverdue && <span className="text-red-500 font-bold text-xs">ATRASADO</span>}
+                </div>
             </div>
             
-            {isExpanded && (
-                <div className="mt-2 pt-2 border-t border-[var(--border-primary)] text-xs text-[var(--text-secondary)] space-y-1">
-                    {budget.nextFollowUpDate && <p className="flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> {new Date(budget.nextFollowUpDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>}
-                    {budget.observations && <p className="italic">"{budget.observations}"</p>}
+            <div className="mt-2 pt-2 border-t border-[var(--border-primary)]/50 text-xs text-[var(--text-tertiary)] flex justify-between items-center">
+                <div className="flex items-center gap-1.5" title={`Última atividade: ${lastActivityDate.toLocaleDateString()}`}>
+                    <ClockIcon className="w-3 h-3"/>
+                    <span>{timeSince(lastActivityDate.toISOString())}</span>
                 </div>
-            )}
-            
-            <div className="text-center mt-1">
-                 <button onClick={(e) => { e.stopPropagation(); onToggleExpand(budget.id); }} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
-                    {isExpanded ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
-                </button>
+                {budget.nextFollowUpDate && 
+                    <div className="flex items-center gap-1.5 font-semibold" title="Próximo follow-up">
+                        <CalendarIcon className="w-3 h-3"/>
+                        <span>{new Date(budget.nextFollowUpDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                    </div>
+                }
             </div>
         </div>
     );
@@ -69,56 +114,107 @@ const KanbanColumn: React.FC<{
     clientMap: Map<string, string>;
     onSelectBudget: (id: string) => void;
     onOpenAiModal: (budget: Budget) => void;
-    isExpanded: { [key: string]: boolean };
-    onToggleExpand: (id: string) => void;
     onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
     onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
     isDraggingOver: boolean;
-}> = ({ title, budgets, clientMap, onSelectBudget, onOpenAiModal, isExpanded, onToggleExpand, onDragOver, onDrop, isDraggingOver }) => {
+    draggingBudgetId: string | null;
+    setDraggingBudgetId: (id: string | null) => void;
+}> = ({ title, budgets, clientMap, onSelectBudget, onOpenAiModal, onDragOver, onDrop, isDraggingOver, draggingBudgetId, setDraggingBudgetId }) => {
     
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, budgetId: string) => {
-        e.dataTransfer.setData('budgetId', budgetId);
-    };
+    const totalValue = useMemo(() => budgets.reduce((sum, b) => sum + b.value, 0), [budgets]);
     
     return (
-        <div onDragOver={onDragOver} onDrop={onDrop} className={`flex-1 min-w-[300px] w-full sm:w-1/5 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors duration-200 ${isDraggingOver ? 'bg-slate-200 dark:bg-slate-700' : ''}`}>
-            <div className="flex justify-between items-center mb-4 flex-shrink-0 px-1">
+        <div 
+            onDragOver={onDragOver} 
+            onDrop={onDrop}
+            onDragLeave={(e) => e.currentTarget.classList.remove('bg-slate-200', 'dark:bg-slate-700')}
+            onDragEnter={(e) => e.currentTarget.classList.add('bg-slate-200', 'dark:bg-slate-700')}
+            className={`flex-1 min-w-[320px] w-full sm:w-1/5 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors duration-300 ease-in-out`}
+        >
+            <div className="flex justify-between items-center mb-1 flex-shrink-0 px-1">
                 <h3 className="font-semibold text-lg text-[var(--text-primary)]">{title}</h3>
                 <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{budgets.length}</span>
             </div>
+            <div className="text-sm font-bold text-[var(--text-accent)] mb-3 px-1">
+                R$ {formatCurrency(totalValue)}
+            </div>
             <div className="overflow-y-auto pr-2 custom-scrollbar flex-grow">
                 {budgets.map(budget => (
-                    <div key={budget.id} draggable onDragStart={(e) => handleDragStart(e, budget.id)}>
+                    <div key={budget.id} draggable onDragStart={(e) => { e.dataTransfer.setData('budgetId', budget.id); setDraggingBudgetId(budget.id); }} onDragEnd={() => setDraggingBudgetId(null)}>
                         <BudgetCard
                             budget={budget}
                             clientName={clientMap.get(budget.clientId) || 'Cliente Desconhecido'}
                             onSelect={onSelectBudget}
                             onOpenAiModal={onOpenAiModal}
-                            isExpanded={!!isExpanded[budget.id]}
-                            onToggleExpand={onToggleExpand}
+                            isDragging={draggingBudgetId === budget.id}
                         />
                     </div>
                 ))}
+                {isDraggingOver && (
+                    <div className="h-24 border-2 border-dashed border-[var(--border-secondary)] rounded-lg bg-[var(--background-tertiary-hover)] mt-2 transition-all"></div>
+                )}
             </div>
         </div>
     );
 };
 
+const FilterButton: React.FC<{label: string; icon: string; isActive: boolean; onClick: () => void;}> = ({label, icon, isActive, onClick}) => (
+    <button onClick={onClick} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 border ${isActive ? 'bg-[var(--accent-primary)] text-white border-transparent' : 'bg-[var(--background-secondary)] hover:bg-[var(--background-secondary-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]'}`}>
+        <span>{icon}</span> {label}
+    </button>
+)
 
 const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget, onUpdateStatus, onScheduleFollowUp }) => {
-    const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
     const [aiModalState, setAiModalState] = useState<{ isOpen: boolean, budget: Budget | null }>({ isOpen: false, budget: null });
     const [draggingOverColumn, setDraggingOverColumn] = useState<BudgetStatus | null>(null);
+    const [draggingBudgetId, setDraggingBudgetId] = useState<string | null>(null);
+    const [activeFilter, setActiveFilter] = useState<'all' | 'hot' | 'stale' | 'closingSoon'>('all');
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
 
+    const filteredBudgets = useMemo(() => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(new Date().getDate() - 30);
+        const nextWeek = new Date();
+        nextWeek.setDate(new Date().getDate() + 7);
+
+        const activeDeals = budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+
+        if (activeFilter === 'all') return budgets;
+
+        if (activeFilter === 'hot') {
+            const values = activeDeals.map(b => b.value).sort((a,b) => b-a);
+            const top20Percentile = values[Math.floor(values.length * 0.20)] || 0;
+            return budgets.filter(b => b.value >= top20Percentile && b.value > 0);
+        }
+        
+        if (activeFilter === 'stale') {
+            return budgets.filter(b => {
+                const lastActivity = b.followUps.length > 0 
+                    ? new Date(Math.max(...b.followUps.map(f => new Date(f.date).getTime())))
+                    : new Date(b.dateSent);
+                return lastActivity < thirtyDaysAgo && ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status);
+            });
+        }
+
+        if (activeFilter === 'closingSoon') {
+            return budgets.filter(b => 
+                b.nextFollowUpDate && 
+                new Date(b.nextFollowUpDate) >= new Date() &&
+                new Date(b.nextFollowUpDate) <= nextWeek
+            );
+        }
+        
+        return budgets;
+    }, [budgets, activeFilter]);
+
     const budgetsByStatus = useMemo(() => {
         const grouped: { [key in BudgetStatus]?: Budget[] } = {};
-        budgets.forEach(budget => {
+        filteredBudgets.forEach(budget => {
             (grouped[budget.status] = grouped[budget.status] || []).push(budget);
         });
         return grouped;
-    }, [budgets]);
+    }, [filteredBudgets]);
     
     const suggestedFollowUps = useMemo(() => {
         return budgets.filter(b =>
@@ -133,53 +229,55 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
         onScheduleFollowUp(budgetId, date);
     };
 
-    const handleToggleExpand = (id: string) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
     const handleOpenAiModal = (budget: Budget) => setAiModalState({ isOpen: true, budget });
     const handleCloseAiModal = () => setAiModalState({ isOpen: false, budget: null });
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, newStatus: BudgetStatus) => {
         e.preventDefault();
         const budgetId = e.dataTransfer.getData('budgetId');
-        if (budgetId) {
+        const budget = budgets.find(b => b.id === budgetId);
+        if (budget && budget.status !== newStatus) {
             onUpdateStatus(budgetId, newStatus);
         }
         setDraggingOverColumn(null);
     };
     
     const columns: BudgetStatus[] = [
-        BudgetStatus.SENT,
-        BudgetStatus.FOLLOWING_UP,
-        BudgetStatus.ORDER_PLACED,
-        BudgetStatus.INVOICED,
-        BudgetStatus.LOST,
+        BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST,
     ];
 
     return (
         <div className="flex flex-col h-full w-full">
-            <div className="flex justify-between items-center mb-6 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 flex-shrink-0 gap-4">
                 <div>
-                    <h2 className="text-2xl font-semibold text-[var(--text-primary)] flex items-center"><FireIcon className="w-6 h-6 mr-2 text-red-500"/> Hub de Negócios</h2>
-                    <p className="text-[var(--text-secondary)]">Arraste os negócios entre as colunas para atualizar o status.</p>
+                    <h2 className="text-3xl font-bold text-[var(--text-primary)]">Hub de Negócios</h2>
+                    <p className="text-[var(--text-secondary)] mt-1">Arraste os negócios para atualizar seu pipeline.</p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                   <FilterButton label="Todos" icon="✨" isActive={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
+                   <FilterButton label="Hot" icon="🔥" isActive={activeFilter === 'hot'} onClick={() => setActiveFilter('hot')} />
+                   <FilterButton label="Stale" icon="❄️" isActive={activeFilter === 'stale'} onClick={() => setActiveFilter('stale')} />
+                   <FilterButton label="Fechando" icon="🎯" isActive={activeFilter === 'closingSoon'} onClick={() => setActiveFilter('closingSoon')} />
                 </div>
             </div>
             
             {suggestedFollowUps.length > 0 && (
-                <div className="mb-6 bg-amber-50 dark:bg-amber-900/40 p-4 rounded-lg border border-amber-200 dark:border-amber-800/50 animated-item">
-                    <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2">
-                        <ExclamationTriangleIcon className="w-5 h-5" />
-                        Ações Sugeridas
+                <div className="mb-6 bg-blue-50 dark:bg-blue-900/40 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 animated-item">
+                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                        <SparklesIcon className="w-5 h-5" />
+                        Assistente de Vendas
                     </h3>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">Estes orçamentos precisam de um próximo passo. Agende um follow-up para não perder a oportunidade.</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">Estes negócios precisam de um próximo passo. Agende um follow-up para não perder a oportunidade.</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
                         {suggestedFollowUps.map(budget => (
-                            <div key={budget.id} className="bg-white dark:bg-slate-800 p-2 rounded-md flex flex-wrap justify-between items-center shadow-sm gap-2">
+                            <div key={budget.id} className="bg-white dark:bg-slate-800 p-2 pl-3 rounded-md flex flex-wrap justify-between items-center shadow-sm gap-2">
                                 <div>
                                     <p className="font-semibold text-gray-800 dark:text-slate-200">{budget.title}</p>
                                     <p className="text-sm text-blue-600 dark:text-blue-400">{clientMap.get(budget.clientId) || 'Cliente'}</p>
                                 </div>
                                 <button
                                     onClick={() => handleScheduleClick(budget.id)}
-                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1 px-3 rounded-lg text-sm flex items-center gap-1.5 transition-colors"
+                                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-sm flex items-center gap-1.5 transition-colors"
                                 >
                                     <CalendarIcon className="w-4 h-4" />
                                     Agendar (+3d)
@@ -199,11 +297,11 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                         clientMap={clientMap}
                         onSelectBudget={onSelectBudget}
                         onOpenAiModal={handleOpenAiModal}
-                        isExpanded={expandedCards}
-                        onToggleExpand={handleToggleExpand}
                         onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(status); }}
                         onDrop={(e) => handleDrop(e, status)}
                         isDraggingOver={draggingOverColumn === status}
+                        draggingBudgetId={draggingBudgetId}
+                        setDraggingBudgetId={setDraggingBudgetId}
                     />
                 ))}
             </div>

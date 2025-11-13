@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
@@ -16,7 +16,7 @@ type FormattedBudget = Budget & {
     client?: Client;
     contact?: Contact;
 };
-type SortKey = keyof FormattedBudget | 'client.name';
+type SortKey = keyof FormattedBudget | 'client.name' | 'id';
 
 
 // --- HELPER FUNCTIONS ---
@@ -24,21 +24,20 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
 
-const getStatusPill = (status: BudgetStatus) => {
-  const styles: {[key in BudgetStatus]: string} = {
-    [BudgetStatus.SENT]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    [BudgetStatus.FOLLOWING_UP]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    [BudgetStatus.ORDER_PLACED]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
-    [BudgetStatus.INVOICED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
-    [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-    [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
+const getStatusStyles = (status: BudgetStatus) => {
+  const styles: {[key in BudgetStatus]: { pill: string; bar: string }} = {
+    [BudgetStatus.SENT]: { pill: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300', bar: 'border-l-blue-500' },
+    [BudgetStatus.FOLLOWING_UP]: { pill: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300', bar: 'border-l-yellow-500' },
+    [BudgetStatus.ORDER_PLACED]: { pill: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300', bar: 'border-l-indigo-500' },
+    [BudgetStatus.INVOICED]: { pill: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300', bar: 'border-l-emerald-500' },
+    [BudgetStatus.LOST]: { pill: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', bar: 'border-l-red-500' },
+    [BudgetStatus.ON_HOLD]: { pill: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200', bar: 'border-l-gray-400' },
   };
-  return <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${styles[status]}`}>{status}</span>;
+  return styles[status] || styles[BudgetStatus.ON_HOLD];
 }
 
 
 // --- SUB-COMPONENTS ---
-// FIX: Added className prop to KPICard to allow passing additional classes.
 const KPICard = ({ title, value, icon, style, className }: { title: string; value: string | number; icon: React.ReactNode; style?: React.CSSProperties; className?: string; }) => (
     <div style={style} className={`bg-[var(--background-secondary)] p-4 rounded-xl flex items-center gap-4 border border-[var(--border-primary)] shadow-sm ${className || ''}`}>
         <div className="bg-[var(--background-tertiary)] p-3 rounded-full">{icon}</div>
@@ -106,9 +105,12 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         
         if (searchTerm) {
             const lowerSearchTerm = searchTerm.toLowerCase();
+            const numericSearchTerm = searchTerm.replace(/\D/g, '');
             filtered = filtered.filter(b => 
                 b.title.toLowerCase().includes(lowerSearchTerm) ||
-                (b.client?.name || '').toLowerCase().includes(lowerSearchTerm)
+                b.id.toLowerCase().includes(lowerSearchTerm) ||
+                (b.client?.name || '').toLowerCase().includes(lowerSearchTerm) ||
+                (numericSearchTerm && (b.client?.cnpj || '').replace(/\D/g, '').includes(numericSearchTerm))
             );
         }
 
@@ -119,8 +121,8 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     aValue = a.client?.name || '';
                     bValue = b.client?.name || '';
                 } else {
-                    aValue = a[sortConfig.key as keyof Budget];
-                    bValue = b[sortConfig.key as keyof Budget];
+                    aValue = a[sortConfig.key as keyof FormattedBudget];
+                    bValue = b[sortConfig.key as keyof FormattedBudget];
                 }
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -198,7 +200,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                         )}
                         <div className="relative w-full sm:w-64 order-2 sm:order-1">
                              <span className="absolute inset-y-0 left-0 flex items-center pl-3"><MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></span>
-                            <input type="text" placeholder="Buscar por título ou cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg p-2 pl-10 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"/>
+                            <input type="text" placeholder="Buscar por título, ID, cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg p-2 pl-10 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"/>
                         </div>
                     </div>
                 </div>
@@ -208,7 +210,8 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                         <thead className="bg-[var(--background-tertiary)] text-[var(--text-secondary)] uppercase text-xs">
                             <tr>
                                 <th className="p-3 w-10"><input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></th>
-                                <SortableHeader label="Cliente / Orçamento" sortKey="client.name" sortConfig={sortConfig} requestSort={requestSort} />
+                                <SortableHeader label="Orçamento" sortKey="title" sortConfig={sortConfig} requestSort={requestSort} />
+                                <SortableHeader label="Cliente" sortKey="client.name" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Valor" sortKey="value" sortConfig={sortConfig} requestSort={requestSort} className="text-right" />
                                 <SortableHeader label="Status" sortKey="status" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Data Envio" sortKey="dateSent" sortConfig={sortConfig} requestSort={requestSort} />
@@ -216,14 +219,26 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                         </thead>
                         <tbody className="divide-y divide-[var(--border-primary)]">
                             {filteredAndSortedBudgets.map((budget, index) => (
-                                <tr key={budget.id} className="hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item" style={{ animationDelay: `${index * 30}ms`}}>
+                                <tr 
+                                    key={budget.id} 
+                                    className={`hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item border-l-4 ${getStatusStyles(budget.status).bar}`}
+                                    style={{ animationDelay: `${index * 30}ms`}}
+                                >
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
                                     <td className="p-3 cursor-pointer" onClick={() => onSelectBudget(budget.id)}>
-                                        <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors">{budget.client?.name || 'Cliente'}</p>
-                                        <p className="text-xs text-[var(--text-secondary)]">{budget.title}</p>
+                                        <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors truncate" title={budget.title}>{budget.title}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] font-mono">#{budget.id.substring(0, 8)}</p>
+                                    </td>
+                                    <td className="p-3">
+                                        <p className="font-semibold text-[var(--text-primary)] truncate" title={budget.client?.name}>{budget.client?.name || 'Cliente'}</p>
+                                        <p className="text-xs text-[var(--text-secondary)]">{budget.client?.cnpj || 'CNPJ não informado'}</p>
                                     </td>
                                     <td className="p-3 font-semibold text-[var(--text-primary)] text-right">R$ {formatCurrency(budget.value)}</td>
-                                    <td className="p-3">{getStatusPill(budget.status)}</td>
+                                    <td className="p-3">
+                                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${getStatusStyles(budget.status).pill}`}>
+                                            {budget.status}
+                                        </span>
+                                    </td>
                                     <td className="p-3 text-[var(--text-secondary)]">{new Date(budget.dateSent).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                                 </tr>
                             ))}

@@ -14,6 +14,12 @@ export enum UserRole {
   SUPER_ADMIN = 'Super Admin',
 }
 
+export enum FollowUpStatus {
+  WAITING_RESPONSE = 'Aguardando Resposta',
+  COMPLETED = 'Concluído',
+  RESCHEDULED = 'Reagendado',
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -57,6 +63,7 @@ export interface FollowUp {
   date: string;
   notes: string;
   audioUrl?: string;
+  status?: FollowUpStatus;
 }
 
 export interface Budget {

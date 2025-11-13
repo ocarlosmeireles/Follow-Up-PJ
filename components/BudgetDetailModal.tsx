@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact } from '../types';
-import { BudgetStatus } from '../types';
+import { BudgetStatus, FollowUpStatus } from '../types';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon } from './icons';
 
 interface BudgetDetailModalProps {
@@ -87,6 +87,16 @@ const getStatusPill = (status: BudgetStatus) => {
   return <span className={`px-3 py-1 text-sm font-bold rounded-full whitespace-nowrap ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
 }
 
+const getFollowUpStatusPill = (status: FollowUpStatus | undefined) => {
+  if (!status) return null;
+  const styles: {[key in FollowUpStatus]: string} = {
+    [FollowUpStatus.COMPLETED]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    [FollowUpStatus.WAITING_RESPONSE]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    [FollowUpStatus.RESCHEDULED]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+  }
+  return <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${styles[status]}`}>{status}</span>;
+};
+
 const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
     <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-1">
@@ -101,6 +111,7 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
     const [nextFollowUpTime, setNextFollowUpTime] = useState('');
+    const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>(FollowUpStatus.WAITING_RESPONSE);
     const [showWinPrompt, setShowWinPrompt] = useState(false);
     const [winValue, setWinValue] = useState('');
     
@@ -123,6 +134,8 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
             setWinValue('');
         }
     }, [isOpen, audioUrl]);
+
+    if (!budget || !isOpen) return null;
 
     const startRecording = async () => {
         try {
@@ -168,7 +181,7 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
         }
 
         const followUpDate = new Date().toISOString();
-        const followUpData: Omit<FollowUp, 'id'> = { date: followUpDate, notes };
+        const followUpData: Omit<FollowUp, 'id'> = { date: followUpDate, notes, status: followUpStatus };
 
         if (audioUrl) {
             followUpData.audioUrl = audioUrl;
@@ -185,6 +198,7 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
         setNotes('');
         setNextFollowUpDate('');
         setNextFollowUpTime('');
+        setFollowUpStatus(FollowUpStatus.WAITING_RESPONSE);
         setAudioUrl(null);
         setRecordingStatus('idle');
     };
@@ -327,6 +341,16 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                 </div>
 
                                 <div className="flex flex-wrap items-end gap-4">
+                                     <div className="flex-grow min-w-[150px]">
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status do Contato</label>
+                                        <select 
+                                            value={followUpStatus}
+                                            onChange={e => setFollowUpStatus(e.target.value as FollowUpStatus)}
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                        >
+                                            {Object.values(FollowUpStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
                                     <div className="flex-grow min-w-[150px]">
                                         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Próximo Follow-up</label>
                                         <input 
@@ -366,7 +390,10 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                             <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {budget.followUps.length > 0 ? budget.followUps.slice().reverse().map(fu => (
                                     <div key={fu.id} className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                        <p className="font-semibold text-sm text-[var(--text-secondary)]">{formatDisplayDate(fu.date)}</p>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="font-semibold text-sm text-[var(--text-secondary)]">{formatDisplayDate(fu.date)}</p>
+                                            {getFollowUpStatusPill(fu.status)}
+                                        </div>
                                         {fu.notes && <p className="text-[var(--text-primary)] whitespace-pre-wrap">{fu.notes}</p>}
                                         {fu.audioUrl && <audio controls src={fu.audioUrl} className="w-full mt-2 h-10"></audio>}
                                     </div>

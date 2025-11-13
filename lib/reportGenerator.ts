@@ -188,7 +188,7 @@ export const generateFollowUpReport = (
                             <h3>Histórico de Follow-ups</h3>
                             ${item.followUps.length > 0 ? item.followUps.map(fu => `
                                 <div class="followup-item">
-                                    <p>Data: ${formatTimestamp(fu.date)}</p>
+                                    <p>Data: ${formatTimestamp(fu.date)} ${fu.status ? `| <strong>Status: ${fu.status}</strong>` : ''}</p>
                                     <p>${fu.notes ? fu.notes.replace(/\n/g, '<br>') : '<em>Nenhuma nota de texto.</em>'}</p>
                                     ${fu.audioUrl ? '<p><em>- Contém nota de áudio -</em></p>' : ''}
                                 </div>

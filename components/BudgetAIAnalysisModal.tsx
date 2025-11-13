@@ -110,7 +110,7 @@ Sua resposta DEVE ser um objeto JSON.`;
     
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4 transform transition-all">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-md m-4 transform transition-all">
                 <div className="flex justify-between items-center mb-4">
                      <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
                         <SparklesIcon className="w-6 h-6 text-purple-500"/>
@@ -121,7 +121,7 @@ Sua resposta DEVE ser um objeto JSON.`;
                     </button>
                 </div>
                 
-                <div className="text-center p-6">
+                <div className="text-center p-4 sm:p-6">
                      {loading && (
                         <div className="flex flex-col items-center justify-center">
                             <svg className="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

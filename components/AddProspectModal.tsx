@@ -117,8 +117,8 @@ const AddProspectModal: React.FC<AddProspectModalProps> = ({ isOpen, onClose, on
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-40">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-lg m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Novo Prospect</h2>
                     <button onClick={handleClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">

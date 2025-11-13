@@ -123,7 +123,7 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                 {/* Left Column */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* Organization Profile Card */}
-                    <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '100ms' }}>
+                    <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '100ms' }}>
                         <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"><BriefcaseIcon className="w-6 h-6"/> Perfil da Organização</h3>
                         <div className="space-y-4">
                             <div>
@@ -158,7 +158,7 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                     </div>
                     
                     {/* Prospecting Stages Card */}
-                    <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '200ms' }}>
+                    <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '200ms' }}>
                         <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"><FunnelIcon className="w-6 h-6"/> Funil de Prospecção</h3>
                         <div className="space-y-3">
                             {localStages.map(stage => (
@@ -191,7 +191,7 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                 {/* Right Column */}
                 <div className="lg:col-span-1 space-y-8">
                     {/* Users Card */}
-                    <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '300ms' }}>
+                    <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '300ms' }}>
                          <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"><UserGroupIcon className="w-6 h-6"/> Usuários</h3>
                          <div className="flex justify-between items-center bg-[var(--background-tertiary)] p-3 rounded-lg">
                             <p className="font-semibold">{users.length} membros na equipe</p>
@@ -199,7 +199,7 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                          </div>
                     </div>
                     {/* Subscription Card */}
-                     <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '400ms' }}>
+                     <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '400ms' }}>
                          <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"><BillingIcon className="w-6 h-6"/> Assinatura</h3>
                          <div className="flex justify-between items-center bg-[var(--background-tertiary)] p-3 rounded-lg">
                             <div>

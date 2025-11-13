@@ -56,7 +56,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-[var(--background-secondary)] rounded-xl shadow-2xl p-6 w-full max-w-2xl m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="bg-[var(--background-secondary)] rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-[var(--text-primary)]">Configurações</h2>
                     <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">

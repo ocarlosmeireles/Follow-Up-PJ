@@ -79,7 +79,7 @@ O tom deve ser profissional, mas amigável e direto ao ponto. Forneça apenas o 
 
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 transform transition-all max-h-[80vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-lg m-4 transform transition-all max-h-[80vh] flex flex-col">
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         {modalConfig[mode].icon}

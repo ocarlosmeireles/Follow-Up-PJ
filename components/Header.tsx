@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({
 
 
   return (
-    <header className={`p-4 flex justify-between items-center flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-30 shadow-sm'}`}>
+    <header className={`p-4 flex justify-between items-center flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-20 shadow-sm'}`}>
       <button onClick={onToggleSidebar} className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] md:hidden">
         <Bars3Icon className="w-6 h-6" />
       </button>

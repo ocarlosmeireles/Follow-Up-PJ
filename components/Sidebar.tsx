@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
     );
     
     return (
-        <aside className={`w-64 flex-shrink-0 flex flex-col fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${isDashboardTheme ? 'bg-[var(--background-sidebar)] p-5' : 'bg-[var(--background-secondary)] p-4 border-r border-[var(--border-primary)]'}`}>
+        <aside className={`w-64 flex-shrink-0 flex flex-col fixed md:sticky top-0 h-screen z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${isDashboardTheme ? 'bg-[var(--background-sidebar)] p-5' : 'bg-[var(--background-secondary)] p-4 border-r border-[var(--border-primary)]'}`}>
             <div className={`flex items-center gap-3 mb-8 ${isDashboardTheme ? 'px-0' : 'px-2'}`}>
                 {organization?.logoUrl ? (
                     <img src={organization.logoUrl} alt={`${organization.name} logo`} className={`w-10 h-10 object-contain ${isDashboardTheme ? 'rounded-lg' : 'rounded-full'}`} />

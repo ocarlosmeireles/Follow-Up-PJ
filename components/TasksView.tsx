@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import type { Budget, Client, Reminder, PriorityDeal } from '../types';
 import { BudgetStatus } from '../types';
 import { 
     CalendarIcon, ExclamationTriangleIcon, BriefcaseIcon, LightBulbIcon, SparklesIcon,
-    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon
+    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon,
+    FireIcon
 } from './icons';
 
 // --- PROPS ---
@@ -33,7 +34,7 @@ type UnifiedTask = {
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
-const formatTimeOrDate = (timestamp: number, isToday: boolean) => {
+const formatTimeOrDate = (timestamp: number) => {
     if (!timestamp) return 'N/A';
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return 'N/A';
@@ -49,8 +50,8 @@ const formatTimeOrDate = (timestamp: number, isToday: boolean) => {
 // --- SUB-COMPONENTS ---
 
 const FocusOfTheDay: React.FC = () => {
-    const [focus, setFocus] = useState(() => localStorage.getItem('dailyFocus') || '');
-    const [isEditing, setIsEditing] = useState(false);
+    const [focus, setFocus] = React.useState(() => localStorage.getItem('dailyFocus') || '');
+    const [isEditing, setIsEditing] = React.useState(false);
 
     const handleSave = () => {
         localStorage.setItem('dailyFocus', focus);
@@ -118,11 +119,11 @@ const GoalsPanel: React.FC<{ tasks: GoalsPanelTasks, budgets: Budget[] }> = ({ t
 };
 
 const AIPriorityActions: React.FC<{ budgets: Budget[], clients: Client[], onSelectBudget: (id: string) => void }> = ({ budgets, clients, onSelectBudget }) => {
-    const [actions, setActions] = useState<PriorityDeal[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [isAnalyzed, setIsAnalyzed] = useState(false);
-    const cache = useRef<{ data: PriorityDeal[], timestamp: number } | null>(null);
+    const [actions, setActions] = React.useState<PriorityDeal[]>([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
+    const [isAnalyzed, setIsAnalyzed] = React.useState(false);
+    const cache = React.useRef<{ data: PriorityDeal[], timestamp: number } | null>(null);
 
     const analyze = async () => {
         if (cache.current && (Date.now() - cache.current.timestamp < 10 * 60 * 1000)) { // 10 min cache
@@ -257,69 +258,46 @@ const DailyRhythm = () => {
     );
 };
 
-const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; index: number; }> = React.memo(({ task, onSelectBudget, index }) => {
+
+const TaskCard: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; }> = React.memo(({ task, onSelectBudget }) => {
     const isFollowUp = task.type === 'follow-up';
+    const accent = task.isOverdue ? 'border-red-500' : isFollowUp ? 'border-blue-500' : 'border-purple-500';
     
     return (
         <div 
             onClick={() => isFollowUp && task.budgetId && onSelectBudget(task.budgetId)}
-            style={{ animationDelay: `${50 * index}ms` }}
-            className={`flex items-center gap-3 p-3 rounded-lg border-l-4 animated-item ${
-                isFollowUp ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50' 
-                           : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
-            } ${task.isCompleted ? 'opacity-60' : ''}`}
+            className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm border-l-4 ${accent} cursor-pointer hover:shadow-md hover:-translate-y-px transition-all duration-200 group ${task.isCompleted ? 'opacity-60' : ''}`}
         >
-            <div className="flex-shrink-0">
-                {isFollowUp ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/> : <LightBulbIcon className="w-5 h-5 text-purple-500"/>}
+            <div className="flex justify-between items-start">
+                <div className="flex-grow overflow-hidden">
+                     <p className={`font-semibold text-sm text-[var(--text-primary)] truncate ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
+                     {task.clientName && <p className="text-xs text-[var(--text-accent)] truncate">{task.clientName}</p>}
+                </div>
+                 <div className="flex-shrink-0 ml-2">
+                    {isFollowUp ? <BriefcaseIcon className="w-4 h-4 text-blue-500"/> : <LightBulbIcon className="w-4 h-4 text-purple-500"/>}
+                </div>
             </div>
-            <div className="flex-grow overflow-hidden">
-                <p className={`font-semibold text-[var(--text-primary)] truncate ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
-                {task.clientName && <p className="text-xs text-[var(--text-accent)] truncate">{task.clientName}</p>}
-            </div>
-            <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold text-[var(--text-secondary)]">{formatTimeOrDate(task.date, !task.isOverdue)}</p>
-                {task.isOverdue && !task.isCompleted && <p className="text-xs font-bold text-red-500">Atrasado</p>}
+            <div className="mt-2 pt-2 border-t border-[var(--border-primary)]/50 flex justify-between items-center">
+                 <p className="text-xs font-bold text-[var(--text-secondary)]">{formatTimeOrDate(task.date)}</p>
+                 {task.isOverdue && !task.isCompleted && <p className="text-xs font-bold text-red-500 animate-pulse">Atrasado</p>}
             </div>
         </div>
     );
 });
 
-const UpcomingTasks: React.FC<{ 
-    overdueTasks: UnifiedTask[],
-    todayTasks: UnifiedTask[],
-    upcomingTasks: UnifiedTask[],
-    onSelectBudget: (id: string) => void 
-}> = ({ overdueTasks, todayTasks, upcomingTasks, onSelectBudget }) => {
-    
-    const TaskSection: React.FC<{ title: string, tasks: UnifiedTask[], icon: React.ReactNode }> = ({ title, tasks, icon }) => {
-        if (tasks.length === 0) return null;
-        return (
-            <div>
-                <h4 className="font-semibold text-[var(--text-secondary)] text-sm mb-2 flex items-center gap-2">
-                    {icon} {title}
-                </h4>
-                <div className="space-y-2">
-                    {tasks.map((task, index) => <TaskItem key={task.id} task={task} onSelectBudget={onSelectBudget} index={index} />)}
-                </div>
-            </div>
-        );
-    };
-
+const TaskColumn: React.FC<{ title: string; tasks: UnifiedTask[]; icon: React.ReactNode; onSelectBudget: (id: string) => void; className?: string; }> = ({ title, tasks, icon, onSelectBudget, className }) => {
     return (
-        <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)] shadow-sm">
-            <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3">Lista de Tarefas</h3>
-            <div className="space-y-6">
-                <TaskSection title="Atrasadas" tasks={overdueTasks} icon={<ExclamationCircleIcon className="w-5 h-5 text-red-500" />} />
-                <TaskSection title="Para Hoje" tasks={todayTasks} icon={<CalendarIcon className="w-5 h-5 text-yellow-500" />} />
-                <TaskSection title="Próximas" tasks={upcomingTasks} icon={<ClockIcon className="w-5 h-5 text-blue-500" />} />
-
-                {overdueTasks.length === 0 && todayTasks.length === 0 && upcomingTasks.length === 0 && (
-                    <div className="text-center py-8 text-[var(--text-secondary)]">
-                        <CheckCircleIcon className="w-12 h-12 mx-auto mb-2 text-green-500"/>
-                        <p className="font-semibold text-[var(--text-primary)]">Tudo em dia!</p>
-                        <p className="text-sm">Nenhuma tarefa pendente ou futura.</p>
+        <div className="flex-1 min-w-[300px] bg-[var(--background-tertiary)] rounded-lg flex flex-col">
+            <div className={`flex items-center justify-between p-3 border-b-2 ${className}`}>
+                <h3 className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2">{icon} {title}</h3>
+                <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{tasks.length}</span>
+            </div>
+            <div className="p-3 space-y-3 overflow-y-auto custom-scrollbar flex-grow">
+                {tasks.map((task, index) => (
+                    <div className="animated-item" style={{ animationDelay: `${index * 50}ms` }} key={task.id}>
+                        <TaskCard task={task} onSelectBudget={onSelectBudget} />
                     </div>
-                )}
+                ))}
             </div>
         </div>
     );
@@ -388,7 +366,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
     }, [budgets, reminders, clientMap]);
 
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col h-full space-y-6">
             <div>
                 <h2 className="text-3xl font-bold text-[var(--text-primary)]">Plano de Ação Estratégico</h2>
                 <p className="text-[var(--text-secondary)]">Seu centro de comando para um dia de vendas produtivo e focado.</p>
@@ -398,19 +376,27 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                 <div className="lg:col-span-2 space-y-6">
                     <div className="animated-item" style={{ animationDelay: '100ms' }}><FocusOfTheDay /></div>
                     <div className="animated-item" style={{ animationDelay: '200ms' }}><AIPriorityActions budgets={budgets} clients={clients} onSelectBudget={onSelectBudget} /></div>
-                    <div className="animated-item" style={{ animationDelay: '300ms' }}>
-                        <UpcomingTasks 
-                            overdueTasks={tasks.overdue}
-                            todayTasks={tasks.today}
-                            upcomingTasks={tasks.upcoming}
-                            onSelectBudget={onSelectBudget} 
-                        />
-                    </div>
                 </div>
                 <div className="lg:col-span-1 space-y-6">
                     <div className="animated-item" style={{ animationDelay: '400ms' }}><GoalsPanel tasks={tasks} budgets={budgets} /></div>
                     <div className="animated-item" style={{ animationDelay: '500ms' }}><DailyRhythm /></div>
                 </div>
+            </div>
+            
+             <div className="flex-grow flex flex-col min-h-0 animated-item" style={{ animationDelay: '300ms' }}>
+                {tasks.overdue.length === 0 && tasks.today.length === 0 && tasks.upcoming.length === 0 ? (
+                     <div className="flex-grow flex flex-col items-center justify-center text-center p-8 bg-[var(--background-secondary)] rounded-lg border border-[var(--border-primary)] shadow-sm">
+                        <CheckCircleIcon className="w-16 h-16 mx-auto mb-4 text-green-500"/>
+                        <p className="text-xl font-semibold text-[var(--text-primary)]">Tudo em dia!</p>
+                        <p className="text-sm text-[var(--text-secondary)]">Nenhuma tarefa pendente ou futura. Aproveite para prospectar!</p>
+                    </div>
+                ) : (
+                    <div className="flex-grow flex gap-6 overflow-x-auto pb-4 -mx-4 px-4 min-h-[400px]">
+                        <TaskColumn title="Atrasadas" tasks={tasks.overdue} onSelectBudget={onSelectBudget} icon={<ExclamationCircleIcon className="w-6 h-6 text-red-500"/>} className="border-red-500"/>
+                        <TaskColumn title="Para Hoje" tasks={tasks.today} onSelectBudget={onSelectBudget} icon={<FireIcon className="w-6 h-6 text-yellow-500"/>} className="border-yellow-500"/>
+                        <TaskColumn title="Próximas" tasks={tasks.upcoming} onSelectBudget={onSelectBudget} icon={<ClockIcon className="w-6 h-6 text-blue-500"/>} className="border-blue-500"/>
+                    </div>
+                )}
             </div>
         </div>
     );

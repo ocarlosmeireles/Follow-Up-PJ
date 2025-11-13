@@ -187,7 +187,7 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
                     </button>
                 </div>
 
-                <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {isLoadingAI && (
                         <div className="flex flex-col items-center justify-center text-center p-8">
                             <svg className="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

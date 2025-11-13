@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -636,6 +630,7 @@ const App: React.FC = () => {
     
     return (
         <div className={`flex h-screen overflow-hidden ${themeVariant === 'dashboard' ? 'bg-[var(--background-primary)]' : 'bg-[var(--background-primary)]'}`}>
+            {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
             <Sidebar activeView={activeView} setActiveView={changeView} isOpen={isSidebarOpen} userProfile={userProfile} organization={organization} themeVariant={themeVariant}/>
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
@@ -670,7 +665,7 @@ const App: React.FC = () => {
                         }
                     }}
                 />
-                 <main className={`flex-1 ${activeView === 'deals' ? 'overflow-hidden p-4 sm:p-6' : 'overflow-y-auto p-4 sm:p-6 lg:p-8'}`}>
+                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                     <div key={viewKey} className="fade-in">
                         {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile}/>}
                         {activeView === 'deals' && <DealsView budgets={budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status))} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={() => {}}/>}

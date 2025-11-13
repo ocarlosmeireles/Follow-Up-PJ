@@ -107,7 +107,7 @@ const Header: React.FC<HeaderProps> = ({
         {/* Can be used for breadcrumbs or other context info later */}
       </div>
 
-      <div className="flex justify-end items-center gap-2 sm:gap-4">
+      <div className="flex justify-end items-center gap-2 sm:gap-4 flex-wrap">
         {/* Action Buttons */}
         {userProfile.role !== UserRole.SUPER_ADMIN && (
           <>

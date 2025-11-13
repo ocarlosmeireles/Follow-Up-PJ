@@ -317,13 +317,13 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
         <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-4">
             <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all">
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-[var(--border-primary)] flex-shrink-0">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--border-primary)] flex-shrink-0">
                     <div>
                         <EditableField
                             label="Título"
                             value={budget.title}
                             onSave={newTitle => onUpdateBudget(budget.id, { title: newTitle as string })}
-                            renderDisplay={value => <h2 className="text-2xl font-bold text-[var(--text-primary)]">{value}</h2>}
+                            renderDisplay={value => <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">{value}</h2>}
                         />
                         <p className="text-md text-[var(--text-accent)] font-semibold">{client.name}</p>
                         <p className="text-sm text-[var(--text-secondary)] mt-1">{client.cnpj || 'CNPJ não cadastrado'}</p>
@@ -333,7 +333,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                     </button>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
+                <div className="flex-grow overflow-y-auto flex flex-col lg:grid lg:grid-cols-5 gap-6 p-4 sm:p-6">
                     {/* Main Content (Left) */}
                     <div className="lg:col-span-3 space-y-6">
                         {!isFinalStatus && (

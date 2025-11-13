@@ -103,80 +103,89 @@ const GoalsPanel: React.FC<{ tasks: any, budgets: Budget[] }> = ({ tasks, budget
 
 const AIPriorityActions: React.FC<{ budgets: Budget[], clients: Client[], onSelectBudget: (id: string) => void }> = ({ budgets, clients, onSelectBudget }) => {
     const [actions, setActions] = useState<PriorityDeal[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAnalyzed, setIsAnalyzed] = useState(false);
     const cache = useRef<{ data: PriorityDeal[], timestamp: number } | null>(null);
 
-    useEffect(() => {
-        const analyze = async () => {
-            if (cache.current && (Date.now() - cache.current.timestamp < 10 * 60 * 1000)) { // 10 min cache
-                setActions(cache.current.data);
-                setLoading(false);
-                return;
-            }
+    const analyze = async () => {
+        if (cache.current && (Date.now() - cache.current.timestamp < 10 * 60 * 1000)) { // 10 min cache
+            setActions(cache.current.data);
+            setIsAnalyzed(true);
+            return;
+        }
 
-            setLoading(true);
-            setError(null);
-            
-            const activeBudgets = budgets
-                .filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status))
-                .map(b => ({
-                    budgetId: b.id,
-                    title: b.title,
-                    value: b.value,
-                    days_in_pipeline: Math.ceil((new Date().getTime() - new Date(b.dateSent).getTime()) / (1000 * 60 * 60 * 24)),
-                    followup_count: b.followUps.length,
-                    next_followup: b.nextFollowUpDate,
-                }));
-            
-            if (activeBudgets.length === 0) {
-                setLoading(false);
-                setActions([]);
-                return;
-            }
+        setLoading(true);
+        setError(null);
+        
+        const activeBudgets = budgets
+            .filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status))
+            .map(b => ({
+                budgetId: b.id,
+                title: b.title,
+                value: b.value,
+                days_in_pipeline: Math.ceil((new Date().getTime() - new Date(b.dateSent).getTime()) / (1000 * 60 * 60 * 24)),
+                followup_count: b.followUps.length,
+                next_followup: b.nextFollowUpDate,
+            }));
+        
+        if (activeBudgets.length === 0) {
+            setLoading(false);
+            setActions([]);
+            setIsAnalyzed(true);
+            return;
+        }
 
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-                const prompt = `Aja como um coach de vendas estratégico. Analise a lista de orçamentos a seguir e retorne um array JSON com as 3 ações MAIS IMPORTANTES que o vendedor deve tomar hoje para maximizar os resultados. Para cada ação, retorne um objeto JSON com: "budgetId", "priorityScore" (0 a 100), "nextBestAction" (uma ação tática e clara), e "rationale" (uma justificativa estratégica concisa do 'porquê'). A resposta deve ser apenas o array JSON, ordenado por prioridade. Orçamentos: ${JSON.stringify(activeBudgets)}`;
-                
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash', contents: prompt,
-                    config: {
-                        responseMimeType: 'application/json',
-                        responseSchema: {
-                            type: Type.ARRAY, items: {
-                                type: Type.OBJECT, properties: {
-                                    budgetId: { type: Type.STRING },
-                                    priorityScore: { type: Type.NUMBER },
-                                    nextBestAction: { type: Type.STRING },
-                                    rationale: { type: Type.STRING },
-                                }, required: ['budgetId', 'priorityScore', 'nextBestAction', 'rationale'],
-                            }
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `Aja como um coach de vendas estratégico. Analise a lista de orçamentos a seguir e retorne um array JSON com as 3 ações MAIS IMPORTANTES que o vendedor deve tomar hoje para maximizar os resultados. Para cada ação, retorne um objeto JSON com: "budgetId", "priorityScore" (0 a 100), "nextBestAction" (uma ação tática e clara), e "rationale" (uma justificativa estratégica concisa do 'porquê'). A resposta deve ser apenas o array JSON, ordenado por prioridade. Orçamentos: ${JSON.stringify(activeBudgets)}`;
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash', contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.ARRAY, items: {
+                            type: Type.OBJECT, properties: {
+                                budgetId: { type: Type.STRING },
+                                priorityScore: { type: Type.NUMBER },
+                                nextBestAction: { type: Type.STRING },
+                                rationale: { type: Type.STRING },
+                            }, required: ['budgetId', 'priorityScore', 'nextBestAction', 'rationale'],
                         }
                     }
-                });
-                const deals = JSON.parse(response.text || '[]');
-                setActions(deals);
-                cache.current = { data: deals, timestamp: Date.now() };
+                }
+            });
+            const deals = JSON.parse(response.text || '[]');
+            setActions(deals);
+            cache.current = { data: deals, timestamp: Date.now() };
+            setIsAnalyzed(true);
 
-            } catch (err) {
-                setError("Falha ao obter sugestões da IA.");
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        analyze();
-    }, [budgets]);
+        } catch (err) {
+            setError("Falha ao obter sugestões da IA.");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    const renderContent = () => {
+        if (!isAnalyzed) {
+             return (
+                <div className="text-center p-4">
+                    <p className="text-sm text-[var(--text-secondary)] mb-3">Deixe a IA analisar seu pipeline e sugerir as próximas melhores ações para focar hoje.</p>
+                    <button onClick={analyze} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition-colors">
+                        <SparklesIcon className="w-5 h-5 mr-2" />
+                        Analisar e Sugerir Ações
+                    </button>
+                </div>
+            );
+        }
+        if (loading) return <p className="text-sm text-[var(--text-secondary)] p-4">Analisando pipeline...</p>;
+        if (error) return <p className="text-sm text-red-500 p-4">{error}</p>;
+        if (actions.length === 0) return <p className="text-sm text-[var(--text-secondary)] p-4">Nenhuma ação prioritária no momento. Você está em dia!</p>;
 
-    return (
-        <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)] shadow-sm">
-            <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3 flex items-center gap-2">
-                <SparklesIcon className="w-5 h-5 text-purple-500" /> Ações Prioritárias com IA
-            </h3>
-            {loading ? <p className="text-sm text-[var(--text-secondary)]">Analisando pipeline...</p> :
-             error ? <p className="text-sm text-red-500">{error}</p> :
-             actions.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">Nenhuma ação prioritária no momento.</p> :
+        return (
              <div className="space-y-3">
                  {actions.map((action, index) => {
                      const budget = budgets.find(b => b.id === action.budgetId);
@@ -191,7 +200,15 @@ const AIPriorityActions: React.FC<{ budgets: Budget[], clients: Client[], onSele
                      );
                  })}
              </div>
-            }
+        );
+    };
+
+    return (
+        <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)] shadow-sm">
+            <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3 flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5 text-purple-500" /> Ações Prioritárias com IA
+            </h3>
+            {renderContent()}
         </div>
     );
 };

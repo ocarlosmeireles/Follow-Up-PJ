@@ -264,18 +264,20 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                     Performance Mensal (Últimos 12 meses)
                 </h2>
                 {monthlyPerformance.data.length > 0 ? (
-                    <div className="w-full h-80 flex items-end justify-around gap-2 pt-4 border-t border-gray-200 dark:border-slate-700">
-                        {monthlyPerformance.data.map(({ label, value }) => (
-                            <div key={label} className="flex flex-col items-center h-full flex-1" title={`${label}: ${formatCurrency(value)}`}>
-                                <div className="w-full h-full flex items-end">
-                                    <div 
-                                        className="w-full bg-purple-500 hover:bg-purple-400 dark:bg-purple-600 dark:hover:bg-purple-500 rounded-t-md transition-all duration-300"
-                                        style={{ height: `${monthlyPerformance.maxValue > 0 ? (value / monthlyPerformance.maxValue) * 100 : 0}%` }}
-                                    ></div>
+                    <div className="w-full overflow-x-auto">
+                        <div className="h-80 flex items-end justify-start gap-2 pt-4 border-t border-gray-200 dark:border-slate-700 min-w-[600px]">
+                            {monthlyPerformance.data.map(({ label, value }) => (
+                                <div key={label} className="flex flex-col items-center h-full flex-1" title={`${label}: ${formatCurrency(value)}`}>
+                                    <div className="w-full h-full flex items-end">
+                                        <div 
+                                            className="w-full bg-purple-500 hover:bg-purple-400 dark:bg-purple-600 dark:hover:bg-purple-500 rounded-t-md transition-all duration-300"
+                                            style={{ height: `${monthlyPerformance.maxValue > 0 ? (value / monthlyPerformance.maxValue) * 100 : 0}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-semibold capitalize">{label}</span>
                                 </div>
-                                <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-semibold capitalize">{label}</span>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     <div className="text-center py-16 text-gray-400 dark:text-slate-500 border-t border-gray-200 dark:border-slate-700">

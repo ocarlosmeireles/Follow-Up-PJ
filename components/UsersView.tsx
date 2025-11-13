@@ -41,7 +41,8 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700">
-            <div className="overflow-x-auto">
+            {/* Table for medium screens and up */}
+            <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left">
                     <thead className="border-b-2 border-gray-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 uppercase text-xs">
                         <tr>
@@ -77,13 +78,42 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
                         ))}
                     </tbody>
                 </table>
-                 {users.length === 0 && (
-                    <div className="text-center py-10 text-gray-400 dark:text-slate-500">
-                        <UserGroupIcon className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-gray-600"/>
-                        <p>Nenhum usuário encontrado.</p>
-                    </div>
-                )}
             </div>
+
+            {/* Cards for small screens */}
+            <div className="md:hidden space-y-4 p-4">
+                {users.map(user => (
+                    <div key={user.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="font-bold text-gray-800 dark:text-slate-100">{user.name}</p>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">{user.email}</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Matrícula: {user.matricula}</p>
+                            </div>
+                            <RoleBadge role={user.role} />
+                        </div>
+                        <div className="mt-4">
+                            <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Alterar Cargo</glabel>
+                            <select
+                                value={user.role}
+                                onChange={(e) => onUpdateRole(user.id, e.target.value as UserRole)}
+                                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                {Object.values(UserRole).filter(r => r !== UserRole.SUPER_ADMIN).map(role => (
+                                    <option key={role} value={role}>{role}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {users.length === 0 && (
+                <div className="text-center py-10 text-gray-400 dark:text-slate-500">
+                    <UserGroupIcon className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-gray-600"/>
+                    <p>Nenhum usuário encontrado.</p>
+                </div>
+            )}
         </div>
     </div>
   );

@@ -164,8 +164,8 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             )}
             
 
-            <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
-                 <h3 className="text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
+            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
+                 <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
                  {nextTasks.length > 0 ? (
                     <div className="space-y-4">
                         {nextTasks.map((budget, index) => {
@@ -178,7 +178,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                                     key={budget.id}
                                     style={{ animationDelay: `${index * 50}ms` }}
                                     onClick={() => onSelectBudget(budget.id)}
-                                    className="animated-item bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-center"
+                                    className="animated-item bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center"
                                 >
                                     <div>
                                         <p className="font-bold text-[var(--text-primary)] truncate">{budget.title}</p>

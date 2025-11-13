@@ -133,10 +133,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
     const sortedBudgets = [...budgets].sort((a,b) => new Date(b.dateSent).getTime() - new Date(a.dateSent).getTime());
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-6xl m-4 max-h-[90vh] flex flex-col transform transition-all">
-                <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-200 dark:border-slate-700">
-                    <div className="flex items-center gap-4">
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50 p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col transform transition-all">
+                <div className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start mb-4 pb-4 border-b border-gray-200 dark:border-slate-700">
+                    <div className="flex items-center gap-4 w-full">
                          <div className="relative group flex-shrink-0">
                             <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" id="client-logo-upload" />
                             {logoPreview ? (
@@ -150,35 +150,35 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                 <PencilIcon className="w-6 h-6"/>
                             </label>
                         </div>
-                        <div>
-                            <h2 className="text-3xl font-bold text-gray-900 dark:text-slate-100">{client.name}</h2>
+                        <div className="flex-grow">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-100">{client.name}</h2>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-slate-400 mt-2">
                                 {client.cnpj && <span>CNPJ: {client.cnpj}</span>}
                                 {client.address && <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4"/>{client.address}</span>}
                             </div>
                         </div>
+                         <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 sm:ml-4">
+                            <XMarkIcon className="w-7 h-7" />
+                        </button>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 mt-4 sm:mt-0 w-full sm:w-auto flex-wrap">
                         {isDirty && (
-                             <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm">
+                             <button onClick={handleSave} className="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition-colors duration-200 shadow-sm text-sm">
                                 <CheckCircleIcon className="w-4 h-4 mr-2" />
-                                Salvar Alterações
+                                Salvar
                             </button>
                         )}
                         <button
                             onClick={() => onAddBudgetForClient(client)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm text-sm"
+                            className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-colors duration-200 shadow-sm text-sm"
                         >
                             <PlusIcon className="w-4 h-4 mr-2" />
                             Novo Orçamento
                         </button>
-                        <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
-                            <XMarkIcon className="w-7 h-7" />
-                        </button>
                     </div>
                 </div>
 
-                <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar flex flex-col lg:grid lg:grid-cols-3 gap-6 p-4 sm:p-6 pt-0">
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                          <div>

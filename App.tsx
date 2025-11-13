@@ -1,5 +1,11 @@
 
 
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -47,13 +53,13 @@ export type ActiveView =
     | 'organizations';
 
 const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
-     <div className="h-screen w-screen flex justify-center items-center bg-slate-100 dark:bg-slate-900">
+     <div className="h-screen w-screen flex justify-center items-center bg-[var(--background-primary)]">
         <div className="text-center">
-            <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-10 w-10 text-[var(--accent-primary)] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-slate-200">{message}</p>
+            <p className="mt-4 text-lg font-semibold text-[var(--text-secondary)]">{message}</p>
         </div>
     </div>
 );
@@ -90,7 +96,7 @@ const App: React.FC = () => {
     // UI states
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
-    const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'classic');
+    const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'dashboard');
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
     const [isBudgetDetailModalOpen, setBudgetDetailModalOpen] = useState(false);
@@ -391,8 +397,12 @@ const App: React.FC = () => {
                 ...budgetData,
                 userId: user.uid,
                 organizationId: userProfile.organizationId,
-                clientId: finalClientId,
-                contactId: finalContactId,
+                // FIX: Type 'unknown' is not assignable to type 'string'.
+                // Added explicit type assertion to resolve a complex type inference issue.
+                clientId: finalClientId as string,
+                // FIX: Type 'unknown' is not assignable to type 'string'.
+                // Added explicit type assertion to resolve a complex type inference issue.
+                contactId: finalContactId as string | null,
                 status: BudgetStatus.SENT,
                 followUps: []
             };
@@ -468,9 +478,7 @@ const App: React.FC = () => {
             const budgetData = budgetDoc.data() as Budget;
             const newFollowUp: FollowUp = { 
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                // FIX: The `followUp.date` is already a string. The explicit `String()` casting is unnecessary and was causing a type error.
                 date: followUp.date,
-                // FIX: The `followUp.notes` is already a string. The explicit `String()` casting is unnecessary and was causing a type error.
                 notes: followUp.notes,
             };
             if (followUp.audioUrl) {
@@ -712,61 +720,75 @@ const App: React.FC = () => {
 
     const selectedBudgetClient = clients.find(c => c.id === selectedBudget?.clientId);
     const selectedBudgetContact = contacts.find(c => c.id === selectedBudget?.contactId);
+    
+    const isDashboardTheme = themeVariant === 'dashboard';
 
     return (
-        <div className="flex h-screen bg-[var(--background-primary)]">
+        <div className={`flex h-screen ${isDashboardTheme ? 'bg-[var(--background-primary)]' : 'bg-[var(--background-primary)]'}`}>
              {/* Sidebar backdrop for mobile */}
             {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 md:hidden"></div>}
-            <Sidebar activeView={activeView} setActiveView={handleSetView} isOpen={isSidebarOpen} userProfile={userProfile} organization={organization}/>
-            <div className="flex-1 flex flex-col h-screen">
-                 {impersonatingOrg && originalUserProfile && (
-                    <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
-                        <ExclamationTriangleIcon className="w-5 h-5" />
-                        Você está visualizando como {userProfile.name} da organização {impersonatingOrg.name}.
-                        <button onClick={handleExitImpersonation} className="ml-4 bg-black/20 hover:bg-black/40 text-white font-bold py-1 px-3 rounded-lg">
-                            Voltar ao Super Admin
-                        </button>
-                    </div>
-                )}
-                <Header 
-                    onAddBudget={() => setAddBudgetModalOpen(true)} 
-                    onAddProspect={() => setAddProspectModalOpen(true)}
-                    onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
-                    theme={theme}
-                    toggleTheme={toggleTheme}
-                    notifications={notifications}
-                    onNotificationClick={handleSelectBudget}
-                    userProfile={userProfile}
-                    onEditProfile={() => setProfileModalOpen(true)}
-                    onSettings={() => setSettingsModalOpen(true)}
-                    onLogout={handleLogout}
-                />
-                <main key={viewKey} className="flex-1 p-4 sm:p-6 overflow-y-auto fade-in">
-                    {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
-                        <SuperAdminView 
-                            organizations={allOrganizations} 
-                            users={allUsers} 
-                            clients={allClients} 
-                            budgets={allBudgets}
-                            onImpersonate={handleImpersonate}
-                            onToggleStatus={handleToggleOrgStatus}
-                            onDelete={handleDeleteOrganization}
-                        />
-                    ) : (
-                        <>
-                            {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                            {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                            {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
-                            {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
-                            {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
-                            {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
-                            {activeView === 'map' && <MapView clients={clients} />}
-                            {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
-                            {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
-                            {(activeView === 'users' && (userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER)) && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
-                        </>
+            
+            <Sidebar 
+                activeView={activeView} 
+                setActiveView={handleSetView} 
+                isOpen={isSidebarOpen} 
+                userProfile={userProfile} 
+                organization={organization}
+                themeVariant={themeVariant}
+            />
+
+            <div className={`flex-1 flex flex-col h-screen ${isDashboardTheme ? 'p-4 sm:p-6' : ''}`}>
+                 <div className={`flex flex-col h-full w-full ${isDashboardTheme ? 'bg-[var(--background-secondary)] rounded-2xl shadow-lg' : ''}`}>
+                     {impersonatingOrg && originalUserProfile && (
+                        <div className="bg-yellow-400 dark:bg-yellow-600 text-black dark:text-white text-center p-2 font-semibold flex justify-center items-center gap-4 z-50">
+                            <ExclamationTriangleIcon className="w-5 h-5" />
+                            Você está visualizando como {userProfile.name} da organização {impersonatingOrg.name}.
+                            <button onClick={handleExitImpersonation} className="ml-4 bg-black/20 hover:bg-black/40 text-white font-bold py-1 px-3 rounded-lg">
+                                Voltar ao Super Admin
+                            </button>
+                        </div>
                     )}
-                </main>
+                    <Header 
+                        onAddBudget={() => setAddBudgetModalOpen(true)} 
+                        onAddProspect={() => setAddProspectModalOpen(true)}
+                        onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+                        theme={theme}
+                        toggleTheme={toggleTheme}
+                        notifications={notifications}
+                        onNotificationClick={handleSelectBudget}
+                        userProfile={userProfile}
+                        onEditProfile={() => setProfileModalOpen(true)}
+                        onSettings={() => setSettingsModalOpen(true)}
+                        onLogout={handleLogout}
+                        themeVariant={themeVariant}
+                    />
+                    <main key={viewKey} className={`flex-1 overflow-y-auto fade-in ${isDashboardTheme ? 'p-4 sm:p-6' : 'p-4 sm:p-8'}`}>
+                        {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
+                            <SuperAdminView 
+                                organizations={allOrganizations} 
+                                users={allUsers} 
+                                clients={allClients} 
+                                budgets={allBudgets}
+                                onImpersonate={handleImpersonate}
+                                onToggleStatus={handleToggleOrgStatus}
+                                onDelete={handleDeleteOrganization}
+                            />
+                        ) : (
+                            <>
+                                {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
+                                {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                                {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
+                                {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
+                                {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
+                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                                {activeView === 'map' && <MapView clients={clients} />}
+                                {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
+                                {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}
+                                {(activeView === 'users' && (userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.MANAGER)) && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onInviteUserClick={() => setAddUserModalOpen(true)} />}
+                            </>
+                        )}
+                    </main>
+                </div>
             </div>
             
             {/* Modals */}

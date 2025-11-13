@@ -18,7 +18,11 @@ interface SettingsModalProps {
 const ThemePreview: React.FC<{ variant: ThemeVariant; name: string; isActive: boolean; onClick: () => void; }> = ({ variant, name, isActive, onClick }) => {
     const classicColors = { bg: 'bg-slate-100', sidebar: 'bg-white', accent: 'bg-blue-500' };
     const vibrantColors = { bg: 'bg-slate-50', sidebar: 'bg-white', accent: 'bg-purple-600' };
-    const colors = variant === 'classic' ? classicColors : vibrantColors;
+    const flowColors = { bg: 'bg-gray-50', sidebar: 'bg-white', accent: 'bg-cyan-500' };
+    const dashboardColors = { bg: 'bg-[#eef1f8]', sidebar: 'bg-[#28334d]', accent: 'bg-blue-500' };
+
+    
+    const colors = variant === 'classic' ? classicColors : variant === 'vibrant' ? vibrantColors : variant === 'dashboard' ? dashboardColors : flowColors;
     
     return (
         <div onClick={onClick} className={`cursor-pointer rounded-lg p-2 border-2 transition-all ${isActive ? 'border-[var(--accent-primary)]' : 'border-transparent hover:border-[var(--border-secondary)]'}`}>
@@ -108,9 +112,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Theme Settings */}
                     <div>
                         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Tema da Aplicação</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <ThemePreview variant="dashboard" name="Painel Moderno" isActive={currentThemeVariant === 'dashboard'} onClick={() => setThemeVariant('dashboard')} />
                             <ThemePreview variant="classic" name="Clássico" isActive={currentThemeVariant === 'classic'} onClick={() => setThemeVariant('classic')} />
                             <ThemePreview variant="vibrant" name="Vibrante" isActive={currentThemeVariant === 'vibrant'} onClick={() => setThemeVariant('vibrant')} />
+                            <ThemePreview variant="flow" name="Fluxo" isActive={currentThemeVariant === 'flow'} onClick={() => setThemeVariant('flow')} />
                         </div>
                     </div>
                     
@@ -151,7 +157,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-[var(--border-primary)] flex justify-end">
-                    <button onClick={handleSave} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg">
+                    <button onClick={handleSave} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-[var(--text-on-accent)] font-bold py-2 px-4 rounded-lg">
                         Salvar Alterações
                     </button>
                 </div>

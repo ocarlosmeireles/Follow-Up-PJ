@@ -44,6 +44,14 @@ export const BellIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const BillingIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className || "w-6 h-6"}>
+    <rect x="6" y="6" width="12" height="12" rx="2" opacity="0.6" />
+    <rect x="9" y="9" width="10" height="10" rx="2" fill="white" stroke="currentColor" />
+  </svg>
+);
+
+
 export const BriefcaseIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.075c0 1.313-.964 2.505-2.287 2.695H6.037c-1.323-.19-2.287-1.382-2.287-2.695V14.15M16.023 18.285H7.977a48.432 48.432 0 0 0-4.275 0" />

@@ -24,7 +24,7 @@
 <script>
   // Script para evitar flash de tema
   const theme = localStorage.getItem('theme') || 'light';
-  const themeVariant = localStorage.getItem('themeVariant') || 'classic';
+  const themeVariant = localStorage.getItem('themeVariant') || 'flow';
   
   if (theme === 'dark') {
     document.documentElement.classList.add('dark');
@@ -119,6 +119,103 @@
   --accent-primary-hover: #C084FC; /* purple-400 */
 }
 
+:root[data-theme="flow"] {
+  --background-primary: #F9FAFB; /* gray-50 */
+  --background-secondary: #FFFFFF; /* white */
+  --background-secondary-hover: #F3F4F6; /* gray-100 */
+  --background-tertiary: #F3F4F6; /* gray-100 */
+  --background-tertiary-hover: #E5E7EB; /* gray-200 */
+  --background-accent-subtle: #ECFEFF; /* cyan-50 */
+
+  --text-primary: #1F2937; /* gray-800 */
+  --text-secondary: #6B7280; /* gray-500 */
+  --text-tertiary: #9CA3AF; /* gray-400 */
+  --text-accent: #0891B2; /* cyan-600 */
+  --text-on-accent: #FFFFFF;
+
+  --border-primary: #E5E7EB; /* gray-200 */
+  --border-secondary: #D1D5DB; /* gray-300 */
+
+  --accent-primary: #0891B2; /* cyan-600 */
+  --accent-primary-hover: #0E7490; /* cyan-700 */
+}
+
+.dark[data-theme="flow"] {
+  --background-primary: #030712; /* gray-950 */
+  --background-secondary: #111827; /* gray-900 */
+  --background-secondary-hover: #1F2937; /* gray-800 */
+  --background-tertiary: #1F2937; /* gray-800 */
+  --background-tertiary-hover: #3751; /* gray-700 */
+  --background-accent-subtle: #164e63; /* cyan-900 */
+
+  --text-primary: #F9FAFB; /* gray-50 */
+  --text-secondary: #9CA3AF; /* gray-400 */
+  --text-tertiary: #4B5563; /* gray-600 */
+  --text-accent: #67e8f9; /* cyan-300 */
+  --text-on-accent: #030712;
+
+  --border-primary: #1F2937; /* gray-800 */
+  --border-secondary: #374151; /* gray-700 */
+
+  --accent-primary: #06b6d4; /* cyan-500 */
+  --accent-primary-hover: #22d3ee; /* cyan-400 */
+}
+
+/* NOVO TEMA: DASHBOARD */
+:root[data-theme="dashboard"] {
+  --background-primary: #eef1f8; /* Fundo principal claro */
+  --background-secondary: #ffffff; /* Fundo dos cards e painel principal */
+  --background-secondary-hover: #F8FAFC;
+  --background-tertiary: #F1F5F9;
+  --background-tertiary-hover: #E2E8F0;
+  
+  --background-sidebar: #28334d; /* Sidebar escura */
+  --text-on-sidebar: #e5e7eb; /* Texto claro na sidebar */
+  --text-on-sidebar-hover: #ffffff;
+  --background-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --background-sidebar-active: #3b82f6;
+  --text-on-sidebar-active: #ffffff;
+
+  --text-primary: #111827; /* Texto escuro no conteúdo */
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --text-accent: #3b82f6; /* Azul */
+  --text-on-accent: #ffffff;
+
+  --border-primary: #e5e7eb;
+  --border-secondary: #d1d5db;
+
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #2563eb;
+}
+
+.dark[data-theme="dashboard"] {
+  --background-primary: #17213a; /* Fundo principal escuro */
+  --background-secondary: #28334d; /* Fundo dos cards escuro */
+  --background-secondary-hover: #354261;
+  --background-tertiary: #354261;
+  --background-tertiary-hover: #4c5a7f;
+
+  --background-sidebar: #1e293b; /* Sidebar escura */
+  --text-on-sidebar: #e5e7eb;
+  --text-on-sidebar-hover: #ffffff;
+  --background-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --background-sidebar-active: #3b82f6;
+  --text-on-sidebar-active: #ffffff;
+
+  --text-primary: #f9fafb; /* Texto claro no conteúdo */
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --text-accent: #60a5fa; /* Azul mais claro */
+  --text-on-accent: #ffffff;
+  
+  --border-primary: #374151;
+  --border-secondary: #4b5563;
+
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #60a5fa;
+}
+
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -135,12 +232,12 @@
 }
 
 /* Page transition animation */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes fadeInScaleUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeInScaleUp 0.5s ease-out forwards;
 }
 
 </style>

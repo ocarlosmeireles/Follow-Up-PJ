@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ActiveView } from '../App';
-import type { UserProfile, Organization } from '../types';
+import type { UserProfile, Organization, ThemeVariant } from '../types';
 import { UserRole } from '../types';
 import { 
     ChartPieIcon as DashboardIcon, 
@@ -13,7 +13,8 @@ import {
     CurrencyDollarIcon,
     UserIcon,
     UserGroupIcon as UsersIcon,
-    Cog6ToothIcon
+    Cog6ToothIcon,
+    BillingIcon,
 } from './icons';
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ interface SidebarProps {
     isOpen: boolean;
     userProfile: UserProfile | null;
     organization: Organization | null;
+    themeVariant: ThemeVariant;
 }
 
 const NavLink: React.FC<{
@@ -29,23 +31,35 @@ const NavLink: React.FC<{
     label: string;
     isActive: boolean;
     onClick: () => void;
-}> = ({ icon, label, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`w-full flex items-center p-3 rounded-lg text-left transition-colors duration-200 ${
-            isActive 
-            ? 'bg-[var(--background-accent-subtle)] text-[var(--text-accent)]' 
-            : 'text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--text-primary)]'
-        }`}
-    >
-        {icon}
-        <span className="ml-3 font-semibold text-sm">{label}</span>
-    </button>
-);
+    isDashboardTheme: boolean;
+}> = ({ icon, label, isActive, onClick, isDashboardTheme }) => {
+    
+    const activeClass = isDashboardTheme 
+        ? 'bg-[var(--background-sidebar-active)] text-[var(--text-on-sidebar-active)]'
+        : 'bg-[var(--background-accent-subtle)] text-[var(--text-accent)]';
+    
+    const inactiveClass = isDashboardTheme
+        ? 'text-[var(--text-on-sidebar)] hover:bg-[var(--background-sidebar-hover)] hover:text-[var(--text-on-sidebar-hover)]'
+        : 'text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--text-primary)]';
 
-const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full flex items-center p-3 rounded-lg text-left transition-colors duration-200 ${
+                isActive ? activeClass : inactiveClass
+            }`}
+        >
+            {icon}
+            <span className="ml-3 font-semibold text-sm">{label}</span>
+        </button>
+    );
+};
+
+const NavSection: React.FC<{ title: string; children: React.ReactNode; isDashboardTheme: boolean; }> = ({ title, children, isDashboardTheme }) => (
     <div className="mt-6">
-        <h3 className="px-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">{title}</h3>
+        <h3 className={`px-3 text-xs font-semibold uppercase tracking-wider ${isDashboardTheme ? 'text-gray-400' : 'text-[var(--text-tertiary)]'}`}>
+            {title}
+        </h3>
         <div className="mt-2 space-y-1">
             {children}
         </div>
@@ -53,115 +67,93 @@ const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ ti
 );
 
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, userProfile, organization }) => {
-    return (
-        <aside className={`w-64 bg-[var(--background-secondary)] p-4 flex-shrink-0 flex flex-col border-r border-[var(--border-primary)] fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-            <div className="flex items-center gap-3 mb-8 px-2">
-                {organization?.logoUrl ? (
-                    <img src={organization.logoUrl} alt={`${organization.name} logo`} className="w-10 h-10 rounded-full object-contain" />
-                ) : (
-                    <div className="w-10 h-10 bg-[var(--background-accent-subtle)] rounded-full flex items-center justify-center text-[var(--text-accent)] font-bold">
-                        {organization?.name.charAt(0).toUpperCase()}
-                    </div>
-                )}
-                <span className="text-xl font-bold text-[var(--text-accent)]">{organization?.name || "Follow-up CRM"}</span>
-            </div>
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, userProfile, organization, themeVariant }) => {
+    const isDashboardTheme = themeVariant === 'dashboard';
 
-            <nav className="flex-grow overflow-y-auto custom-scrollbar">
-                {userProfile?.role === UserRole.SUPER_ADMIN ? (
+    const renderLink = (view: ActiveView, label: string, icon: React.ReactNode) => (
+        <NavLink
+            label={label}
+            icon={icon}
+            isActive={activeView === view}
+            onClick={() => setActiveView(view)}
+            isDashboardTheme={isDashboardTheme}
+        />
+    );
+
+    const renderSection = (title: string, children: React.ReactNode) => (
+        <NavSection title={title} isDashboardTheme={isDashboardTheme}>
+            {children}
+        </NavSection>
+    );
+    
+    return (
+        <aside className={`w-64 flex-shrink-0 flex flex-col fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${isDashboardTheme ? 'bg-[var(--background-sidebar)] p-5' : 'bg-[var(--background-secondary)] p-4 border-r border-[var(--border-primary)]'}`}>
+            <div className={`flex items-center gap-3 mb-8 ${isDashboardTheme ? 'px-0' : 'px-2'}`}>
+                {isDashboardTheme ? (
                     <>
-                        <NavSection title="Super Admin">
-                             <NavLink 
-                                label="Organizações"
-                                icon={<Cog6ToothIcon className="w-6 h-6" />}
-                                isActive={activeView === 'organizations'}
-                                onClick={() => setActiveView('organizations')}
-                            />
-                        </NavSection>
+                        <BillingIcon className="w-8 h-8 text-blue-400"/>
+                        <span className="text-xl font-bold text-white">BILLING SYSTEM</span>
                     </>
                 ) : (
                     <>
-                        <NavLink 
-                            label="Painel"
-                            icon={<DashboardIcon className="w-6 h-6" />}
-                            isActive={activeView === 'dashboard'}
-                            onClick={() => setActiveView('dashboard')}
-                        />
-                         <NavLink 
-                            label="Plano de Ação"
-                            icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
-                            isActive={activeView === 'action-plan'}
-                            onClick={() => setActiveView('action-plan')}
-                        />
+                         {organization?.logoUrl ? (
+                            <img src={organization.logoUrl} alt={`${organization.name} logo`} className="w-10 h-10 rounded-full object-contain" />
+                        ) : (
+                            <div className="w-10 h-10 bg-[var(--background-accent-subtle)] rounded-full flex items-center justify-center text-[var(--text-accent)] font-bold">
+                                {organization?.name.charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <span className="text-xl font-bold text-[var(--text-accent)]">{organization?.name || "Follow-up CRM"}</span>
+                    </>
+                )}
+            </div>
 
-                        <NavSection title="Vendas">
-                            <NavLink 
-                                label="Prospecção"
-                                icon={<FunnelIcon className="w-6 h-6" />}
-                                isActive={activeView === 'prospecting'}
-                                onClick={() => setActiveView('prospecting')}
-                            />
-                            <NavLink 
-                                label="Orçamentos"
-                                icon={<BriefcaseIcon className="w-6 h-6" />}
-                                isActive={activeView === 'budgeting'}
-                                onClick={() => setActiveView('budgeting')}
-                            />
-                             <NavLink 
-                                label="Hub de Negócios"
-                                icon={<CurrencyDollarIcon className="w-6 h-6" />}
-                                isActive={activeView === 'deals'}
-                                onClick={() => setActiveView('deals')}
-                            />
-                            <NavLink 
-                                label="Clientes"
-                                icon={<UserIcon className="w-6 h-6" />}
-                                isActive={activeView === 'clients'}
-                                onClick={() => setActiveView('clients')}
-                            />
-                        </NavSection>
+            <nav className="flex-grow overflow-y-auto custom-scrollbar -mr-2 pr-2">
+                {userProfile?.role === UserRole.SUPER_ADMIN ? (
+                    <>
+                        {renderSection("Super Admin", 
+                           renderLink('organizations', "Organizações", <Cog6ToothIcon className="w-6 h-6" />)
+                        )}
+                    </>
+                ) : (
+                    <>
+                        {renderLink('dashboard', "Painel", <DashboardIcon className="w-6 h-6" />)}
+                        {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
+                        
+                        {renderSection("Vendas", <>
+                            {renderLink('prospecting', "Prospecção", <FunnelIcon className="w-6 h-6" />)}
+                            {renderLink('budgeting', "Orçamentos", <BriefcaseIcon className="w-6 h-6" />)}
+                            {renderLink('deals', "Hub de Negócios", <CurrencyDollarIcon className="w-6 h-6" />)}
+                            {renderLink('clients', "Clientes", <UserIcon className="w-6 h-6" />)}
+                        </>)}
 
-                        <NavSection title="Organização">
-                             <NavLink 
-                                label="Calendário"
-                                icon={<CalendarDaysIcon className="w-6 h-6" />}
-                                isActive={activeView === 'calendar'}
-                                onClick={() => setActiveView('calendar')}
-                            />
-                        </NavSection>
-                         <NavSection title="Análise">
-                             <NavLink 
-                                label="Relatórios"
-                                icon={<ChartBarIcon className="w-6 h-6" />}
-                                isActive={activeView === 'reports'}
-                                onClick={() => setActiveView('reports')}
-                            />
-                             <NavLink 
-                                label="Mapa"
-                                icon={<MapPinIcon className="w-6 h-6" />}
-                                isActive={activeView === 'map'}
-                                onClick={() => setActiveView('map')}
-                            />
-                        </NavSection>
+                        {renderSection("Organização", 
+                            renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)
+                        )}
+                         
+                        {renderSection("Análise", <>
+                            {renderLink('reports', "Relatórios", <ChartBarIcon className="w-6 h-6" />)}
+                            {renderLink('map', "Mapa", <MapPinIcon className="w-6 h-6" />)}
+                        </>)}
 
                         {(userProfile?.role === UserRole.ADMIN || userProfile?.role === UserRole.MANAGER) && (
-                            <NavSection title="Admin">
-                                <NavLink 
-                                    label="Gerenciar Usuários"
-                                    icon={<UsersIcon className="w-6 h-6" />}
-                                    isActive={activeView === 'users'}
-                                    onClick={() => setActiveView('users')}
-                                />
-                            </NavSection>
+                            renderSection("Admin", 
+                                renderLink('users', "Gerenciar Usuários", <UsersIcon className="w-6 h-6" />)
+                            )
                         )}
                     </>
                 )}
             </nav>
 
-            <div className="mt-auto text-center text-xs text-[var(--text-tertiary)] pt-4">
-                <p>&copy; 2024 Follow-up CRM</p>
-                <p>Todos os direitos reservados.</p>
-            </div>
+            {isDashboardTheme && (
+                 <div className="mt-auto flex-shrink-0">
+                    <div className="p-4 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-700 text-white text-center">
+                        <h4 className="font-bold text-base">Upgrade to PRO</h4>
+                        <p className="text-xs mt-1 opacity-80">For more Profile Control</p>
+                        <button className="mt-3 bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full transition-colors">Upgrade</button>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 };

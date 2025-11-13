@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client } from '../types';
+import type { Budget, Client, ThemeVariant } from '../types';
 import { BudgetStatus } from '../types';
-import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon } from './icons';
+import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 
 interface DashboardProps {
   budgets: Budget[];
   clients: Client[];
   onSelectBudget: (id: string) => void;
+  themeVariant: ThemeVariant;
 }
 
 const formatCurrency = (value: number) => {
@@ -38,20 +39,41 @@ const formatFollowUpDate = (dateString: string | null): string => {
     }
 };
 
-const MetricCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
-    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg flex items-center gap-4 border border-gray-200 dark:border-slate-700 shadow-sm">
-        <div className="bg-blue-50 dark:bg-slate-700 p-3 rounded-full">
+// Componente de cartão de métrica para temas clássicos
+const ClassicMetricCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
+    <div className="bg-[var(--background-secondary)] p-6 rounded-xl flex items-center gap-4 border border-[var(--border-primary)] shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div className="bg-[var(--background-tertiary)] p-3 rounded-full">
             {icon}
         </div>
         <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-            <p className="text-xl font-bold text-gray-800 dark:text-slate-100">{value}</p>
+            <p className="text-sm font-medium text-[var(--text-secondary)]">{title}</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{value}</p>
         </div>
     </div>
 );
 
+// Componente de cartão de métrica para o novo tema 'dashboard'
+const DashboardMetricCard = ({ title, value, subValue, icon, gradient }: { title: string, value: string | number, subValue: string, icon: React.ReactNode, gradient: string }) => (
+    <div className={`relative p-6 rounded-2xl text-white overflow-hidden shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${gradient}`}>
+        <div className="relative z-10">
+            <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-lg font-semibold">{title}</p>
+                    <p className="text-3xl font-bold mt-1">{value}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-full">
+                    {icon}
+                </div>
+            </div>
+            <p className="text-sm opacity-80 mt-4">{subValue}</p>
+        </div>
+        <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+         <div className="absolute -bottom-10 -left-2 w-20 h-20 bg-white/10 rounded-full"></div>
+    </div>
+);
 
-const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget }) => {
+
+const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant }) => {
     const [timePeriod, setTimePeriod] = useState<'month' | '30days' | 'all'>('all');
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -93,7 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
             (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)
         ).length;
 
-        return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue };
+        return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
     }, [filteredBudgetsByTime, budgets]);
     
     const nextTasks = useMemo(() => {
@@ -102,34 +124,47 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
         );
         return activeBudgetsWithFollowUp
             .sort((a,b) => new Date(a.nextFollowUpDate!).getTime() - new Date(b.nextFollowUpDate!).getTime())
-            .slice(0, 3);
+            .slice(0, 5);
     }, [budgets]);
+    
+    const isDashboardTheme = themeVariant === 'dashboard';
 
     return (
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">Dashboard de Vendas</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Métricas de performance do seu funil de vendas.</p>
+                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Dashboard de Vendas</h1>
+                    <p className="text-[var(--text-secondary)] mt-1">Métricas de performance do seu funil de vendas.</p>
                 </div>
-                <div className="flex items-center gap-1 bg-gray-200/70 dark:bg-slate-700/50 p-1 rounded-lg mt-4 md:mt-0">
-                    <button onClick={() => setTimePeriod('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'month' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-slate-600/50'}`}>Este Mês</button>
-                    <button onClick={() => setTimePeriod('30days')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === '30days' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-slate-600/50'}`}>Últimos 30 dias</button>
-                    <button onClick={() => setTimePeriod('all')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'all' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-slate-600/50'}`}>Todo o Período</button>
+                <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mt-4 md:mt-0">
+                    <button onClick={() => setTimePeriod('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'month' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Este Mês</button>
+                    <button onClick={() => setTimePeriod('30days')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === '30days' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Últimos 30 dias</button>
+                    <button onClick={() => setTimePeriod('all')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'all' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Todo o Período</button>
                 </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                <MetricCard title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500 dark:text-blue-400" />} />
-                <MetricCard title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500 dark:text-purple-400" />} />
-                <MetricCard title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500 dark:text-green-400" />} />
-                <MetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />} />
-                <MetricCard title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500 dark:text-red-400" />} />
-            </div>
+            
+            {isDashboardTheme ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <DashboardMetricCard title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
+                    <DashboardMetricCard title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-purple-500 to-purple-700"/>
+                    <DashboardMetricCard title="Conversão" value={metrics.conversionRate} subValue="de negócios fechados" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
+                    <DashboardMetricCard title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-teal-500 to-teal-700"/>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
+                    <ClassicMetricCard title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
+                    <ClassicMetricCard title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500" />} />
+                    <ClassicMetricCard title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
+                    <ClassicMetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
+                    <ClassicMetricCard title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
+                </div>
+            )}
+            
 
-            <div>
-                 <h3 className="text-2xl font-semibold text-gray-800 dark:text-slate-100 mb-4">Próximas Tarefas</h3>
+            <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
+                 <h3 className="text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
                  {nextTasks.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         {nextTasks.map(budget => {
                              const today = new Date();
                              today.setHours(0,0,0,0);
@@ -139,14 +174,14 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
                                 <div 
                                     key={budget.id}
                                     onClick={() => onSelectBudget(budget.id)}
-                                    className="bg-white dark:bg-slate-800 p-4 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 border border-gray-200 dark:border-slate-700 shadow-sm transition-all duration-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-center"
+                                    className="bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-center"
                                 >
                                     <div>
-                                        <p className="font-bold text-gray-800 dark:text-slate-100 truncate">{budget.title}</p>
-                                        <p className="text-sm text-blue-600 dark:text-blue-400">{clientMap.get(budget.clientId)}</p>
+                                        <p className="font-bold text-[var(--text-primary)] truncate">{budget.title}</p>
+                                        <p className="text-sm text-[var(--text-accent)]">{clientMap.get(budget.clientId)}</p>
                                     </div>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 text-left sm:text-right">{formatCurrency(budget.value)}</p>
-                                    <div className={`flex items-center gap-2 font-semibold ${isOverdue ? 'text-red-500 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                    <p className="text-lg font-semibold text-[var(--text-secondary)] text-left sm:text-right">{formatCurrency(budget.value)}</p>
+                                    <div className={`flex items-center gap-2 font-semibold ${isOverdue ? 'text-red-500' : 'text-yellow-600'}`}>
                                         <CalendarIcon className="w-5 h-5"/>
                                         <span>{formatFollowUpDate(budget.nextFollowUpDate)}</span>
                                     </div>
@@ -155,9 +190,9 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget 
                         })}
                     </div>
                  ) : (
-                    <div className="text-center py-10 bg-white dark:bg-slate-800 rounded-lg text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-slate-700">
-                        <CalendarIcon className="w-12 h-12 mx-auto mb-2 text-gray-400 dark:text-gray-500"/>
-                        <p className="font-semibold text-gray-600 dark:text-gray-300">Nenhuma tarefa futura agendada.</p>
+                    <div className="text-center py-10 bg-[var(--background-secondary-hover)] rounded-lg text-[var(--text-secondary)] border border-dashed border-[var(--border-secondary)]">
+                        <CalendarIcon className="w-12 h-12 mx-auto mb-2 text-[var(--text-tertiary)]"/>
+                        <p className="font-semibold text-[var(--text-primary)]">Nenhuma tarefa futura agendada.</p>
                         <p className="text-sm">Agende um follow-up em um orçamento para vê-lo aqui.</p>
                     </div>
                  )}

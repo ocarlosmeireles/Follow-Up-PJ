@@ -22,8 +22,6 @@ export interface Organization {
   companyInfo?: string; // Could be used for address, phone, etc.
   // Campos para gerenciamento de assinatura
   subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'unpaid' | 'canceled';
-  stripeCustomerId?: string;
-  subscriptionId?: string;
 }
 
 export interface Invite {
@@ -118,6 +116,6 @@ export interface UserData extends UserProfile {
   id: string;
 }
 
-export type ThemeVariant = 'classic' | 'vibrant';
+export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard';
 // FIX: Moved Theme type here to be accessible globally and fix import errors.
 export type Theme = 'light' | 'dark';

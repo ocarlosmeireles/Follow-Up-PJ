@@ -4,7 +4,7 @@ import type { Budget, Client, Reminder, PriorityDeal } from '../types';
 import { BudgetStatus } from '../types';
 import { 
     CalendarIcon, ExclamationTriangleIcon, BriefcaseIcon, LightBulbIcon, SparklesIcon,
-    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon
+    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon
 } from './icons';
 
 // --- PROPS ---
@@ -25,16 +25,22 @@ type UnifiedTask = {
   clientName?: string;
   value?: number;
   budgetId?: string;
+  isOverdue: boolean;
 };
 
 // --- HELPER FUNCTIONS ---
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
-const formatDate = (date: Date) => {
+const formatTimeOrDate = (date: Date, isToday: boolean) => {
     if (!date || isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    // Check if the date string from the source included time information
+    if (date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0) {
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 };
+
 
 // --- SUB-COMPONENTS ---
 
@@ -237,25 +243,72 @@ const DailyRhythm = () => {
     );
 };
 
-const UpcomingTasks: React.FC<{ tasks: UnifiedTask[], onSelectBudget: (id: string) => void }> = ({ tasks, onSelectBudget }) => (
-    <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)] shadow-sm">
-        <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3">Próximas Tarefas</h3>
-        <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-            {tasks.length > 0 ? tasks.map(task => (
-                <div key={task.id} onClick={() => task.budgetId && onSelectBudget(task.budgetId)} className={`flex items-center justify-between p-2 rounded-md ${task.budgetId ? 'cursor-pointer hover:bg-[var(--background-tertiary)]' : ''}`}>
-                    <div className="flex items-center gap-3">
-                        {task.type === 'follow-up' ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/> : <LightBulbIcon className="w-5 h-5 text-purple-500"/>}
-                        <div>
-                            <p className={`text-sm font-semibold text-[var(--text-primary)] ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
-                            {task.clientName && <p className="text-xs text-[var(--text-accent)]">{task.clientName}</p>}
-                        </div>
-                    </div>
-                    <span className="text-xs font-bold text-[var(--text-secondary)]">{formatDate(task.date)}</span>
-                </div>
-            )) : <p className="text-sm text-center text-[var(--text-secondary)] p-4">Tudo em dia!</p>}
+const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void }> = ({ task, onSelectBudget }) => {
+    const isFollowUp = task.type === 'follow-up';
+    
+    return (
+        <div 
+            onClick={() => isFollowUp && task.budgetId && onSelectBudget(task.budgetId)}
+            className={`flex items-center gap-3 p-3 rounded-lg border-l-4 ${
+                isFollowUp ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50' 
+                           : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+            } ${task.isCompleted ? 'opacity-60' : ''}`}
+        >
+            <div className="flex-shrink-0">
+                {isFollowUp ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/> : <LightBulbIcon className="w-5 h-5 text-purple-500"/>}
+            </div>
+            <div className="flex-grow overflow-hidden">
+                <p className={`font-semibold text-[var(--text-primary)] truncate ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
+                {task.clientName && <p className="text-xs text-[var(--text-accent)] truncate">{task.clientName}</p>}
+            </div>
+            <div className="text-right flex-shrink-0">
+                <p className="text-sm font-bold text-[var(--text-secondary)]">{formatTimeOrDate(task.date, !task.isOverdue)}</p>
+                {task.isOverdue && !task.isCompleted && <p className="text-xs font-bold text-red-500">Atrasado</p>}
+            </div>
         </div>
-    </div>
-);
+    );
+};
+
+const UpcomingTasks: React.FC<{ 
+    overdueTasks: UnifiedTask[],
+    todayTasks: UnifiedTask[],
+    upcomingTasks: UnifiedTask[],
+    onSelectBudget: (id: string) => void 
+}> = ({ overdueTasks, todayTasks, upcomingTasks, onSelectBudget }) => {
+    
+    const TaskSection: React.FC<{ title: string, tasks: UnifiedTask[], icon: React.ReactNode }> = ({ title, tasks, icon }) => {
+        if (tasks.length === 0) return null;
+        return (
+            <div>
+                <h4 className="font-semibold text-[var(--text-secondary)] text-sm mb-2 flex items-center gap-2">
+                    {icon} {title}
+                </h4>
+                <div className="space-y-2">
+                    {tasks.map(task => <TaskItem key={task.id} task={task} onSelectBudget={onSelectBudget} />)}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)] shadow-sm">
+            <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3">Lista de Tarefas</h3>
+            <div className="space-y-6">
+                <TaskSection title="Atrasadas" tasks={overdueTasks} icon={<ExclamationCircleIcon className="w-5 h-5 text-red-500" />} />
+                <TaskSection title="Para Hoje" tasks={todayTasks} icon={<CalendarIcon className="w-5 h-5 text-yellow-500" />} />
+                <TaskSection title="Próximas" tasks={upcomingTasks} icon={<ClockIcon className="w-5 h-5 text-blue-500" />} />
+
+                {overdueTasks.length === 0 && todayTasks.length === 0 && upcomingTasks.length === 0 && (
+                    <div className="text-center py-8 text-[var(--text-secondary)]">
+                        <CheckCircleIcon className="w-12 h-12 mx-auto mb-2 text-green-500"/>
+                        <p className="font-semibold text-[var(--text-primary)]">Tudo em dia!</p>
+                        <p className="text-sm">Nenhuma tarefa pendente ou futura.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 
 // --- MAIN COMPONENT ---
@@ -263,24 +316,38 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
 
     const tasks = useMemo(() => {
+        const today = new Date(); 
+        today.setHours(0, 0, 0, 0);
+
         const followUpTasks: UnifiedTask[] = budgets
             .filter(b => (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) && b.nextFollowUpDate)
-            .map(b => ({
-                id: `budget-${b.id}`, type: 'follow-up', date: new Date(b.nextFollowUpDate!), title: b.title,
-                clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
-            }));
+            .map(b => {
+                const eventDate = new Date(b.nextFollowUpDate!);
+                const eventDateOnly = new Date(eventDate.getUTCFullYear(), eventDate.getUTCMonth(), eventDate.getUTCDate());
+                return {
+                    id: `budget-${b.id}`, type: 'follow-up', date: eventDate, title: b.title,
+                    clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
+                    isOverdue: eventDateOnly < today,
+                };
+            });
         
         const reminderTasks: UnifiedTask[] = reminders
             .filter(r => !r.isDismissed)
-            .map(r => ({
-                id: `reminder-${r.id}`, type: 'reminder', date: new Date(r.reminderDateTime), title: r.title,
-                isCompleted: r.isCompleted,
-            }));
+            .map(r => {
+                const eventDate = new Date(r.reminderDateTime);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return {
+                    id: `reminder-${r.id}`, type: 'reminder', date: eventDate, title: r.title,
+                    isCompleted: r.isCompleted,
+                    isOverdue: !r.isCompleted && eventDateOnly < today,
+                };
+            });
 
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const overdue = [...followUpTasks, ...reminderTasks].filter(t => !t.isCompleted && new Date(t.date) < today);
-        const todayTasks = [...followUpTasks, ...reminderTasks].filter(t => !t.isCompleted && new Date(t.date).toDateString() === today.toDateString());
-        const upcoming = [...followUpTasks, ...reminderTasks].filter(t => !t.isCompleted && new Date(t.date) > today);
+        const allTasks = [...followUpTasks, ...reminderTasks];
+
+        const overdue = allTasks.filter(t => t.isOverdue && !t.isCompleted);
+        const todayTasks = allTasks.filter(t => !t.isCompleted && new Date(t.date).toDateString() === new Date().toDateString());
+        const upcoming = allTasks.filter(t => !t.isCompleted && new Date(t.date) > new Date() && new Date(t.date).toDateString() !== new Date().toDateString());
         
         const sortByDate = (a: UnifiedTask, b: UnifiedTask) => a.date.getTime() - b.date.getTime();
         
@@ -305,7 +372,12 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                 <div className="lg:col-span-2 space-y-6">
                     <FocusOfTheDay />
                     <AIPriorityActions budgets={budgets} clients={clients} onSelectBudget={onSelectBudget} />
-                    <UpcomingTasks tasks={[...tasks.today, ...tasks.upcoming]} onSelectBudget={onSelectBudget} />
+                    <UpcomingTasks 
+                        overdueTasks={tasks.overdue}
+                        todayTasks={tasks.today}
+                        upcomingTasks={tasks.upcoming}
+                        onSelectBudget={onSelectBudget} 
+                    />
                 </div>
                 <div className="lg:col-span-1 space-y-6">
                     <GoalsPanel tasks={tasks} budgets={budgets} />

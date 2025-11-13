@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client, ThemeVariant } from '../types';
+import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 
@@ -8,6 +9,7 @@ interface DashboardProps {
   clients: Client[];
   onSelectBudget: (id: string) => void;
   themeVariant: ThemeVariant;
+  userProfile: UserProfile;
 }
 
 const formatCurrency = (value: number) => {
@@ -40,8 +42,8 @@ const formatFollowUpDate = (dateString: string | null): string => {
 };
 
 // Componente de cartão de métrica para temas clássicos
-const ClassicMetricCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
-    <div className="bg-[var(--background-secondary)] p-6 rounded-xl flex items-center gap-4 border border-[var(--border-primary)] shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+const ClassicMetricCard = ({ title, value, icon, style, className }: { title: string, value: string | number, icon: React.ReactNode, style?: React.CSSProperties, className?: string }) => (
+    <div style={style} className={`bg-[var(--background-secondary)] p-6 rounded-xl flex items-center gap-4 border border-[var(--border-primary)] shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${className || ''}`}>
         <div className="bg-[var(--background-tertiary)] p-3 rounded-full">
             {icon}
         </div>
@@ -53,8 +55,8 @@ const ClassicMetricCard = ({ title, value, icon }: { title: string, value: strin
 );
 
 // Componente de cartão de métrica para o novo tema 'dashboard'
-const DashboardMetricCard = ({ title, value, subValue, icon, gradient }: { title: string, value: string | number, subValue: string, icon: React.ReactNode, gradient: string }) => (
-    <div className={`relative p-6 rounded-2xl text-white overflow-hidden shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${gradient}`}>
+const DashboardMetricCard = ({ title, value, subValue, icon, gradient, style, className }: { title: string, value: string | number, subValue: string, icon: React.ReactNode, gradient: string, style?: React.CSSProperties, className?: string }) => (
+    <div style={style} className={`relative p-6 rounded-2xl text-white overflow-hidden shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${gradient} ${className || ''}`}>
         <div className="relative z-10">
             <div className="flex justify-between items-start">
                 <div>
@@ -73,7 +75,7 @@ const DashboardMetricCard = ({ title, value, subValue, icon, gradient }: { title
 );
 
 
-const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant }) => {
+const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant, userProfile }) => {
     const [timePeriod, setTimePeriod] = useState<'month' | '30days' | 'all'>('all');
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -133,8 +135,9 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
                  <div>
-                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Dashboard de Vendas</h1>
-                    <p className="text-[var(--text-secondary)] mt-1">Métricas de performance do seu funil de vendas.</p>
+                    <h2 className="text-xl font-medium text-[var(--text-secondary)]">Olá, {userProfile.name}!</h2>
+                    <h1 className="text-3xl font-bold text-[var(--text-primary)] mt-1">Dashboard de Vendas</h1>
+                    <p className="text-[var(--text-secondary)] mt-1">Bem-vindo(a) de volta! Este é o seu painel de controle.</p>
                 </div>
                 <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mt-4 md:mt-0">
                     <button onClick={() => setTimePeriod('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'month' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Este Mês</button>
@@ -145,18 +148,18 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             
             {isDashboardTheme ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <DashboardMetricCard title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
-                    <DashboardMetricCard title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-purple-500 to-purple-700"/>
-                    <DashboardMetricCard title="Conversão" value={metrics.conversionRate} subValue="de negócios fechados" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
-                    <DashboardMetricCard title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-teal-500 to-teal-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-purple-500 to-purple-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Conversão" value={metrics.conversionRate} subValue="de negócios fechados" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-teal-500 to-teal-700"/>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                    <ClassicMetricCard title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
-                    <ClassicMetricCard title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500" />} />
-                    <ClassicMetricCard title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
-                    <ClassicMetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
-                    <ClassicMetricCard title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '500ms' }} className="animated-item" title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
                 </div>
             )}
             
@@ -165,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                  <h3 className="text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
                  {nextTasks.length > 0 ? (
                     <div className="space-y-4">
-                        {nextTasks.map(budget => {
+                        {nextTasks.map((budget, index) => {
                              const today = new Date();
                              today.setHours(0,0,0,0);
                              const followUpDate = new Date(budget.nextFollowUpDate!);
@@ -173,8 +176,9 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                              return (
                                 <div 
                                     key={budget.id}
+                                    style={{ animationDelay: `${index * 50}ms` }}
                                     onClick={() => onSelectBudget(budget.id)}
-                                    className="bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-center"
+                                    className="animated-item bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-center"
                                 >
                                     <div>
                                         <p className="font-bold text-[var(--text-primary)] truncate">{budget.title}</p>

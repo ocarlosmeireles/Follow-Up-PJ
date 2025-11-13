@@ -30,8 +30,8 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-const KPICard = ({ title, value, icon, className = '' }: { title: string, value: string | number, icon: React.ReactNode, className?: string }) => (
-    <div className={`bg-white dark:bg-slate-800 p-4 rounded-lg flex items-center gap-4 border border-gray-200 dark:border-slate-700 shadow-sm ${className}`}>
+const KPICard = ({ title, value, icon, className = '', style }: { title: string, value: string | number, icon: React.ReactNode, className?: string, style?: React.CSSProperties }) => (
+    <div style={style} className={`bg-white dark:bg-slate-800 p-4 rounded-lg flex items-center gap-4 border border-gray-200 dark:border-slate-700 shadow-sm ${className}`}>
         <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded-full">{icon}</div>
         <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
@@ -40,7 +40,7 @@ const KPICard = ({ title, value, icon, className = '' }: { title: string, value:
     </div>
 );
 
-const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void }> = ({ client, onSelectClient, onGenerateIdea }) => {
+const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, style?: React.CSSProperties }> = ({ client, onSelectClient, onGenerateIdea, style }) => {
     const ActivityBadge = () => {
         switch (client.activityStatus) {
             case 'active':
@@ -53,7 +53,7 @@ const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string
     };
     
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600">
+        <div style={style} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600">
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="font-bold text-lg text-gray-800 dark:text-slate-100">{client.name}</h3>
@@ -207,10 +207,10 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard title="Total de Clientes" value={kpis.totalClients} icon={<UserGroupIcon className="w-6 h-6 text-blue-500 dark:text-blue-400"/>} />
-                <KPICard title="Clientes Ativos" value={kpis.activeClients} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} />
-                <KPICard title="Clientes Inativos" value={kpis.inactiveClients} icon={<ExclamationTriangleIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400"/>} />
-                <KPICard title="Receita Total" value={formatCurrency(kpis.totalRevenue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-purple-500 dark:text-purple-400"/>} />
+                <KPICard style={{ animationDelay: '100ms' }} className="animated-item" title="Total de Clientes" value={kpis.totalClients} icon={<UserGroupIcon className="w-6 h-6 text-blue-500 dark:text-blue-400"/>} />
+                <KPICard style={{ animationDelay: '200ms' }} className="animated-item" title="Clientes Ativos" value={kpis.activeClients} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} />
+                <KPICard style={{ animationDelay: '300ms' }} className="animated-item" title="Clientes Inativos" value={kpis.inactiveClients} icon={<ExclamationTriangleIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400"/>} />
+                <KPICard style={{ animationDelay: '400ms' }} className="animated-item" title="Receita Total" value={formatCurrency(kpis.totalRevenue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-purple-500 dark:text-purple-400"/>} />
             </div>
 
             <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700">
@@ -237,8 +237,8 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
 
                 {filteredClients.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredClients.map(client => (
-                            <ClientCard key={client.id} client={client} onSelectClient={onSelectClient} onGenerateIdea={handleGenerateIdea} />
+                        {filteredClients.map((client, index) => (
+                            <ClientCard style={{ animationDelay: `${index * 50}ms` }} className="animated-item" key={client.id} client={client} onSelectClient={onSelectClient} onGenerateIdea={handleGenerateIdea} />
                         ))}
                     </div>
                 ) : (

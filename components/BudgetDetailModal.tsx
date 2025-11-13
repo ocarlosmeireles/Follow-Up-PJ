@@ -68,7 +68,7 @@ const getStatusPill = (status: BudgetStatus) => {
     [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
     [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
   }
-  return <span className={`px-3 py-1 text-xs font-bold rounded-full ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
+  return <span className={`px-3 py-1 text-sm font-bold rounded-full ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
 }
 
 const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
@@ -234,6 +234,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                     <div>
                         <h2 className="text-2xl font-bold text-[var(--text-primary)]">{budget.title}</h2>
                         <p className="text-md text-[var(--text-accent)] font-semibold">{client.name}</p>
+                        <p className="text-sm text-[var(--text-secondary)] mt-1">{client.cnpj || 'CNPJ não cadastrado'}</p>
                     </div>
                     <button onClick={onClose} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                         <XMarkIcon className="w-7 h-7" />

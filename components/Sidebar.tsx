@@ -89,23 +89,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
     return (
         <aside className={`w-64 flex-shrink-0 flex flex-col fixed md:sticky top-0 h-screen z-30 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${isDashboardTheme ? 'bg-[var(--background-sidebar)] p-5' : 'bg-[var(--background-secondary)] p-4 border-r border-[var(--border-primary)]'}`}>
             <div className={`flex items-center gap-3 mb-8 ${isDashboardTheme ? 'px-0' : 'px-2'}`}>
-                {isDashboardTheme ? (
-                    <>
-                        <BillingIcon className="w-8 h-8 text-blue-400"/>
-                        <span className="text-xl font-bold text-white">BILLING SYSTEM</span>
-                    </>
+                {organization?.logoUrl ? (
+                    <img src={organization.logoUrl} alt={`${organization.name} logo`} className={`w-10 h-10 object-contain ${isDashboardTheme ? 'rounded-lg' : 'rounded-full'}`} />
                 ) : (
-                    <>
-                         {organization?.logoUrl ? (
-                            <img src={organization.logoUrl} alt={`${organization.name} logo`} className="w-10 h-10 rounded-full object-contain" />
-                        ) : (
-                            <div className="w-10 h-10 bg-[var(--background-accent-subtle)] rounded-full flex items-center justify-center text-[var(--text-accent)] font-bold">
-                                {organization?.name.charAt(0).toUpperCase()}
-                            </div>
-                        )}
-                        <span className="text-xl font-bold text-[var(--text-accent)]">{organization?.name || "Follow-up CRM"}</span>
-                    </>
+                    <div className={`w-10 h-10 flex items-center justify-center font-bold ${isDashboardTheme ? 'bg-white/10 text-white rounded-lg' : 'bg-[var(--background-accent-subtle)] text-[var(--text-accent)] rounded-full'}`}>
+                        {organization?.name.charAt(0).toUpperCase()}
+                    </div>
                 )}
+                <span className={`text-xl font-bold ${isDashboardTheme ? 'text-white' : 'text-[var(--text-accent)]'}`}>{organization?.name || "Follow-up CRM"}</span>
             </div>
 
             <nav className="flex-grow overflow-y-auto custom-scrollbar -mr-2 pr-2">
@@ -118,7 +109,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                 ) : (
                     <>
                         {renderLink('dashboard', "Painel", <DashboardIcon className="w-6 h-6" />)}
-                        {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
                         
                         {renderSection("Vendas", <>
                             {renderLink('prospecting', "Prospecção", <FunnelIcon className="w-6 h-6" />)}
@@ -127,9 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                             {renderLink('clients', "Clientes", <UserIcon className="w-6 h-6" />)}
                         </>)}
 
-                        {renderSection("Organização", 
-                            renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)
-                        )}
+                        {renderSection("Organização", <>
+                            {renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)}
+                            {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
+                        </>)}
                          
                         {renderSection("Análise", <>
                             {renderLink('reports', "Relatórios", <ChartBarIcon className="w-6 h-6" />)}

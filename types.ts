@@ -123,6 +123,7 @@ export interface Reminder {
   title: string;
   reminderDateTime: string; // ISO string
   isDismissed: boolean;
+  isCompleted: boolean;
 }
 
 export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard';

@@ -17,8 +17,9 @@ interface HeaderProps {
   onLogout: () => void;
   themeVariant: ThemeVariant;
   reminders: Reminder[];
-  onAddReminder: (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed'>) => void;
+  onAddReminder: (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => void;
   onDeleteReminder: (reminderId: string) => void;
+  onToggleReminderStatus: (reminderId: string) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -37,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({
     reminders,
     onAddReminder,
     onDeleteReminder,
+    onToggleReminderStatus,
 }) => {
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
@@ -75,7 +77,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const handleAddReminder = () => {
     if (!newReminderTitle || !newReminderDate || !newReminderTime) {
-        alert('Por favor, preencha todos os campos do lembrete.');
+        alert('Por favor, preencha todos os campos da tarefa.');
         return;
     }
     const reminderDateTime = new Date(`${newReminderDate}T${newReminderTime}`).toISOString();
@@ -92,7 +94,8 @@ const Header: React.FC<HeaderProps> = ({
 
   const sortedReminders = [...reminders]
     .filter(r => !r.isDismissed)
-    .sort((a, b) => new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
+    .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
+
 
   return (
     <header className={`p-4 flex justify-between items-center flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-30 shadow-sm'}`}>
@@ -132,37 +135,45 @@ const Header: React.FC<HeaderProps> = ({
                 {theme === 'dark' ? <SunIcon className="w-6 h-6 text-yellow-400" /> : <MoonIcon className="w-6 h-6 text-slate-500" />}
             </button>
 
-            {/* Reminders */}
+            {/* Reminders / Tasks */}
             <div className="relative" ref={remindersRef}>
                 <button onClick={() => setRemindersOpen(prev => !prev)} className="p-2 relative rounded-full text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] transition-colors">
                     <ClockIcon className="w-6 h-6" />
                 </button>
                 <div className={`absolute top-full right-0 mt-2 w-80 bg-[var(--background-secondary)] rounded-xl shadow-2xl border border-[var(--border-primary)] overflow-hidden z-40 transition-all transform duration-300 ease-in-out ${isRemindersOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                    <div className="p-4 border-b border-[var(--border-primary)]">
-                     <h3 className="font-semibold text-[var(--text-primary)]">Lembretes</h3>
+                     <h3 className="font-semibold text-[var(--text-primary)]">Lista de Tarefas</h3>
                    </div>
                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
                      {sortedReminders.length > 0 ? (
                         sortedReminders.map(r => (
                             <div key={r.id} className="p-3 flex items-start justify-between gap-3 hover:bg-[var(--background-secondary-hover)] border-b border-[var(--border-primary)]/50">
-                                <div>
-                                    <p className="text-sm text-[var(--text-primary)]">{r.title}</p>
-                                    <p className="text-xs text-[var(--text-tertiary)]">{new Date(r.reminderDateTime).toLocaleString('pt-BR')}</p>
+                                <div className="flex items-start gap-3 flex-grow">
+                                  <input 
+                                      type="checkbox"
+                                      checked={r.isCompleted}
+                                      onChange={() => onToggleReminderStatus(r.id)}
+                                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <div className="flex-grow">
+                                      <p className={`text-sm text-[var(--text-primary)] ${r.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{r.title}</p>
+                                      <p className={`text-xs ${r.isCompleted ? 'text-[var(--text-tertiary)]/80' : 'text-[var(--text-tertiary)]'}`}>{new Date(r.reminderDateTime).toLocaleString('pt-BR')}</p>
+                                  </div>
                                 </div>
                                 <button onClick={() => onDeleteReminder(r.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full flex-shrink-0"><TrashIcon className="w-4 h-4"/></button>
                             </div>
                         ))
                      ) : (
-                        <p className="p-6 text-center text-sm text-[var(--text-secondary)]">Nenhum lembrete ativo.</p>
+                        <p className="p-6 text-center text-sm text-[var(--text-secondary)]">Nenhuma tarefa adicionada.</p>
                      )}
                    </div>
                    <div className="p-3 bg-[var(--background-tertiary)] space-y-2">
-                        <input type="text" placeholder="Adicionar um lembrete..." value={newReminderTitle} onChange={e => setNewReminderTitle(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm"/>
+                        <input type="text" placeholder="Adicionar nova tarefa..." value={newReminderTitle} onChange={e => setNewReminderTitle(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm"/>
                         <div className="flex gap-2">
                              <input type="date" value={newReminderDate} onChange={e => setNewReminderDate(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm dark:[color-scheme:dark]"/>
                              <input type="time" value={newReminderTime} onChange={e => setNewReminderTime(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm dark:[color-scheme:dark]"/>
                         </div>
-                        <button onClick={handleAddReminder} className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-semibold py-2 rounded-lg text-sm">Adicionar</button>
+                        <button onClick={handleAddReminder} className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-semibold py-2 rounded-lg text-sm">Adicionar Tarefa</button>
                    </div>
                 </div>
             </div>

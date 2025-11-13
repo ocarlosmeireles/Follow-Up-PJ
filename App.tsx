@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -10,6 +12,7 @@ import Dashboard from './components/Dashboard';
 import DealsView from './components/DealsView';
 import ProspectingView from './components/ProspectingView';
 import CalendarView from './components/CalendarView';
+import TasksView from './components/TasksView';
 import MapView from './components/MapView';
 import ClientsView from './components/ClientsView';
 import ReportsView from './components/ReportsView';
@@ -24,7 +27,6 @@ import ProfileModal from './components/ProfileModal';
 import SettingsModal from './components/SettingsModal';
 import AddClientModal from './components/AddClientModal';
 import SubscriptionView from './components/SubscriptionView'; // Import the new view
-import TasksView from './components/TasksView';
 import { auth, db, storage } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
@@ -34,13 +36,13 @@ import { ExclamationTriangleIcon } from './components/icons';
 
 export type ActiveView = 
     | 'dashboard'
-    | 'action-plan'
     | 'prospecting' 
     | 'budgeting' 
     | 'deals' 
     | 'clients' 
     | 'reports' 
-    | 'calendar' 
+    | 'calendar'
+    | 'action-plan'
     | 'map'
     | 'users'
     | 'organizations';
@@ -313,6 +315,16 @@ const App: React.FC = () => {
         }
     }, [userProfile, fetchOrganizationData, fetchSuperAdminData, impersonatingOrg]);
 
+    // FIX: This useEffect hook keeps the selectedBudget state in sync with the main budgets list.
+    // When budgets are refetched (e.g., after a status change), this ensures the modal
+    // receives the updated budget data, fixing the bug where the status pill wouldn't update.
+    useEffect(() => {
+        if (selectedBudget) {
+            const updatedBudget = budgets.find(b => b.id === selectedBudget.id) || null;
+            setSelectedBudget(updatedBudget);
+        }
+    }, [budgets, selectedBudget]);
+
     useEffect(() => {
         if (userProfile?.role === UserRole.SUPER_ADMIN) {
             setNotifications([]);
@@ -379,7 +391,6 @@ const App: React.FC = () => {
         }
     }, [clients]);
 
-    // FIX: Refactored function to improve type safety and clarity, resolving potential type inference issues.
     const handleAddBudget = useCallback(async (
         budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
         clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
@@ -394,7 +405,7 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-// FIX: Explicitly cast DocumentReference.id to string to resolve potential type inference issue.
+                // FIX: Cast DocumentReference id to string to resolve type error.
                 finalClientId = newClientRef.id as string;
             }
 
@@ -409,7 +420,7 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-// FIX: Explicitly cast DocumentReference.id to string to resolve potential type inference issue.
+                // FIX: Cast DocumentReference id to string to resolve type error.
                 finalContactId = newContactRef.id as string;
             }
             
@@ -609,15 +620,25 @@ const App: React.FC = () => {
         setAddUserModalOpen(false);
     };
 
-    const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed'>) => {
+    const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => {
         if (!user || !userProfile) return;
         await addDoc(collection(db, 'reminders'), {
             ...reminderData,
             userId: user.uid,
             organizationId: userProfile.organizationId,
             isDismissed: false,
+            isCompleted: false,
         });
         await fetchOrganizationData();
+    };
+
+    const handleToggleReminderStatus = async (reminderId: string) => {
+        const reminder = reminders.find(r => r.id === reminderId);
+        if (reminder) {
+            const reminderRef = doc(db, 'reminders', reminderId);
+            await updateDoc(reminderRef, { isCompleted: !reminder.isCompleted });
+            await fetchOrganizationData();
+        }
     };
 
     const handleDeleteReminder = async (reminderId: string) => {
@@ -803,6 +824,7 @@ const App: React.FC = () => {
                         reminders={reminders}
                         onAddReminder={handleAddReminder}
                         onDeleteReminder={handleDeleteReminder}
+                        onToggleReminderStatus={handleToggleReminderStatus}
                     />
                     <main key={viewKey} className={`flex-1 overflow-y-auto fade-in ${isDashboardTheme ? 'p-4 sm:p-6' : 'p-4 sm:p-8'}`}>
                         {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
@@ -817,12 +839,12 @@ const App: React.FC = () => {
                             />
                         ) : (
                             <>
-                                {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
-                                {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                                {activeView === 'dashboard' && <Dashboard userProfile={userProfile} budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} />}
                                 {activeView === 'deals' && <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleChangeStatus} />}
                                 {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
                                 {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateSelectionReport}/>}
-                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} />}
+                                {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />}
+                                {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />}
                                 {activeView === 'map' && <MapView clients={clients} />}
                                 {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)}/>}
                                 {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport} />}

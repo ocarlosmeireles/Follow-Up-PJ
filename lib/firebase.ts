@@ -1,6 +1,6 @@
 // lib/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
@@ -16,21 +16,25 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+let db;
+
+// Initialize Firestore with the new recommended offline persistence API.
+// This allows the app to work even when the user is offline by caching data.
+// It uses multi-tab persistence to sync state across open tabs.
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (err: any) {
+    console.warn('Firestore persistence with multi-tab support failed, falling back to in-memory cache.', err);
+    // This can happen if the browser doesn't support IndexedDB or other features.
+    // We fall back to in-memory cache to ensure the app still works.
+    db = initializeFirestore(app, {
+        localCache: memoryLocalCache()
+    });
+}
+
+export { db };
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-
-// Enable Firestore offline persistence
-// This allows the app to work even when the user is offline by caching data.
-// It helps mitigate "client is offline" errors caused by network issues.
-enableIndexedDbPersistence(db)
-  .catch((err) => {
-    if (err.code == 'failed-precondition') {
-      // This can happen if multiple tabs are open, as persistence can only be
-      // enabled in one tab at a time.
-      console.warn('Firestore persistence failed: can only be enabled in one tab at a time.');
-    } else if (err.code == 'unimplemented') {
-      // The current browser does not support all of the features required for persistence.
-      console.warn('Firestore persistence is not available in this browser.');
-    }
-  });

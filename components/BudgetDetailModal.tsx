@@ -41,13 +41,19 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
 };
 
 const formatCurrencyForInput = (value: number | string): string => {
+    let numberValue: number;
     if (typeof value === 'number') {
-        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+        numberValue = value;
+    } else {
+        const digitsOnly = String(value).replace(/\D/g, '');
+        if (digitsOnly === '') return '';
+        numberValue = parseInt(digitsOnly, 10) / 100;
     }
-    const digitsOnly = value.replace(/\D/g, '');
-    if (digitsOnly === '') return '';
-    const numberValue = parseInt(digitsOnly, 10) / 100;
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numberValue);
+
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(numberValue);
 };
 
 const unmaskCurrency = (maskedValue: string): number => {
@@ -314,7 +320,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
 
 
     return (
-        <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-2 sm:p-4">
             <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--border-primary)] flex-shrink-0">
@@ -333,9 +339,9 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                     </button>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto flex flex-col lg:grid lg:grid-cols-5 gap-6 p-4 sm:p-6">
+                <div className="flex-grow overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
                     {/* Main Content (Left) */}
-                    <div className="lg:col-span-3 space-y-6">
+                    <div className="lg:w-3/5 space-y-6">
                         {!isFinalStatus && (
                          <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
                             <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Adicionar Novo Follow-up</h3>
@@ -450,40 +456,39 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                     </div>
 
                     {/* Sidebar (Right) */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
-                            <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Detalhes do Orçamento</h3>
-                            <div className="space-y-3">
-                                <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                    <label htmlFor="budget-status" className="text-sm text-[var(--text-secondary)] block mb-1">Status</label>
-                                    <div className="flex items-center gap-4">
-                                        {getStatusPill(budget.status)}
-                                        <select
-                                            id="budget-status"
-                                            value={budget.status}
-                                            onChange={(e) => onChangeStatus(budget.id, e.target.value as BudgetStatus)}
-                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] font-semibold focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] text-sm"
-                                        >
-                                            {Object.values(BudgetStatus).map(status => (
-                                                <option key={status} value={status}>{status}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                    <div className="lg:w-2/5 space-y-6">
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)] space-y-4">
+                            <h3 className="font-semibold text-lg text-[var(--text-primary)]">Detalhes do Orçamento</h3>
+                            
+                            <div>
+                                <label className="text-sm text-[var(--text-secondary)] block mb-1">Status</label>
+                                <div className="flex items-center gap-4">
+                                    {getStatusPill(budget.status)}
+                                    <select
+                                        value={budget.status}
+                                        onChange={(e) => onChangeStatus(budget.id, e.target.value as BudgetStatus)}
+                                        className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] font-semibold focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] text-sm"
+                                    >
+                                        {Object.values(BudgetStatus).map(status => (
+                                            <option key={status} value={status}>{status}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                   <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                       <div className="text-sm text-[var(--text-secondary)] mb-1">Valor</div>
-                                       <EditableField label="Valor" value={formatCurrencyForInput(budget.value)} onSave={(newValue) => onUpdateBudget(budget.id, { value: newValue as number})} type="currency" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">R$ {formatCurrency(v as number)}</p>} />
-                                   </div>
-                                    <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                       <div className="text-sm text-[var(--text-secondary)] mb-1">Enviado em</div>
-                                       <EditableField label="Enviado em" value={budget.dateSent.split('T')[0]} onSave={(newDate) => onUpdateBudget(budget.id, { dateSent: newDate as string})} type="date" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(v as string)}</p>} />
-                                   </div>
-                                </div>
-                                 <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                    <div className="text-sm text-[var(--text-secondary)] mb-1">Próximo Contato</div>
-                                    <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(budget.nextFollowUpDate)}</p>
-                                </div>
+                            </div>
+                            
+                            <div>
+                               <label className="text-sm text-[var(--text-secondary)] block mb-1">Valor</label>
+                               <EditableField label="Valor" value={formatCurrencyForInput(budget.value)} onSave={(newValue) => onUpdateBudget(budget.id, { value: newValue as number})} type="currency" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">R$ {v}</p>} />
+                            </div>
+
+                            <div>
+                               <label className="text-sm text-[var(--text-secondary)] block mb-1">Enviado em</label>
+                               <EditableField label="Enviado em" value={budget.dateSent.split('T')[0]} onSave={(newDate) => onUpdateBudget(budget.id, { dateSent: newDate as string})} type="date" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(v as string)}</p>} />
+                            </div>
+
+                             <div>
+                                <label className="text-sm text-[var(--text-secondary)] block mb-1">Próximo Contato</label>
+                                <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(budget.nextFollowUpDate)}</p>
                             </div>
                         </div>
                         

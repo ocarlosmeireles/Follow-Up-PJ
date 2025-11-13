@@ -264,8 +264,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                     Performance Mensal (Últimos 12 meses)
                 </h2>
                 {monthlyPerformance.data.length > 0 ? (
-                    <div className="w-full overflow-x-auto">
-                        <div className="h-80 flex items-end justify-start gap-2 pt-4 border-t border-gray-200 dark:border-slate-700 min-w-[600px]">
+                    <div className="w-full overflow-x-auto pb-4">
+                        <div className="h-80 flex items-end justify-start gap-4 pt-4 border-t border-gray-200 dark:border-slate-700 min-w-[600px]">
                             {monthlyPerformance.data.map(({ label, value }) => (
                                 <div key={label} className="flex flex-col items-center h-full flex-1" title={`${label}: ${formatCurrency(value)}`}>
                                     <div className="w-full h-full flex items-end">

@@ -133,9 +133,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
     const sortedBudgets = [...budgets].sort((a,b) => new Date(b.dateSent).getTime() - new Date(a.dateSent).getTime());
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50 p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col transform transition-all">
-                <div className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start mb-4 pb-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50 p-2 sm:p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all">
+                <div className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start pb-4 border-b border-gray-200 dark:border-slate-700">
                     <div className="flex items-center gap-4 w-full">
                          <div className="relative group flex-shrink-0">
                             <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" id="client-logo-upload" />
@@ -161,7 +161,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                             <XMarkIcon className="w-7 h-7" />
                         </button>
                     </div>
-                    <div className="flex items-center gap-4 mt-4 sm:mt-0 w-full sm:w-auto flex-wrap">
+                    <div className="flex items-center gap-4 mt-4 sm:mt-0 w-full sm:w-auto flex-wrap flex-shrink-0">
                         {isDirty && (
                              <button onClick={handleSave} className="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition-colors duration-200 shadow-sm text-sm">
                                 <CheckCircleIcon className="w-4 h-4 mr-2" />
@@ -178,7 +178,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                     </div>
                 </div>
 
-                <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar flex flex-col lg:grid lg:grid-cols-3 gap-6 p-4 sm:p-6 pt-0">
+                <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar flex flex-col lg:grid lg:grid-cols-3 gap-6 p-4 sm:p-6 pt-4">
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                          <div>
@@ -235,7 +235,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                     <thead className="bg-gray-100 dark:bg-slate-700/50 text-gray-500 dark:text-gray-400 uppercase text-xs sticky top-0">
                                         <tr>
                                             <th className="p-3">Título</th>
-                                            <th className="p-3">Contato</th>
+                                            <th className="p-3 hidden sm:table-cell">Contato</th>
                                             <th className="p-3 text-right">Valor</th>
                                             <th className="p-3 text-center">Status</th>
                                         </tr>
@@ -247,7 +247,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({ isOpen, onClose, 
                                             return (
                                                 <tr key={budget.id} onClick={() => onSelectBudget(budget.id)} className="border-t border-gray-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 cursor-pointer transition-colors duration-200">
                                                     <td className="p-3 font-medium text-gray-800 dark:text-slate-200">{budget.title}</td>
-                                                    <td className="p-3 text-gray-600 dark:text-slate-300">{contactName}</td>
+                                                    <td className="p-3 text-gray-600 dark:text-slate-300 hidden sm:table-cell">{contactName}</td>
                                                     <td className="p-3 text-right text-gray-700 dark:text-slate-200 font-semibold">{formatCurrency(budget.value)}</td>
                                                     <td className="p-3 text-center">
                                                         <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${statusColorClass}`}>

@@ -33,7 +33,7 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
             </div>
             <button 
                 onClick={onInviteUserClick}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm self-start md:self-center"
             >
                 <UserPlusIcon className="w-5 h-5 mr-2"/>
                 Convidar Usuário

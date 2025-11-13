@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
@@ -133,13 +134,13 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                  <div>
                     <h2 className="text-xl font-medium text-[var(--text-secondary)]">Olá, {userProfile.name}!</h2>
                     <h1 className="text-3xl font-bold text-[var(--text-primary)] mt-1">Dashboard de Vendas</h1>
                     <p className="text-[var(--text-secondary)] mt-1">Bem-vindo(a) de volta! Este é o seu painel de controle.</p>
                 </div>
-                <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mt-4 md:mt-0">
+                <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mt-4 md:mt-0 self-start md:self-center">
                     <button onClick={() => setTimePeriod('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'month' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Este Mês</button>
                     <button onClick={() => setTimePeriod('30days')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === '30days' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Últimos 30 dias</button>
                     <button onClick={() => setTimePeriod('all')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${timePeriod === 'all' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Todo o Período</button>

@@ -59,6 +59,28 @@ const isPhoneNumber = (contact: string) => {
 
 const today = new Date().toISOString().split('T')[0];
 
+const getStatusPill = (status: BudgetStatus) => {
+  const styles: {[key in BudgetStatus]: string} = {
+    [BudgetStatus.SENT]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+    [BudgetStatus.FOLLOWING_UP]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    [BudgetStatus.ORDER_PLACED]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    [BudgetStatus.INVOICED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
+    [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+    [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
+  }
+  return <span className={`px-3 py-1 text-xs font-bold rounded-full ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
+}
+
+const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
+    <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-1">
+            {icon}
+            <span>{label}</span>
+        </div>
+        <p className="font-semibold text-lg text-[var(--text-primary)]">{value}</p>
+    </div>
+);
+
 const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus }) => {
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
@@ -179,7 +201,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                 }
             });
     
-            setNotes(response.text);
+            setNotes(response.text || '');
     
         } catch (error) {
             console.error("Erro ao gerar e-mail com IA:", error);
@@ -205,82 +227,32 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-2xl m-4 max-h-[90vh] flex flex-col transform transition-all">
-                <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-4">
+            <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all">
+                {/* Header */}
+                <div className="flex justify-between items-center p-6 border-b border-[var(--border-primary)] flex-shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{budget.title}</h2>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-400 mt-1">
-                           <span className="text-blue-600 dark:text-blue-400 font-semibold">{client.name}</span>
-                           <span className="flex items-center gap-1.5"><UserIcon className="w-4 h-4 text-gray-400"/> {contact?.name || 'N/A'}</span>
-                        </div>
+                        <h2 className="text-2xl font-bold text-[var(--text-primary)]">{budget.title}</h2>
+                        <p className="text-md text-[var(--text-accent)] font-semibold">{client.name}</p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
-                        <XMarkIcon className="w-6 h-6" />
+                    <button onClick={onClose} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
+                        <XMarkIcon className="w-7 h-7" />
                     </button>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
-                            <p className="text-sm text-gray-500 dark:text-slate-400">Valor</p>
-                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatCurrency(budget.value)}</p>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
-                            <label htmlFor="budget-status" className="text-sm text-gray-500 dark:text-slate-400 block mb-1">Status</label>
-                            <select
-                                id="budget-status"
-                                value={budget.status}
-                                onChange={(e) => onChangeStatus(budget.id, e.target.value as BudgetStatus)}
-                                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-800 dark:text-slate-100 font-semibold focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                {Object.values(BudgetStatus).map(status => (
-                                    <option key={status} value={status}>{status}</option>
-                                ))}
-                            </select>
-                        </div>
-                         <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
-                            <p className="text-sm text-gray-500 dark:text-slate-400">Enviado em</p>
-                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDisplayDate(budget.dateSent)}</p>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
-                            <p className="text-sm text-gray-500 dark:text-slate-400">Próximo Contato</p>
-                            <p className="font-semibold text-lg text-gray-800 dark:text-slate-100">{formatDisplayDate(budget.nextFollowUpDate)}</p>
-                        </div>
-                    </div>
-
-                    {budget.observations && (
-                        <div className="mb-6">
-                             <h3 className="font-semibold text-lg mb-2 text-gray-700 dark:text-slate-300">Observações</h3>
-                             <div className="bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50 text-sm">
-                                {budget.observations}
-                             </div>
-                        </div>
-                    )}
-                    
-                    <div className="mb-6">
-                        <h3 className="font-semibold text-lg mb-2 text-gray-700 dark:text-slate-300 flex items-center"><ArrowPathIcon className="w-5 h-5 mr-2 text-blue-500 dark:text-blue-400"/> Histórico de Follow-ups</h3>
-                        <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                            {budget.followUps.length > 0 ? budget.followUps.slice().reverse().map(fu => (
-                                <div key={fu.id} className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg border border-gray-200 dark:border-slate-600">
-                                    <p className="font-semibold text-sm text-gray-600 dark:text-slate-400">{formatDisplayDate(fu.date)}</p>
-                                    {fu.notes && <p className="text-gray-700 dark:text-slate-300">{fu.notes}</p>}
-                                    {fu.audioUrl && <audio controls src={fu.audioUrl} className="w-full mt-2 h-10"></audio>}
-                                </div>
-                            )) : <p className="text-gray-400 dark:text-slate-500 italic">Nenhum follow-up registrado.</p>}
-                        </div>
-                    </div>
-
-                    {!isFinalStatus && (
-                         <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
-                            <h3 className="font-semibold text-lg mb-3 text-gray-800 dark:text-slate-200">Adicionar Novo Follow-up</h3>
+                <div className="flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
+                    {/* Main Content (Left) */}
+                    <div className="lg:col-span-3 space-y-6">
+                        {!isFinalStatus && (
+                         <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                            <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Adicionar Novo Follow-up</h3>
                             <div className="space-y-4">
                                 <textarea 
                                     value={notes} 
                                     onChange={e => setNotes(e.target.value)} 
                                     rows={5} 
                                     placeholder="Descreva o contato com o cliente ou gere um e-mail com IA..." 
-                                    className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                                 />
 
                                 <div className="flex items-center flex-wrap gap-4">
@@ -321,12 +293,10 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                         <span className="ml-1">{isGeneratingEmail ? 'Gerando...' : 'Gerar E-mail com IA'}</span>
                                     </button>
                                 </div>
-                                 <p className="text-xs text-center text-gray-500 dark:text-slate-500 -mt-2">IA pode cometer erros. Verifique fatos importantes.</p>
-
 
                                 <div className="flex flex-wrap items-end gap-4">
                                     <div className="flex-grow min-w-[150px]">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Próximo Follow-up</label>
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Próximo Follow-up</label>
                                         <input 
                                             type="date" 
                                             value={nextFollowUpDate} 
@@ -339,48 +309,107 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                                 }
                                             }}
                                             min={today}
-                                            className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500 dark:[color-scheme:dark]"
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] dark:[color-scheme:dark]"
                                         />
                                     </div>
                                     <div className="flex-grow min-w-[120px]">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Horário</label>
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Horário</label>
                                         <input 
                                             type="time" 
                                             value={nextFollowUpTime} 
                                             onChange={e => setNextFollowUpTime(e.target.value)}
                                             disabled={!nextFollowUpDate}
-                                            className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500 dark:[color-scheme:dark] disabled:bg-gray-100 disabled:dark:bg-slate-800"
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] dark:[color-scheme:dark] disabled:bg-[var(--background-tertiary)] disabled:dark:bg-slate-800"
                                         />
                                     </div>
                                     <div className="flex-shrink-0">
-                                        <button onClick={handleAddFollowUp} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Registrar</button>
+                                        <button onClick={handleAddFollowUp} className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg">Registrar</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    )}
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row-reverse items-center justify-start gap-3">
-                    <div className="flex w-full sm:w-auto sm:space-x-4 space-x-2">
-                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ORDER_PLACED)} className="flex-1 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
-                            <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
-                        </button>
-                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
-                            <XCircleIcon className="w-5 h-5 mr-2" /> Perdido
-                        </button>
+                        )}
+                        <div>
+                            <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)] flex items-center"><ArrowPathIcon className="w-5 h-5 mr-2 text-[var(--text-accent)]"/> Histórico de Follow-ups</h3>
+                            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {budget.followUps.length > 0 ? budget.followUps.slice().reverse().map(fu => (
+                                    <div key={fu.id} className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                        <p className="font-semibold text-sm text-[var(--text-secondary)]">{formatDisplayDate(fu.date)}</p>
+                                        {fu.notes && <p className="text-[var(--text-primary)] whitespace-pre-wrap">{fu.notes}</p>}
+                                        {fu.audioUrl && <audio controls src={fu.audioUrl} className="w-full mt-2 h-10"></audio>}
+                                    </div>
+                                )) : <p className="text-gray-400 dark:text-slate-500 italic text-center p-4">Nenhum follow-up registrado.</p>}
+                            </div>
+                        </div>
                     </div>
-                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex items-center justify-center bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg w-full sm:w-auto">
-                        <PauseCircleIcon className="w-5 h-5 mr-2" /> Congelar
-                    </button>
-                    {canContactOnWhatsApp && (
-                        <button 
-                            onClick={handleSendWhatsApp} 
-                            className="flex items-center justify-center bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg w-full sm:w-auto transition-colors"
-                        >
-                            <WhatsAppIcon className="w-5 h-5 mr-2" /> Enviar via WhatsApp
-                        </button>
-                    )}
+
+                    {/* Sidebar (Right) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                            <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Detalhes do Orçamento</h3>
+                            <div className="space-y-3">
+                                <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                    <label htmlFor="budget-status" className="text-sm text-[var(--text-secondary)] block mb-1">Status</label>
+                                    <div className="flex items-center gap-4">
+                                        {getStatusPill(budget.status)}
+                                        <select
+                                            id="budget-status"
+                                            value={budget.status}
+                                            onChange={(e) => onChangeStatus(budget.id, e.target.value as BudgetStatus)}
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] font-semibold focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] text-sm"
+                                        >
+                                            {Object.values(BudgetStatus).map(status => (
+                                                <option key={status} value={status}>{status}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                   <InfoPill label="Valor" value={`R$ ${formatCurrency(budget.value)}`} />
+                                   <InfoPill label="Enviado em" value={formatDisplayDate(budget.dateSent)} />
+                                   <InfoPill label="Próximo Contato" value={formatDisplayDate(budget.nextFollowUpDate)} />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                             <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Informações do Contato</h3>
+                             <div className="space-y-2 text-sm">
+                                <p><strong className="text-[var(--text-secondary)] w-20 inline-block">Comprador:</strong> <span className="text-[var(--text-primary)] font-semibold">{contact?.name || 'N/A'}</span></p>
+                                {canContactOnWhatsApp && (
+                                     <button 
+                                        onClick={handleSendWhatsApp} 
+                                        className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg w-full transition-colors"
+                                    >
+                                        <WhatsAppIcon className="w-5 h-5" /> Contatar via WhatsApp
+                                    </button>
+                                )}
+                             </div>
+                        </div>
+
+                        {budget.observations && (
+                            <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                                <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">Observações</h3>
+                                <div className="bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50 text-sm">
+                                    {budget.observations}
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="space-y-2 pt-4 border-t border-[var(--border-primary)]">
+                            <button onClick={() => onChangeStatus(budget.id, BudgetStatus.INVOICED)} className="w-full flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
+                                <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
+                            </button>
+                            <div className="flex gap-2">
+                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                                    <XCircleIcon className="w-5 h-5 mr-2" /> Perdido
+                                </button>
+                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex-1 flex items-center justify-center bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg">
+                                    <PauseCircleIcon className="w-5 h-5 mr-2" /> Congelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

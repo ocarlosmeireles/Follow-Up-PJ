@@ -116,6 +116,15 @@ export interface UserData extends UserProfile {
   id: string;
 }
 
+export interface Reminder {
+  id: string;
+  userId: string;
+  organizationId: string;
+  title: string;
+  reminderDateTime: string; // ISO string
+  isDismissed: boolean;
+}
+
 export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard';
 // FIX: Moved Theme type here to be accessible globally and fix import errors.
 export type Theme = 'light' | 'dark';

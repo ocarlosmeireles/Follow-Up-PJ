@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail, UserCredential } from 'firebase/auth';
 import { doc, setDoc, addDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import type { UserProfile, Invite } from '../types';
@@ -38,79 +38,91 @@ const Auth: React.FC = () => {
         setLoading(true);
         setError('');
         setMessage('');
-
         const trimmedEmail = email.trim();
-
-        try {
-            if (isLogin) {
+    
+        if (isLogin) {
+            try {
                 await signInWithEmailAndPassword(auth, trimmedEmail, password);
-            } else { // Registration Flow
-                if (!name) {
-                    setError('Seu nome completo é obrigatório.');
-                    setLoading(false);
-                    return;
-                }
-
-                // Check for pending invitation
-                const invitesRef = collection(db, "invites");
-                const q = query(invitesRef, where("email", "==", trimmedEmail.toLowerCase()), where("status", "==", "pending"));
-                const querySnapshot = await getDocs(q);
-                
-                let invite: (Invite & {docId: string}) | null = null;
-                if (!querySnapshot.empty) {
-                    const inviteDoc = querySnapshot.docs[0];
-                    invite = { docId: inviteDoc.id, ...inviteDoc.data() } as (Invite & {docId: string});
-                }
-
-                // Create user in Auth
-                const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-                const user = userCredential.user;
-                await updateProfile(user, { displayName: name });
-                
-                if (invite) {
-                     // User is accepting an invitation
-                    const invitedUserProfile: UserProfile = {
-                        name,
-                        matricula: 'N/A',
-                        email: user.email!,
-                        role: invite.role,
-                        organizationId: invite.organizationId
-                    };
-                    await setDoc(doc(db, "users", user.uid), invitedUserProfile);
-                    // Delete the invite
-                    await deleteDoc(doc(db, "invites", invite.docId));
-
-                } else {
-                    // User is creating a new company
-                    if (!companyName) {
-                        // We need to delete the created auth user if company name is missing
-                        await user.delete();
-                        setError('O nome da empresa é obrigatório para criar uma nova conta.');
-                        setLoading(false);
-                        return;
-                    }
-
-                    // Create new organization
-                    const orgRef = await addDoc(collection(db, "organizations"), {
-                        name: companyName,
-                        status: 'active',
-                        subscriptionStatus: 'unpaid' // Set initial subscription status
-                    });
-                    
-                    // Create user profile as ADMIN of the new organization
-                    const newUserProfile: UserProfile = { 
-                        name, 
-                        matricula: 'N/A',
-                        email: user.email!,
-                        role: UserRole.ADMIN,
-                        organizationId: orgRef.id
-                    };
-                    await setDoc(doc(db, "users", user.uid), newUserProfile);
-                }
+            } catch (err: any) {
+                setError(getFriendlyErrorMessage(err.code));
+            } finally {
+                setLoading(false);
             }
-        } catch (err: any) {
-            console.error(err.code, err.message);
-            setError(getFriendlyErrorMessage(err.code));
+            return;
+        }
+    
+        // --- Registration Flow ---
+        if (!name.trim()) {
+            setError('Seu nome completo é obrigatório.');
+            setLoading(false);
+            return;
+        }
+    
+        let invite: (Invite & { docId: string }) | null = null;
+        try {
+            const invitesRef = collection(db, "invites");
+            const q = query(invitesRef, where("email", "==", trimmedEmail.toLowerCase()), where("status", "==", "pending"));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const inviteDoc = querySnapshot.docs[0];
+                invite = { docId: inviteDoc.id, ...inviteDoc.data() } as (Invite & { docId: string });
+            }
+        } catch (dbError) {
+            setError("Erro ao verificar convites. Tente novamente.");
+            setLoading(false);
+            return;
+        }
+    
+        if (!invite && !companyName.trim()) {
+            setError('O nome da empresa é obrigatório para criar uma nova conta.');
+            setLoading(false);
+            return;
+        }
+    
+        let userCredential: UserCredential;
+        try {
+            userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        } catch (authError: any) {
+            setError(getFriendlyErrorMessage(authError.code));
+            setLoading(false);
+            return;
+        }
+    
+        const user = userCredential.user;
+    
+        try {
+            await updateProfile(user, { displayName: name });
+    
+            if (invite) {
+                const invitedUserProfile: UserProfile = {
+                    name,
+                    matricula: 'N/A',
+                    email: user.email!,
+                    role: invite.role,
+                    organizationId: invite.organizationId
+                };
+                await setDoc(doc(db, "users", user.uid), invitedUserProfile);
+                await deleteDoc(doc(db, "invites", invite.docId));
+            } else {
+                const orgRef = await addDoc(collection(db, "organizations"), {
+                    name: companyName,
+                    status: 'active',
+                    subscriptionStatus: 'unpaid'
+                });
+    
+                const newUserProfile: UserProfile = {
+                    name,
+                    matricula: 'N/A',
+                    email: user.email!,
+                    role: UserRole.ADMIN,
+                    organizationId: orgRef.id
+                };
+                await setDoc(doc(db, "users", user.uid), newUserProfile);
+            }
+        } catch (dbError: any) {
+            await user.delete();
+            setError("Falha ao configurar a conta. O usuário não foi criado. Por favor, tente novamente.");
+            console.error("Firestore error after user creation:", dbError);
         } finally {
             setLoading(false);
         }

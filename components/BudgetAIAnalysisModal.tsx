@@ -75,9 +75,18 @@ Sua resposta DEVE ser um objeto JSON.`;
                     }
                 });
                 
-                const jsonString = response.text;
-                const parsedResult = JSON.parse(jsonString);
-                setResult(parsedResult);
+                const jsonString = response.text?.trim();
+                if (jsonString) {
+                    try {
+                        const parsedResult = JSON.parse(jsonString);
+                        setResult(parsedResult);
+                    } catch (e) {
+                        console.error("Failed to parse AI response:", e);
+                        setError("A resposta da IA não estava no formato esperado.");
+                    }
+                } else {
+                    setError("A IA retornou uma resposta vazia.");
+                }
 
             } catch (err) {
                 console.error("Erro ao gerar análise com IA:", err);

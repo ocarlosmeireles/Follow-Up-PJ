@@ -144,16 +144,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                     </>
                 )}
             </nav>
-
-            {isDashboardTheme && (
-                 <div className="mt-auto flex-shrink-0">
-                    <div className="p-4 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-700 text-white text-center">
-                        <h4 className="font-bold text-base">Upgrade to PRO</h4>
-                        <p className="text-xs mt-1 opacity-80">For more Profile Control</p>
-                        <button className="mt-3 bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full transition-colors">Upgrade</button>
-                    </div>
-                </div>
-            )}
         </aside>
     );
 };

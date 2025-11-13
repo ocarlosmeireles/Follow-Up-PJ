@@ -1,16 +1,8 @@
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -37,6 +29,7 @@ import { auth, db, storage } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
+import ReminderNotification from './components/ReminderNotification';
 import { ExclamationTriangleIcon } from './components/icons';
 
 export type ActiveView = 
@@ -82,6 +75,7 @@ const App: React.FC = () => {
     const [prospects, setProspects] = useState<Prospect[]>([]);
     const [stages, setStages] = useState<ProspectingStage[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);
+    const [reminders, setReminders] = useState<Reminder[]>([]);
     
     // Data states for super admin
     const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
@@ -98,6 +92,7 @@ const App: React.FC = () => {
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
     const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'dashboard');
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [activeReminder, setActiveReminder] = useState<Reminder | null>(null);
     const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
     const [isBudgetDetailModalOpen, setBudgetDetailModalOpen] = useState(false);
     const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
@@ -211,6 +206,7 @@ const App: React.FC = () => {
                 prospectingStages: collection(db, 'prospectingStages'),
                 contacts: collection(db, 'contacts'),
                 users: collection(db, 'users'),
+                reminders: collection(db, 'reminders'),
             };
 
             const queries = Object.fromEntries(
@@ -226,7 +222,8 @@ const App: React.FC = () => {
                 prospectsSnapshot, 
                 stagesSnapshot,
                 contactsSnapshot,
-                usersSnapshot
+                usersSnapshot,
+                remindersSnapshot
             ] = await Promise.all([
                 getDocs(queries.clients),
                 getDocs(queries.budgets),
@@ -234,6 +231,7 @@ const App: React.FC = () => {
                 getDocs(queries.prospectingStages),
                 getDocs(queries.contacts),
                 getDocs(queries.users),
+                getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid))),
             ]);
 
             const clientsData = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
@@ -266,6 +264,7 @@ const App: React.FC = () => {
 
             setContacts(contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
             setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserData)));
+            setReminders(remindersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reminder)));
 
         } catch (error) {
             console.error("Error fetching data: ", error);
@@ -339,6 +338,24 @@ const App: React.FC = () => {
         setNotifications(newNotifications);
     }, [budgets, clients, userProfile]);
 
+    // Reminder check effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (activeReminder) return; // Don't show a new one if one is already active
+
+            const now = new Date();
+            const dueReminder = reminders.find(r => 
+                !r.isDismissed && new Date(r.reminderDateTime) <= now
+            );
+
+            if (dueReminder) {
+                setActiveReminder(dueReminder);
+            }
+        }, 15000); // Check every 15 seconds
+
+        return () => clearInterval(interval);
+    }, [reminders, activeReminder]);
+
     const handleLogout = async () => {
         await signOut(auth);
         setBudgets([]); setClients([]); setContacts([]); setProspects([]); setStages([]); setUsers([]);
@@ -362,6 +379,7 @@ const App: React.FC = () => {
         }
     }, [clients]);
 
+    // FIX: Refactored function to improve type safety and clarity, resolving potential type inference issues.
     const handleAddBudget = useCallback(async (
         budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
         clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
@@ -376,33 +394,31 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                finalClientId = newClientRef.id;
+// FIX: Explicitly cast DocumentReference.id to string to resolve potential type inference issue.
+                finalClientId = newClientRef.id as string;
             }
 
-            if (!finalClientId) throw new Error("Client ID is missing.");
+            if (!finalClientId) {
+                throw new Error("Client ID is missing.");
+            }
 
-            let finalContactId = contactInfo.existingId;
+            let finalContactId: string | null = contactInfo.existingId || null;
             if (contactInfo.newContactData) {
                 const newContactRef = await addDoc(collection(db, 'contacts'), {
                     ...contactInfo.newContactData,
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                finalContactId = newContactRef.id;
+// FIX: Explicitly cast DocumentReference.id to string to resolve potential type inference issue.
+                finalContactId = newContactRef.id as string;
             }
-            
-            if (!finalContactId) finalContactId = null;
             
             const newBudget: Omit<Budget, 'id'> = {
                 ...budgetData,
                 userId: user.uid,
                 organizationId: userProfile.organizationId,
-                // FIX: Type 'unknown' is not assignable to type 'string'.
-                // Added explicit type assertion to resolve a complex type inference issue.
-                clientId: finalClientId as string,
-                // FIX: Type 'unknown' is not assignable to type 'string'.
-                // Added explicit type assertion to resolve a complex type inference issue.
-                contactId: finalContactId as string | null,
+                clientId: finalClientId,
+                contactId: finalContactId,
                 status: BudgetStatus.SENT,
                 followUps: []
             };
@@ -593,6 +609,29 @@ const App: React.FC = () => {
         setAddUserModalOpen(false);
     };
 
+    const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed'>) => {
+        if (!user || !userProfile) return;
+        await addDoc(collection(db, 'reminders'), {
+            ...reminderData,
+            userId: user.uid,
+            organizationId: userProfile.organizationId,
+            isDismissed: false,
+        });
+        await fetchOrganizationData();
+    };
+
+    const handleDeleteReminder = async (reminderId: string) => {
+        await deleteDoc(doc(db, 'reminders', reminderId));
+        await fetchOrganizationData();
+    };
+    
+    const handleDismissReminder = async (reminderId: string) => {
+        const reminderRef = doc(db, 'reminders', reminderId);
+        await updateDoc(reminderRef, { isDismissed: true });
+        setActiveReminder(null); // Hide notification immediately
+        await fetchOrganizationData(); // Refresh state
+    };
+
     const handleGenerateSelectionReport = (selectedIds: string[]) => {
         if (!userProfile) return;
         
@@ -761,6 +800,9 @@ const App: React.FC = () => {
                         onSettings={() => setSettingsModalOpen(true)}
                         onLogout={handleLogout}
                         themeVariant={themeVariant}
+                        reminders={reminders}
+                        onAddReminder={handleAddReminder}
+                        onDeleteReminder={handleDeleteReminder}
                     />
                     <main key={viewKey} className={`flex-1 overflow-y-auto fade-in ${isDashboardTheme ? 'p-4 sm:p-6' : 'p-4 sm:p-8'}`}>
                         {userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg ? (
@@ -791,6 +833,14 @@ const App: React.FC = () => {
                 </div>
             </div>
             
+            {/* Reminder Notification */}
+            {activeReminder && (
+                <ReminderNotification 
+                    reminder={activeReminder}
+                    onDismiss={() => handleDismissReminder(activeReminder.id)}
+                />
+            )}
+
             {/* Modals */}
             <AddBudgetModal 
                 isOpen={isAddBudgetModalOpen} 

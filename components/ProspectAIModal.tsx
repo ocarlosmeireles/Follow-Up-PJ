@@ -45,7 +45,7 @@ O tom deve ser profissional, mas amigável e direto ao ponto. Forneça apenas o 
                     contents: prompt,
                 });
 
-                setResult(response.text);
+                setResult(response.text || '');
 
             } catch (err) {
                 console.error("Erro ao gerar conteúdo com IA:", err);

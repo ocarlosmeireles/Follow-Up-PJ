@@ -185,7 +185,8 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                  config: { systemInstruction: "Você é um assistente de vendas especialista em reengajamento de clientes (CRM). Suas sugestões são proativas e focadas em criar valor." }
              });
 
-             setAiIdea({ client, idea: response.text, loading: false, error: null });
+             // FIX: Safely handle potentially nullish `response.text` by providing a fallback empty string.
+             setAiIdea({ client, idea: response.text || '', loading: false, error: null });
         } catch(error) {
             console.error("Erro ao gerar ideia com IA:", error);
             setAiIdea({ client, idea: '', loading: false, error: 'Falha ao gerar sugestão. Tente novamente.' });

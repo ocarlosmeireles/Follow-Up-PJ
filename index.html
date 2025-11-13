@@ -4,10 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sistema de Follow-up</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            },
+          },
+        },
       }
     </script>
 <script type="importmap">
@@ -242,7 +252,7 @@
 
 </style>
 </head>
-<body class="bg-[var(--background-primary)] text-[var(--text-primary)] antialiased transition-colors duration-300">
+<body class="bg-[var(--background-primary)] text-[var(--text-primary)] antialiased transition-colors duration-300 font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

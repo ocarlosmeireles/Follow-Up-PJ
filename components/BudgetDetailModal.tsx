@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact } from '../types';
 import { BudgetStatus, FollowUpStatus } from '../types';
-import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon } from './icons';
+import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon } from './icons';
 
 interface BudgetDetailModalProps {
     isOpen: boolean;
@@ -13,6 +13,7 @@ interface BudgetDetailModalProps {
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
     onChangeStatus: (budgetId: string, status: BudgetStatus) => void;
     onConfirmWin: (budgetId: string, closingValue: number) => void;
+    onUpdateBudget: (budgetId: string, updates: Partial<Budget>) => void;
 }
 
 const formatDisplayDate = (dateString: string | null | undefined): string => {
@@ -21,17 +22,15 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'Data inválida';
 
-        // Check if time is specified (not midnight) or if 'T' is in the original string
         const hasTime = dateString.includes('T');
 
         if (hasTime) {
             return date.toLocaleString('pt-BR', {
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',
-                timeZone: 'America/Sao_Paulo' // Be explicit to avoid browser inconsistencies
+                timeZone: 'America/Sao_Paulo'
             }).replace(',', ' às');
         } else {
-            // Handles 'YYYY-MM-DD' correctly by treating it as UTC to avoid timezone shifts
             const [year, month, day] = dateString.split('-').map(Number);
             const utcDate = new Date(Date.UTC(year, month - 1, day));
             return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -41,12 +40,14 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
     }
 };
 
-const formatCurrencyForInput = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'decimal',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
+const formatCurrencyForInput = (value: number | string): string => {
+    if (typeof value === 'number') {
+        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') return '';
+    const numberValue = parseInt(digitsOnly, 10) / 100;
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numberValue);
 };
 
 const unmaskCurrency = (maskedValue: string): number => {
@@ -97,17 +98,61 @@ const getFollowUpStatusPill = (status: FollowUpStatus | undefined) => {
   return <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${styles[status]}`}>{status}</span>;
 };
 
-const InfoPill: React.FC<{label: string, value: string, icon?: React.ReactNode}> = ({label, value, icon}) => (
-    <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
-        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-1">
-            {icon}
-            <span>{label}</span>
-        </div>
-        <p className="font-semibold text-lg text-[var(--text-primary)]">{value}</p>
-    </div>
-);
+// --- Editable Field Component ---
+const EditableField = ({ label, value: initialValue, onSave, type = 'text', renderDisplay }: { label: string, value: string | number, onSave: (newValue: string | number) => void, type?: 'text' | 'textarea' | 'date' | 'currency', renderDisplay?: (value: any) => React.ReactNode }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [value, setValue] = useState(initialValue);
+    const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
-const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onConfirmWin }) => {
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    const handleSave = () => {
+        if (type === 'currency') {
+            onSave(unmaskCurrency(String(value)));
+        } else {
+            onSave(value);
+        }
+        setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && type !== 'textarea') {
+            handleSave();
+        }
+        if (e.key === 'Escape') {
+            setValue(initialValue);
+            setIsEditing(false);
+        }
+    };
+    
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                {type === 'textarea' ? (
+                     <textarea ref={inputRef} value={String(value)} onChange={e => setValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)]" rows={4} />
+                ) : (
+                    <input ref={inputRef} type={type === 'currency' ? 'text' : type} value={String(value)} onChange={e => setValue(type === 'currency' ? formatCurrencyForInput(e.target.value) : e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] dark:[color-scheme:dark]" />
+                )}
+            </div>
+        );
+    }
+
+    return (
+         <div className="group relative" onClick={() => setIsEditing(true)}>
+             <div className="flex items-start justify-between cursor-pointer">
+                {renderDisplay ? renderDisplay(initialValue) : <p>{initialValue}</p>}
+                <PencilIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0" />
+            </div>
+         </div>
+    );
+};
+
+const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onConfirmWin, onUpdateBudget }) => {
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
     const [nextFollowUpTime, setNextFollowUpTime] = useState('');
@@ -125,7 +170,6 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
     const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
 
     useEffect(() => {
-        // Cleanup on open/close
         if (!isOpen) {
             if(audioUrl) URL.revokeObjectURL(audioUrl);
             setAudioUrl(null);
@@ -151,7 +195,6 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
                 setAudioUrl(url);
                 setRecordingStatus('recorded');
                 audioChunksRef.current = [];
-                 // Stop all tracks to turn off the microphone indicator
                 stream.getTracks().forEach(track => track.stop());
             };
             mediaRecorderRef.current.start();
@@ -194,7 +237,6 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
 
         onAddFollowUp(budget.id, followUpData, combinedNextDate);
         
-        // Reset state
         setNotes('');
         setNextFollowUpDate('');
         setNextFollowUpTime('');
@@ -277,7 +319,12 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 border-b border-[var(--border-primary)] flex-shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold text-[var(--text-primary)]">{budget.title}</h2>
+                        <EditableField
+                            label="Título"
+                            value={budget.title}
+                            onSave={newTitle => onUpdateBudget(budget.id, { title: newTitle as string })}
+                            renderDisplay={value => <h2 className="text-2xl font-bold text-[var(--text-primary)]">{value}</h2>}
+                        />
                         <p className="text-md text-[var(--text-accent)] font-semibold">{client.name}</p>
                         <p className="text-sm text-[var(--text-secondary)] mt-1">{client.cnpj || 'CNPJ não cadastrado'}</p>
                     </div>
@@ -424,9 +471,18 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                   <InfoPill label="Valor" value={`R$ ${formatCurrency(budget.value)}`} />
-                                   <InfoPill label="Enviado em" value={formatDisplayDate(budget.dateSent)} />
-                                   <InfoPill label="Próximo Contato" value={formatDisplayDate(budget.nextFollowUpDate)} />
+                                   <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                       <div className="text-sm text-[var(--text-secondary)] mb-1">Valor</div>
+                                       <EditableField label="Valor" value={formatCurrencyForInput(budget.value)} onSave={(newValue) => onUpdateBudget(budget.id, { value: newValue as number})} type="currency" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">R$ {formatCurrency(v as number)}</p>} />
+                                   </div>
+                                    <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                       <div className="text-sm text-[var(--text-secondary)] mb-1">Enviado em</div>
+                                       <EditableField label="Enviado em" value={budget.dateSent.split('T')[0]} onSave={(newDate) => onUpdateBudget(budget.id, { dateSent: newDate as string})} type="date" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(v as string)}</p>} />
+                                   </div>
+                                </div>
+                                 <div className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                    <div className="text-sm text-[var(--text-secondary)] mb-1">Próximo Contato</div>
+                                    <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(budget.nextFollowUpDate)}</p>
                                 </div>
                             </div>
                         </div>
@@ -446,14 +502,16 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                              </div>
                         </div>
 
-                        {budget.observations && (
-                            <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
-                                <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">Observações</h3>
-                                <div className="bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50 text-sm">
-                                    {budget.observations}
-                                </div>
-                            </div>
-                        )}
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                            <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">Observações</h3>
+                            <EditableField 
+                                label="Observações" 
+                                value={budget.observations || ''} 
+                                onSave={(newObs) => onUpdateBudget(budget.id, { observations: newObs as string })} 
+                                type="textarea" 
+                                renderDisplay={(v) => <div className="bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50 text-sm min-h-[40px] whitespace-pre-wrap">{v || 'Clique para adicionar...'}</div>} 
+                            />
+                        </div>
                         
                         <div className="space-y-2 pt-4 border-t border-[var(--border-primary)]">
                              {showWinPrompt ? (
@@ -462,7 +520,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                     <input
                                         type="text"
                                         value={winValue}
-                                        onChange={e => setWinValue(e.target.value)}
+                                        onChange={e => setWinValue(formatCurrencyForInput(e.target.value))}
                                         className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-emerald-500 focus:border-emerald-500"
                                         autoFocus
                                     />

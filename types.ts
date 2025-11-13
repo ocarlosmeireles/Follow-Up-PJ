@@ -136,3 +136,10 @@ export interface Reminder {
 export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard';
 // FIX: Moved Theme type here to be accessible globally and fix import errors.
 export type Theme = 'light' | 'dark';
+
+export interface PriorityDeal {
+    budgetId: string;
+    priorityScore: number;
+    nextBestAction: string;
+    rationale: string;
+}

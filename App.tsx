@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -335,6 +336,19 @@ const App: React.FC = () => {
 
         const docRef = await addDoc(collection(db, "budgets"), newBudget);
         setBudgets(prev => [...prev, { id: docRef.id, ...newBudget }]);
+    };
+
+    const handleUpdateBudget = async (budgetId: string, updates: Partial<Budget>) => {
+        const budgetDocRef = doc(db, "budgets", budgetId);
+        await updateDoc(budgetDocRef, updates);
+
+        const updatedBudget = { ...budgets.find(b => b.id === budgetId)!, ...updates };
+        
+        setBudgets(prev => prev.map(b => b.id === budgetId ? updatedBudget as Budget : b));
+        
+        if (selectedBudget?.id === budgetId) {
+            setSelectedBudget(updatedBudget as Budget);
+        }
     };
 
     const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
@@ -688,7 +702,7 @@ const App: React.FC = () => {
                 } : null}
                 initialClientId={initialClientIdForBudget}
             />
-            {selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} />}
+            {selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} onUpdateBudget={handleUpdateBudget} />}
             <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />
             {selectedClient && <ClientDetailModal isOpen={isClientDetailModalOpen} onClose={() => setClientDetailModalOpen(false)} client={selectedClient} contacts={selectedClientContacts} budgets={selectedClientBudgets} onSelectBudget={handleSelectBudget} onAddBudgetForClient={handleAddBudgetForClient} onUpdateClient={handleUpdateClient} />}
             {userProfile && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} userProfile={userProfile} onSave={async (profileUpdate) => {

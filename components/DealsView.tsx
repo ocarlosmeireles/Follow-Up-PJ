@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
-import type { Budget, Client } from '../types';
+import type { Budget, Client, PriorityDeal } from '../types';
 import { BudgetStatus } from '../types';
 import { 
     CalendarIcon, SparklesIcon, LightBulbIcon, ExclamationCircleIcon, XMarkIcon
@@ -11,13 +11,6 @@ import {
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
-
-interface PriorityDeal {
-    budgetId: string;
-    priorityScore: number;
-    nextBestAction: string;
-    rationale: string;
-}
 
 // --- Sub-componentes do Modal de Foco (Movidos para fora de DealsView) ---
 
@@ -69,19 +62,30 @@ const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ isOpen, onClose, budg
 
     useEffect(() => {
         if (!isOpen) return;
-        
-        const budgetsKey = JSON.stringify(budgets.map(b => `${b.id}-${b.value}-${b.status}-${b.dateSent}-${b.followUps.length}-${b.nextFollowUpDate}`));
 
         const fetchPriorityDeals = async () => {
-             // Check cache first
+            const budgetsKey = JSON.stringify(budgets.map(b => `${b.id}-${b.value}-${b.status}-${b.dateSent}-${b.followUps.length}-${b.nextFollowUpDate}`));
+            // Check cache first
             if (componentCache.current && (Date.now() - componentCache.current.timestamp < CACHE_DURATION_MS) && componentCache.current.budgetsKey === budgetsKey) {
                 setPriorityDeals(componentCache.current.data);
                 return;
             }
 
-            if (!budgets || budgets.length === 0) {
-                setIsLoadingAI(false);
+            const activeBudgets = budgets
+                .filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status))
+                .map(b => ({
+                    budgetId: b.id,
+                    title: b.title,
+                    value: b.value,
+                    status: b.status,
+                    days_in_pipeline: Math.ceil((new Date().getTime() - new Date(b.dateSent).getTime()) / (1000 * 60 * 60 * 24)),
+                    followup_count: b.followUps.length,
+                    next_followup: b.nextFollowUpDate,
+                }));
+
+            if (activeBudgets.length === 0) {
                 setPriorityDeals([]);
+                setIsLoadingAI(false);
                 return;
             }
 
@@ -92,24 +96,7 @@ const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ isOpen, onClose, budg
             try {
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 
-                const activeBudgets = budgets
-                    .filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status))
-                    .map(b => ({
-                        budgetId: b.id,
-                        title: b.title,
-                        value: b.value,
-                        status: b.status,
-                        days_in_pipeline: Math.ceil((new Date().getTime() - new Date(b.dateSent).getTime()) / (1000 * 60 * 60 * 24)),
-                        followup_count: b.followUps.length,
-                        next_followup: b.nextFollowUpDate,
-                    }));
-
-                if (activeBudgets.length === 0) {
-                    setIsLoadingAI(false);
-                    return;
-                }
-                
-                const prompt = `Aja como um coach de vendas especialista. Analise esta lista de orçamentos em andamento e me retorne um array JSON com os 5 mais importantes para focar agora. Para cada um, forneça uma "priorityScore" (0-100), uma "nextBestAction" (ação curta e direta), e uma "rationale" (justificativa curta do porquê é uma prioridade). Ordene o array pela "priorityScore" (mais alta primeiro).
+                const prompt = `Sua tarefa é analisar a lista de orçamentos de vendas a seguir e retornar um array JSON contendo até 5 dos negócios mais importantes para focar. Para cada negócio no array, você DEVE retornar um objeto JSON com os seguintes campos EXATOS: "budgetId" (o ID original do orçamento fornecido na entrada), "priorityScore" (um número de 0 a 100), "nextBestAction" (uma ação curta e direta para o vendedor), e "rationale" (uma justificativa concisa para a prioridade). A resposta deve ser apenas o array JSON, ordenado pela "priorityScore" em ordem decrescente.
 
 Orçamentos: ${JSON.stringify(activeBudgets)}`;
 
@@ -135,12 +122,19 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
                 });
                 
                 const jsonString = response.text?.trim();
-                if (jsonString) {
+                
+                if (!jsonString) {
+                    setPriorityDeals([]);
+                    componentCache.current = { data: [], timestamp: Date.now(), budgetsKey };
+                } else {
                     const deals = JSON.parse(jsonString);
+                    if (!Array.isArray(deals)) {
+                        console.error("AI response is not an array:", deals);
+                        throw new Error("Formato de resposta da IA inválido.");
+                    }
                     setPriorityDeals(deals);
                     componentCache.current = { data: deals, timestamp: Date.now(), budgetsKey };
                 }
-                
             } catch (err: any) {
                 console.error("Erro ao priorizar negócios com IA:", err);
                 if (err.message && err.message.includes('429')) {
@@ -155,8 +149,9 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
 
         fetchPriorityDeals();
     }, [isOpen, budgets]);
-
+    
     const priorityBudgetsData = useMemo(() => {
+        if (!priorityDeals || !Array.isArray(priorityDeals)) return [];
         return priorityDeals
             .map(deal => {
                 const budget = budgets.find(b => b.id === deal.budgetId);

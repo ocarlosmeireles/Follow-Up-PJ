@@ -243,13 +243,14 @@ const DailyRhythm = () => {
     );
 };
 
-const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void }> = ({ task, onSelectBudget }) => {
+const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; index: number; }> = ({ task, onSelectBudget, index }) => {
     const isFollowUp = task.type === 'follow-up';
     
     return (
         <div 
             onClick={() => isFollowUp && task.budgetId && onSelectBudget(task.budgetId)}
-            className={`flex items-center gap-3 p-3 rounded-lg border-l-4 ${
+            style={{ animationDelay: `${50 * index}ms` }}
+            className={`flex items-center gap-3 p-3 rounded-lg border-l-4 animated-item ${
                 isFollowUp ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50' 
                            : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
             } ${task.isCompleted ? 'opacity-60' : ''}`}
@@ -284,7 +285,7 @@ const UpcomingTasks: React.FC<{
                     {icon} {title}
                 </h4>
                 <div className="space-y-2">
-                    {tasks.map(task => <TaskItem key={task.id} task={task} onSelectBudget={onSelectBudget} />)}
+                    {tasks.map((task, index) => <TaskItem key={task.id} task={task} onSelectBudget={onSelectBudget} index={index} />)}
                 </div>
             </div>
         );
@@ -370,18 +371,20 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2 space-y-6">
-                    <FocusOfTheDay />
-                    <AIPriorityActions budgets={budgets} clients={clients} onSelectBudget={onSelectBudget} />
-                    <UpcomingTasks 
-                        overdueTasks={tasks.overdue}
-                        todayTasks={tasks.today}
-                        upcomingTasks={tasks.upcoming}
-                        onSelectBudget={onSelectBudget} 
-                    />
+                    <div className="animated-item" style={{ animationDelay: '100ms' }}><FocusOfTheDay /></div>
+                    <div className="animated-item" style={{ animationDelay: '200ms' }}><AIPriorityActions budgets={budgets} clients={clients} onSelectBudget={onSelectBudget} /></div>
+                    <div className="animated-item" style={{ animationDelay: '300ms' }}>
+                        <UpcomingTasks 
+                            overdueTasks={tasks.overdue}
+                            todayTasks={tasks.today}
+                            upcomingTasks={tasks.upcoming}
+                            onSelectBudget={onSelectBudget} 
+                        />
+                    </div>
                 </div>
                 <div className="lg:col-span-1 space-y-6">
-                    <GoalsPanel tasks={tasks} budgets={budgets} />
-                    <DailyRhythm />
+                    <div className="animated-item" style={{ animationDelay: '400ms' }}><GoalsPanel tasks={tasks} budgets={budgets} /></div>
+                    <div className="animated-item" style={{ animationDelay: '500ms' }}><DailyRhythm /></div>
                 </div>
             </div>
         </div>

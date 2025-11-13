@@ -239,7 +239,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '100ms' }}>
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4">Relatórios Rápidos</h2>
                 <div className="flex flex-wrap gap-4">
                     <button
@@ -253,12 +253,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <MetricCard title="Faturamento Total" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-7 h-7 text-green-500 dark:text-green-400" />} />
-                <MetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-7 h-7 text-yellow-500 dark:text-yellow-400" />} />
-                <MetricCard title="Ticket Médio" value={formatCurrency(metrics.averageTicket)} icon={<CurrencyDollarIcon className="w-7 h-7 text-blue-500 dark:text-blue-400" />} />
+                <div className="animated-item" style={{ animationDelay: '200ms' }}><MetricCard title="Faturamento Total" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-7 h-7 text-green-500 dark:text-green-400" />} /></div>
+                <div className="animated-item" style={{ animationDelay: '300ms' }}><MetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-7 h-7 text-yellow-500 dark:text-yellow-400" />} /></div>
+                <div className="animated-item" style={{ animationDelay: '400ms' }}><MetricCard title="Ticket Médio" value={formatCurrency(metrics.averageTicket)} icon={<CurrencyDollarIcon className="w-7 h-7 text-blue-500 dark:text-blue-400" />} /></div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '500ms' }}>
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
                     <ChartBarIcon className="w-6 h-6 mr-3 text-purple-500 dark:text-purple-400"/>
                     Performance Mensal (Últimos 12 meses)
@@ -288,7 +288,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '600ms' }}>
                     <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
                         <FunnelIcon className="w-6 h-6 mr-3 text-blue-500 dark:text-blue-400"/>
                         Funil de Vendas
@@ -321,7 +321,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '700ms' }}>
                     <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
                         <UserGroupIcon className="w-6 h-6 mr-3 text-yellow-500 dark:text-yellow-400"/>
                         Top 5 Clientes por Faturamento

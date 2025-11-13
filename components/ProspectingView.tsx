@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Prospect, ProspectingStage } from '../types';
-import { PlusIcon, Cog6ToothIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, EllipsisVerticalIcon, ClockIcon, ExclamationCircleIcon, SparklesIcon, CalendarIcon } from './icons';
-import StageSettingsModal from './StageSettingsModal';
+import { PlusIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, EllipsisVerticalIcon, ClockIcon, ExclamationCircleIcon, SparklesIcon, CalendarIcon } from './icons';
 import ProspectAIModal from './ProspectAIModal';
 
 interface ProspectingViewProps {
@@ -9,7 +8,6 @@ interface ProspectingViewProps {
   stages: ProspectingStage[];
   onAddProspectClick: () => void;
   onUpdateProspectStage: (prospectId: string, newStageId: string) => void;
-  onUpdateStages: (stages: ProspectingStage[]) => void;
   onConvertProspect: (prospectId: string) => void;
 }
 
@@ -70,10 +68,9 @@ const ProspectCard: React.FC<{
 
 
 // Main Component
-const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onUpdateStages, onConvertProspect }) => {
+const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onConvertProspect }) => {
     const [draggingOverColumn, setDraggingOverColumn] = useState<string | null>(null);
     const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
-    const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [aiModalState, setAiModalState] = useState<{ isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | 'strategy' | null }>({ isOpen: false, prospect: null, mode: null });
 
     const prospectsByStage = useMemo(() => {
@@ -105,7 +102,6 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                     <p className="text-[var(--text-secondary)]">Arraste os cards para avançar os prospects no funil de vendas.</p>
                 </div>
                  <div className="flex gap-4 self-start md:self-center">
-                    <button onClick={() => setSettingsModalOpen(true)} className="bg-[var(--background-secondary)] hover:bg-[var(--background-secondary-hover)] text-[var(--text-secondary)] font-semibold py-2 px-4 rounded-lg border border-[var(--border-secondary)] flex items-center transition-colors duration-200 shadow-sm"><Cog6ToothIcon className="w-5 h-5 mr-2" />Configurar Etapas</button>
                     <button onClick={onAddProspectClick} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm"><PlusIcon className="w-5 h-5 mr-2" />Novo Prospect</button>
                 </div>
             </div>
@@ -138,7 +134,6 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                     );
                 })}
             </div>
-            <StageSettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} stages={stages} onSave={onUpdateStages} />
             {aiModalState.isOpen && aiModalState.prospect && <ProspectAIModal isOpen={aiModalState.isOpen} onClose={handleCloseAiModal} prospect={aiModalState.prospect} mode={aiModalState.mode!} />}
         </div>
     );

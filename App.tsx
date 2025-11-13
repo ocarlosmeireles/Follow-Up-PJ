@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
@@ -29,6 +31,7 @@ import ProfileModal from './components/ProfileModal';
 import SettingsModal from './components/SettingsModal';
 import AddClientModal from './components/AddClientModal';
 import SubscriptionView from './components/SubscriptionView'; // Import the new view
+import AdminSettingsView from './components/AdminSettingsView';
 import { auth, db, storage } from './lib/firebase';
 import Auth from './components/Auth';
 import { generateFollowUpReport } from './lib/reportGenerator';
@@ -47,6 +50,7 @@ export type ActiveView =
     | 'action-plan'
     | 'map'
     | 'users'
+    | 'settings'
     | 'organizations';
 
 const FullScreenLoader: React.FC<{ message: string }> = ({ message }) => (
@@ -453,14 +457,30 @@ const App: React.FC = () => {
     };
     
     const handleUpdateStages = async (updatedStages: ProspectingStage[]) => {
+         if (!userProfile) return;
          const batch = writeBatch(db);
-         updatedStages.forEach(stage => {
+         // First, delete stages that are no longer in the list to handle removals
+         const updatedStageIds = new Set(updatedStages.map(s => s.id));
+         const stagesToDelete = stages.filter(s => !updatedStageIds.has(s.id));
+         
+         for(const stage of stagesToDelete) {
             const stageRef = doc(db, "prospectingStages", stage.id);
-            batch.set(stageRef, stage, { merge: true });
+            batch.delete(stageRef);
+         }
+
+         // Then, set/update the remaining stages
+         updatedStages.forEach(stage => {
+            const stageRef = stage.id.startsWith('new-') 
+                ? doc(collection(db, "prospectingStages")) 
+                : doc(db, "prospectingStages", stage.id);
+            batch.set(stageRef, { ...stage, organizationId: userProfile.organizationId }, { merge: true });
          });
+
          await batch.commit();
-         setStages(updatedStages);
+         // Refetching might be the simplest way to get new IDs
+         await fetchData(user!.uid, userProfile);
     };
+
 
     const handleConvertProspect = async (prospectId: string) => {
         const prospect = prospects.find(p => p.id === prospectId);
@@ -511,6 +531,22 @@ const App: React.FC = () => {
         
         await updateDoc(doc(db, "clients", clientId), finalUpdates);
         setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...finalUpdates } as Client : c));
+    };
+
+     const handleSaveOrganization = async (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => {
+         if(!organization || !userProfile) return;
+
+        let logoUrl = organization.logoUrl;
+
+        if(logoFile) {
+            const storageRef = ref(storage, `organizations/${userProfile.organizationId}/logo.png`);
+            const snapshot = await uploadBytes(storageRef, logoFile);
+            logoUrl = await getDownloadURL(snapshot.ref);
+        }
+
+        const finalUpdate = { ...orgUpdate, logoUrl };
+        await updateDoc(doc(db, "organizations", organization.id), finalUpdate);
+        setOrganization(prev => ({...prev, ...finalUpdate } as Organization));
     };
 
 
@@ -638,7 +674,7 @@ const App: React.FC = () => {
                     <div key={viewKey} className="fade-in">
                         {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile}/>}
                         {activeView === 'deals' && <DealsView budgets={budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status))} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={() => {}}/>}
-                        {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onUpdateStages={handleUpdateStages} onConvertProspect={handleConvertProspect} />}
+                        {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} />}
                         {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateReport}/>}
                         {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)} />}
                         {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport}/>}
@@ -654,6 +690,17 @@ const App: React.FC = () => {
                             await updateDoc(doc(db, "users", userId), { role: newRole });
                             setUsers(prev => prev.map(u => u.id === userId ? {...u, role: newRole} : u));
                         }} onInviteUserClick={() => setAddUserModalOpen(true)}/>}
+                        {activeView === 'settings' && (userProfile.role === 'Admin' || userProfile.role === 'Manager') && organization && (
+                            <AdminSettingsView
+                                organization={organization}
+                                userProfile={userProfile}
+                                stages={stages}
+                                users={users}
+                                onSaveOrganization={handleSaveOrganization}
+                                onUpdateStages={handleUpdateStages}
+                                setActiveView={changeView}
+                            />
+                        )}
                         {activeView === 'organizations' && userProfile.role === 'Super Admin' && <SuperAdminView 
                             organizations={allOrganizations} 
                             users={allUsers} 
@@ -716,21 +763,7 @@ const App: React.FC = () => {
                 setUserProfile(prev => ({...prev, ...profileUpdate} as UserProfile));
                 setProfileModalOpen(false);
             }}/>}
-            <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} userProfile={userProfile} organization={organization} onSaveOrganization={async (orgUpdate, logoFile) => {
-                 if(!organization || !userProfile) return;
-        
-                let logoUrl = organization.logoUrl;
-
-                if(logoFile) {
-                    const storageRef = ref(storage, `organizations/${userProfile.organizationId}/logo.png`);
-                    const snapshot = await uploadBytes(storageRef, logoFile);
-                    logoUrl = await getDownloadURL(snapshot.ref);
-                }
-
-                const finalUpdate = { ...orgUpdate, logoUrl };
-                await updateDoc(doc(db, "organizations", organization.id), finalUpdate);
-                setOrganization(prev => ({...prev, ...finalUpdate } as Organization));
-            }}/>
+            <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} />
             <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />
             <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onInvite={async(email, role) => {
                 if(!userProfile) return;

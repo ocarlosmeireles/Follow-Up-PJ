@@ -10,9 +10,6 @@ interface SettingsModalProps {
     setTheme: (theme: Theme) => void;
     currentThemeVariant: ThemeVariant;
     setThemeVariant: (variant: ThemeVariant) => void;
-    userProfile: UserProfile | null;
-    organization: Organization | null;
-    onSaveOrganization: (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => void;
 }
 
 const ThemePreview: React.FC<{ variant: ThemeVariant; name: string; isActive: boolean; onClick: () => void; }> = ({ variant, name, isActive, onClick }) => {
@@ -52,50 +49,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     currentTheme, 
     setTheme,
     currentThemeVariant, 
-    setThemeVariant, 
-    userProfile, 
-    organization, 
-    onSaveOrganization 
+    setThemeVariant
 }) => {
-    const [orgName, setOrgName] = useState('');
-    const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoPreview, setLogoPreview] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (isOpen && organization) {
-            setOrgName(organization.name);
-            setLogoPreview(organization.logoUrl || null);
-        }
-        return () => { // Cleanup on close
-            setLogoFile(null);
-            if (logoPreview && logoPreview.startsWith('blob:')) {
-                URL.revokeObjectURL(logoPreview);
-            }
-        };
-    }, [isOpen, organization]);
-
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setLogoFile(file);
-            // Revoke old blob URL if it exists
-            if (logoPreview && logoPreview.startsWith('blob:')) {
-                URL.revokeObjectURL(logoPreview);
-            }
-            setLogoPreview(URL.createObjectURL(file));
-        }
-    };
-
-    const handleSave = () => {
-        const orgUpdate: Partial<Omit<Organization, 'id'>> = {};
-        if (orgName !== organization?.name) {
-            orgUpdate.name = orgName;
-        }
-        onSaveOrganization(orgUpdate, logoFile || undefined);
-        onClose();
-    };
-
+    
     if (!isOpen) return null;
 
     return (
@@ -119,46 +75,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <ThemePreview variant="flow" name="Fluxo" isActive={currentThemeVariant === 'flow'} onClick={() => setThemeVariant('flow')} />
                         </div>
                     </div>
-                    
-                    {/* Organization Settings for Admins */}
-                    {(userProfile?.role === UserRole.ADMIN || userProfile?.role === UserRole.MANAGER) && organization && (
-                        <div className="pt-6 border-t border-[var(--border-primary)]">
-                            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"><BriefcaseIcon className="w-5 h-5"/> Organização</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="org-name" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Nome da Organização</label>
-                                    <input
-                                        type="text"
-                                        id="org-name"
-                                        value={orgName}
-                                        onChange={(e) => setOrgName(e.target.value)}
-                                        className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Logo</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-16 h-16 bg-[var(--background-tertiary)] rounded-lg flex items-center justify-center">
-                                            {logoPreview ? (
-                                                <img src={logoPreview} alt="Preview" className="w-full h-full object-contain rounded-lg"/>
-                                            ) : (
-                                                <PhotoIcon className="w-8 h-8 text-[var(--text-tertiary)]"/>
-                                            )}
-                                        </div>
-                                        <input type="file" ref={fileInputRef} onChange={handleLogoChange} accept="image/*" className="hidden"/>
-                                        <button onClick={() => fileInputRef.current?.click()} className="bg-[var(--background-secondary)] hover:bg-[var(--background-secondary-hover)] text-[var(--text-secondary)] font-semibold py-2 px-4 rounded-lg border border-[var(--border-secondary)] text-sm">
-                                            Alterar Logo
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-[var(--border-primary)] flex justify-end">
-                    <button onClick={handleSave} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-[var(--text-on-accent)] font-bold py-2 px-4 rounded-lg">
-                        Salvar Alterações
+                    <button onClick={onClose} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-[var(--text-on-accent)] font-bold py-2 px-4 rounded-lg">
+                        Fechar
                     </button>
                 </div>
             </div>

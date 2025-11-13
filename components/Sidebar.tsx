@@ -128,9 +128,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                         </>)}
 
                         {(userProfile?.role === UserRole.ADMIN || userProfile?.role === UserRole.MANAGER) && (
-                            renderSection("Admin", 
-                                renderLink('users', "Gerenciar Usuários", <UsersIcon className="w-6 h-6" />)
-                            )
+                            renderSection("Admin", <>
+                                {renderLink('users', "Gerenciar Usuários", <UsersIcon className="w-6 h-6" />)}
+                                {renderLink('settings', "Configurações", <Cog6ToothIcon className="w-6 h-6" />)}
+                            </>)
                         )}
                     </>
                 )}

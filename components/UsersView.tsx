@@ -40,7 +40,7 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
             </button>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 animated-item" style={{ animationDelay: '100ms' }}>
             {/* Table for medium screens and up */}
             <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left">
@@ -54,10 +54,11 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map(user => (
+                        {users.map((user, index) => (
                             <tr 
                                 key={user.id}
-                                className="border-b border-gray-200 dark:border-slate-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                                className="border-b border-gray-200 dark:border-slate-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors animated-item"
+                                style={{ animationDelay: `${index * 50}ms` }}
                             >
                                 <td className="p-4 text-gray-800 dark:text-slate-100 font-semibold">{user.name}</td>
                                 <td className="p-4">
@@ -82,8 +83,12 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
 
             {/* Cards for small screens */}
             <div className="md:hidden space-y-4 p-4">
-                {users.map(user => (
-                    <div key={user.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                {users.map((user, index) => (
+                    <div 
+                        key={user.id} 
+                        className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 animated-item"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                    >
                         <div className="flex justify-between items-start">
                             <div>
                                 <p className="font-bold text-gray-800 dark:text-slate-100">{user.name}</p>

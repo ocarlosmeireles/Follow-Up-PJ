@@ -180,7 +180,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                 <KPICard style={{animationDelay: '300ms'}} className="animated-item" title="Ticket Médio (Ganhos)" value={`R$ ${formatCurrency(kpis.averageTicket)}`} icon={<ArrowTrendingUpIcon className="w-7 h-7 text-yellow-500"/>} />
             </div>
             
-            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
+            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '400ms' }}>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                     <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg self-start md:self-center">
                         {(['all', 'active', 'won', 'lost'] as const).map(filter => (
@@ -215,8 +215,8 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border-primary)]">
-                            {filteredAndSortedBudgets.map(budget => (
-                                <tr key={budget.id} className="hover:bg-[var(--background-secondary-hover)] transition-colors group">
+                            {filteredAndSortedBudgets.map((budget, index) => (
+                                <tr key={budget.id} className="hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item" style={{ animationDelay: `${index * 30}ms`}}>
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
                                     <td className="p-3 cursor-pointer" onClick={() => onSelectBudget(budget.id)}>
                                         <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors">{budget.client?.name || 'Cliente'}</p>

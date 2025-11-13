@@ -162,12 +162,12 @@ const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, c
             </div>
 
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard title="Total de Organizações" value={kpis.totalOrgs} icon={<BriefcaseIcon className="w-6 h-6 text-blue-500 dark:text-blue-400"/>} />
-                <KPICard title="Total de Usuários" value={kpis.totalUsers} icon={<UserGroupIcon className="w-6 h-6 text-purple-500 dark:text-purple-400"/>} />
-                <KPICard title="Receita Global" value={formatCurrency(kpis.totalRevenue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} />
+                <div className="animated-item" style={{ animationDelay: '100ms' }}><KPICard title="Total de Organizações" value={kpis.totalOrgs} icon={<BriefcaseIcon className="w-6 h-6 text-blue-500 dark:text-blue-400"/>} /></div>
+                <div className="animated-item" style={{ animationDelay: '200ms' }}><KPICard title="Total de Usuários" value={kpis.totalUsers} icon={<UserGroupIcon className="w-6 h-6 text-purple-500 dark:text-purple-400"/>} /></div>
+                <div className="animated-item" style={{ animationDelay: '300ms' }}><KPICard title="Receita Global" value={formatCurrency(kpis.totalRevenue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-green-500 dark:text-green-400"/>} /></div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 animated-item" style={{ animationDelay: '400ms' }}>
                  <div className="relative w-full sm:w-96 mb-4">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                         <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
@@ -183,7 +183,7 @@ const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, c
 
                 {filteredOrgs.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredOrgs.map(org => <OrganizationCard key={org.id} org={org} onImpersonate={onImpersonate} onToggleStatus={onToggleStatus} onDelete={onDelete} />)}
+                        {filteredOrgs.map((org, index) => <div className="animated-item" style={{ animationDelay: `${index * 50}ms`}} key={org.id}><OrganizationCard org={org} onImpersonate={onImpersonate} onToggleStatus={onToggleStatus} onDelete={onDelete} /></div>)}
                     </div>
                 ) : (
                     <div className="text-center py-16 text-gray-400 dark:text-slate-500">

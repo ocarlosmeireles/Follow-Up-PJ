@@ -227,7 +227,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
                                     <td className="p-3 cursor-pointer" onClick={() => onSelectBudget(budget.id)}>
                                         <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors truncate" title={budget.title}>{budget.title}</p>
-                                        <p className="text-xs text-[var(--text-secondary)] font-mono">#{budget.id.substring(0, 8)}</p>
                                     </td>
                                     <td className="p-3">
                                         <p className="font-semibold text-[var(--text-primary)] truncate" title={budget.client?.name}>{budget.client?.name || 'Cliente'}</p>

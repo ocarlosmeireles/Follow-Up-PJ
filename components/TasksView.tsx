@@ -26,6 +26,7 @@ type UnifiedTask = {
   value?: number;
   budgetId?: string;
   isOverdue: boolean;
+  isToday: boolean;
 };
 
 // --- HELPER FUNCTIONS ---
@@ -320,13 +321,12 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Helper to parse 'YYYY-MM-DD' as local date to avoid timezone issues.
         const parseDateString = (dateString: string): Date => {
             if (dateString.includes('T')) {
-                return new Date(dateString); // Full ISO string is fine
+                return new Date(dateString); 
             }
-            const [year, month, day] = dateString.split('-').map(Number);
-            return new Date(year, month - 1, day);
+            const parts = dateString.split('-').map(Number);
+            return new Date(parts[0], parts[1] - 1, parts[2]);
         };
 
         const followUpTasks: UnifiedTask[] = budgets
@@ -338,6 +338,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                     id: `budget-${b.id}`, type: 'follow-up', date: eventDate, title: b.title,
                     clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
                     isOverdue: eventDateOnly < today,
+                    isToday: eventDateOnly.getTime() === today.getTime(),
                 };
             });
         
@@ -350,21 +351,15 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                     id: `reminder-${r.id}`, type: 'reminder', date: eventDate, title: r.title,
                     isCompleted: r.isCompleted,
                     isOverdue: !r.isCompleted && eventDateOnly < today,
+                    isToday: !r.isCompleted && eventDateOnly.getTime() === today.getTime(),
                 };
             });
 
         const allTasks = [...followUpTasks, ...reminderTasks];
-
-        const todayString = new Date().toDateString();
         
         const overdue = allTasks.filter(t => t.isOverdue && !t.isCompleted);
-        const todayTasks = allTasks.filter(t => !t.isOverdue && !t.isCompleted && new Date(t.date).toDateString() === todayString);
-        const upcoming = allTasks.filter(t => {
-            if (t.isCompleted) return false;
-            const taskDate = new Date(t.date);
-            taskDate.setHours(0,0,0,0);
-            return taskDate > today;
-        });
+        const todayTasks = allTasks.filter(t => t.isToday && !t.isCompleted);
+        const upcoming = allTasks.filter(t => !t.isOverdue && !t.isToday && !t.isCompleted);
         
         const sortByDate = (a: UnifiedTask, b: UnifiedTask) => a.date.getTime() - b.date.getTime();
         

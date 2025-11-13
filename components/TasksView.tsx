@@ -19,7 +19,7 @@ interface TasksViewProps {
 type UnifiedTask = {
   id: string;
   type: 'follow-up' | 'reminder';
-  date: Date;
+  date: number; // Storing as timestamp for stability
   title: string;
   isCompleted?: boolean;
   clientName?: string;
@@ -33,9 +33,12 @@ type UnifiedTask = {
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
-const formatTimeOrDate = (date: Date, isToday: boolean) => {
-    if (!date || isNaN(date.getTime())) return 'N/A';
-    // Check if the date string from the source included time information
+const formatTimeOrDate = (timestamp: number, isToday: boolean) => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    // Check if the original date had time info by seeing if it's not midnight on the dot
     if (date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0) {
         return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
@@ -244,7 +247,7 @@ const DailyRhythm = () => {
     );
 };
 
-const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; index: number; }> = ({ task, onSelectBudget, index }) => {
+const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; index: number; }> = React.memo(({ task, onSelectBudget, index }) => {
     const isFollowUp = task.type === 'follow-up';
     
     return (
@@ -269,7 +272,7 @@ const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => vo
             </div>
         </div>
     );
-};
+});
 
 const UpcomingTasks: React.FC<{ 
     overdueTasks: UnifiedTask[],
@@ -320,6 +323,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
     const tasks = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const todayTime = today.getTime();
 
         const parseDateString = (dateString: string): Date => {
             if (dateString.includes('T')) {
@@ -335,10 +339,10 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                 const eventDate = parseDateString(b.nextFollowUpDate!);
                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
                 return {
-                    id: `budget-${b.id}`, type: 'follow-up', date: eventDate, title: b.title,
+                    id: `budget-${b.id}`, type: 'follow-up', date: eventDate.getTime(), title: b.title,
                     clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
-                    isOverdue: eventDateOnly < today,
-                    isToday: eventDateOnly.getTime() === today.getTime(),
+                    isOverdue: eventDateOnly.getTime() < todayTime,
+                    isToday: eventDateOnly.getTime() === todayTime,
                 };
             });
         
@@ -348,10 +352,10 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                 const eventDate = new Date(r.reminderDateTime);
                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
                 return {
-                    id: `reminder-${r.id}`, type: 'reminder', date: eventDate, title: r.title,
+                    id: `reminder-${r.id}`, type: 'reminder', date: eventDate.getTime(), title: r.title,
                     isCompleted: r.isCompleted,
-                    isOverdue: !r.isCompleted && eventDateOnly < today,
-                    isToday: !r.isCompleted && eventDateOnly.getTime() === today.getTime(),
+                    isOverdue: !r.isCompleted && eventDateOnly.getTime() < todayTime,
+                    isToday: !r.isCompleted && eventDateOnly.getTime() === todayTime,
                 };
             });
 
@@ -361,7 +365,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
         const todayTasks = allTasks.filter(t => t.isToday && !t.isCompleted);
         const upcoming = allTasks.filter(t => !t.isOverdue && !t.isToday && !t.isCompleted);
         
-        const sortByDate = (a: UnifiedTask, b: UnifiedTask) => a.date.getTime() - b.date.getTime();
+        const sortByDate = (a: UnifiedTask, b: UnifiedTask) => a.date - b.date;
         
         const potentialValue = followUpTasks.reduce((sum, t) => sum + (t.value || 0), 0);
 

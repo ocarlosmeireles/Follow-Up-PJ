@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import type { Budget, Client } from '../types';
 import { BudgetStatus } from '../types';
@@ -19,7 +19,7 @@ interface PriorityDeal {
     rationale: string;
 }
 
-// --- Sub-componentes do Modal de Foco ---
+// --- Sub-componentes do Modal de Foco (Movidos para fora de DealsView) ---
 
 const HealthIndicator: React.FC<{ score: number }> = ({ score }) => {
     const health = useMemo(() => {
@@ -52,19 +52,33 @@ const FocusCard: React.FC<{ deal: PriorityDeal, budget: Budget, clientName: stri
 // --- Modal de Foco (IA) ---
 
 interface FocusDealsModalProps {
+    isOpen: boolean;
     onClose: () => void;
     budgets: Budget[];
     clientMap: Map<string, string>;
     onSelectBudget: (id: string) => void;
 }
 
-const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ onClose, budgets, clientMap, onSelectBudget }) => {
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ isOpen, onClose, budgets, clientMap, onSelectBudget }) => {
     const [priorityDeals, setPriorityDeals] = useState<PriorityDeal[]>([]);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
+    const componentCache = useRef<{ data: PriorityDeal[], timestamp: number, budgetsKey: string } | null>(null);
 
     useEffect(() => {
+        if (!isOpen) return;
+        
+        const budgetsKey = JSON.stringify(budgets.map(b => `${b.id}-${b.value}-${b.status}-${b.dateSent}-${b.followUps.length}-${b.nextFollowUpDate}`));
+
         const fetchPriorityDeals = async () => {
+             // Check cache first
+            if (componentCache.current && (Date.now() - componentCache.current.timestamp < CACHE_DURATION_MS) && componentCache.current.budgetsKey === budgetsKey) {
+                setPriorityDeals(componentCache.current.data);
+                return;
+            }
+
             if (!budgets || budgets.length === 0) {
                 setIsLoadingAI(false);
                 setPriorityDeals([]);
@@ -76,14 +90,12 @@ const FocusDealsModal: React.FC<FocusDealsModalProps> = ({ onClose, budgets, cli
             setPriorityDeals([]);
 
             try {
-                if (!process.env.API_KEY) throw new Error("A chave de API do Gemini não foi configurada.");
-
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 
                 const activeBudgets = budgets
                     .filter(b => [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status))
                     .map(b => ({
-                        id: b.id,
+                        budgetId: b.id,
                         title: b.title,
                         value: b.value,
                         status: b.status,
@@ -116,6 +128,7 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
                                     nextBestAction: { type: Type.STRING },
                                     rationale: { type: Type.STRING },
                                 },
+                                required: ['budgetId', 'priorityScore', 'nextBestAction', 'rationale'],
                             },
                         }
                     }
@@ -123,19 +136,25 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
                 
                 const jsonString = response.text?.trim();
                 if (jsonString) {
-                    setPriorityDeals(JSON.parse(jsonString));
+                    const deals = JSON.parse(jsonString);
+                    setPriorityDeals(deals);
+                    componentCache.current = { data: deals, timestamp: Date.now(), budgetsKey };
                 }
                 
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Erro ao priorizar negócios com IA:", err);
-                setAiError("Não foi possível carregar as prioridades da IA. Verifique as configurações.");
+                if (err.message && err.message.includes('429')) {
+                    setAiError("Você atingiu o limite de requisições à IA. Por favor, aguarde alguns minutos e tente novamente.");
+                } else {
+                    setAiError("Não foi possível carregar as prioridades da IA. Verifique as configurações e sua conexão.");
+                }
             } finally {
                 setIsLoadingAI(false);
             }
         };
 
         fetchPriorityDeals();
-    }, [budgets]);
+    }, [isOpen, budgets]);
 
     const priorityBudgetsData = useMemo(() => {
         return priorityDeals
@@ -146,6 +165,8 @@ Orçamentos: ${JSON.stringify(activeBudgets)}`;
             })
             .filter((item): item is { deal: PriorityDeal; budget: Budget } => item !== null);
     }, [priorityDeals, budgets]);
+    
+    if (!isOpen) return null;
 
     return (
         <div 
@@ -336,7 +357,8 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                 </div>
             </section>
 
-             {isFocusModalOpen && <FocusDealsModal 
+             <FocusDealsModal 
+                isOpen={isFocusModalOpen}
                 onClose={() => setIsFocusModalOpen(false)}
                 budgets={budgets}
                 clientMap={clientMap}
@@ -344,7 +366,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
                     setIsFocusModalOpen(false); // Close focus modal
                     onSelectBudget(budgetId); // Open detail modal
                 }}
-            />}
+            />
         </div>
     );
 };

@@ -35,6 +35,19 @@ const unmaskCurrency = (maskedValue: string): number => {
     return parseFloat(numericString);
 };
 
+const formatCurrencyForInput = (value: string): string => {
+    if (!value) return '';
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') return '';
+    
+    const numberValue = parseInt(digitsOnly, 10) / 100;
+
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(numberValue);
+};
+
 
 const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave, clients, contacts, prospectData, initialClientId }) => {
     // Budget fields
@@ -229,6 +242,11 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
         setNewClientCnpj(maskedValue);
     };
 
+    const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formattedValue = formatCurrencyForInput(e.target.value);
+        setValue(formattedValue);
+    };
+
 
     if (!isOpen) return null;
 
@@ -254,8 +272,8 @@ const AddBudgetModal: React.FC<AddBudgetModalProps> = ({ isOpen, onClose, onSave
                                type="text"
                                inputMode="decimal"
                                value={value} 
-                               onChange={e => setValue(e.target.value)}
-                               placeholder="1.234,56"
+                               onChange={handleValueChange}
+                               placeholder="0,00"
                                className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500" />
                         </div>
                         <div>

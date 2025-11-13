@@ -203,6 +203,14 @@ export const HashtagIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+// L
+// FIX: Add missing LightBulbIcon.
+export const LightBulbIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.311a7.5 7.5 0 0 1-7.5 0c-1.421 0-2.8 0-4.125-.372a9.03 9.03 0 0 1-3.125-3.125c-.372-1.325-.372-2.704 0-4.025a9.03 9.03 0 0 1 3.125-3.125c1.325-.372 2.704-.372 4.025 0a9.03 9.03 0 0 1 3.125 3.125c.372 1.325.372 2.704 0 4.025a9.03 9.03 0 0 1-3.125 3.125c-1.325-.372-2.704-.372-4.025 0Z" />
+    </svg>
+);
+
 // M
 export const MagnifyingGlassIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
@@ -310,7 +318,7 @@ export const TrophyIcon = ({ className }: { className?: string }) => (
 // U
 export const UserGroupIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.75-5.418c-2.348-.876-4.682-1.348-7.024-1.348s-4.675.472-7.024 1.348a9.092 9.092 0 0 0 3.75 5.418m-3.75 0a9.093 9.093 0 0 1-3.75-5.418m15 0a9.093 9.093 0 0 0-3.75-5.418m-11.25 0A9.093 9.093 0 0 1 6 6.094m3.75 0a9.093 9.093 0 0 1 3.75 0m-3.75 0a9.093 9.093 0 0 0-3.75 5.418m11.25 0c-2.348.876-4.682 1.348-7.024 1.348s-4.675-.472-7.024-1.348m11.25 0c.608 1.95.446 4.03.13 5.922m-11.49 0c-.316-1.892-.478-3.972-.13-5.922m11.49 0c.235-1.12.235-2.28-.002-3.411m-11.486 0c-.237 1.131-.237 2.291-.002 3.411" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.75-5.418c-2.348-.876-4.682-1.348-7.024-1.348s-4.675.472-7.024 1.348a9.092 9.092 0 0 0 3.75 5.418m-3.75 0a9.093 9.093 0 0 1-3.75-5.418m15 0a9.093 9.093 0 0 0-3.75-5.418m-11.25 0A9.093 9.093 0 0 1 6 6.094m3.75 0a9.093 9.093 0 0 1 3.75 0m-3.75 0a9.093 9.093 0 0 0-3.75 5.418m11.25 0c-2.348.876-4.682 1.348-7.024-1.348s-4.675-.472-7.024-1.348m11.25 0c.608 1.95.446 4.03.13 5.922m-11.49 0c-.316-1.892-.478-3.972-.13-5.922m11.49 0c.235-1.12.235-2.28-.002-3.411m-11.486 0c-.237 1.131-.237 2.291-.002 3.411" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18.72a9.093 9.093 0 0 1-3.75-5.418m15 0a9.093 9.093 0 0 0-3.75-5.418" />
     </svg>
 );

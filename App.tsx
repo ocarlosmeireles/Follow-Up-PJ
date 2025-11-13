@@ -413,7 +413,7 @@ const App: React.FC = () => {
                     userId: user.uid,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: The type of `newClientRef.id` is inferred as `unknown`, causing a type error. Using String() to convert.
+                // FIX: Explicitly cast the document ID to a string to prevent type errors.
                 finalClientId = String(newClientRef.id);
             }
 
@@ -428,7 +428,7 @@ const App: React.FC = () => {
                     clientId: finalClientId,
                     organizationId: userProfile.organizationId
                 });
-                // FIX: The type of `newContactRef.id` is inferred as `unknown`, causing a type error. Using String() to convert.
+                // FIX: Explicitly cast the document ID to a string to prevent type errors.
                 finalContactId = String(newContactRef.id);
             }
             

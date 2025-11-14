@@ -5,7 +5,7 @@ import { XMarkIcon } from './icons';
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (profile: UserProfile) => void;
+  onSave: (profile: Partial<UserProfile>) => void;
   userProfile: UserProfile;
 }
 

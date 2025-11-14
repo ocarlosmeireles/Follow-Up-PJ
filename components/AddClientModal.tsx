@@ -5,7 +5,7 @@ import { XMarkIcon, UserIcon } from './icons';
 interface AddClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (client: Omit<Client, 'id'>, contact?: Omit<Contact, 'id' | 'clientId'>) => void;
+  onSave: (client: Omit<Client, 'id' | 'userId' | 'organizationId'>, contact?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>) => void;
 }
 
 const maskCnpj = (value: string) => {

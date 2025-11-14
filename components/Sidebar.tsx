@@ -15,6 +15,7 @@ import {
     UserGroupIcon as UsersIcon,
     Cog6ToothIcon,
     BillingIcon,
+    LightBulbIcon,
 } from './icons';
 
 interface SidebarProps {
@@ -119,11 +120,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
 
                         {renderSection("Organização", <>
                             {renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)}
-                            {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
+                            {renderLink('tasks', "Tarefas", <LightBulbIcon className="w-6 h-6" />)}
                         </>)}
                          
                         {renderSection("Análise", <>
                             {renderLink('reports', "Relatórios", <ChartBarIcon className="w-6 h-6" />)}
+                            {renderLink('sales-report', "Relatório de Vendas", <ClipboardDocumentListIcon className="w-6 h-6" />)}
                             {renderLink('map', "Mapa", <MapPinIcon className="w-6 h-6" />)}
                         </>)}
 

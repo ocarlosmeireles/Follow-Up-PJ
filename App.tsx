@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getAuth, onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, writeBatch, deleteDoc, getDoc, setDoc, query, where } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Header from './components/Header';
@@ -14,6 +14,7 @@ import TasksView from './components/TasksView';
 import MapView from './components/MapView';
 import ClientsView from './components/ClientsView';
 import ReportsView from './components/ReportsView';
+import SalesReportView from './components/SalesReportView';
 import UsersView from './components/UsersView';
 import SuperAdminView from './components/SuperAdminView';
 import AddBudgetModal from './components/AddBudgetModal';
@@ -39,9 +40,10 @@ export type ActiveView =
     | 'budgeting' 
     | 'deals' 
     | 'clients' 
-    | 'reports' 
+    | 'reports'
+    | 'sales-report'
     | 'calendar'
-    | 'action-plan'
+    | 'tasks'
     | 'map'
     | 'users'
     | 'settings'
@@ -215,8 +217,10 @@ const App: React.FC = () => {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     const profile = userDoc.data() as UserProfile;
-                    
+                    let activeProfile: UserProfile;
+
                     if (profile.role === UserRole.SUPER_ADMIN && !originalUserProfile) {
+                        activeProfile = profile;
                         setUserProfile(profile);
                     } else if (impersonatingOrg && originalUserProfile) {
                          const impersonatedProfile = {
@@ -224,14 +228,16 @@ const App: React.FC = () => {
                             role: UserRole.ADMIN, // Impersonate as admin
                             organizationId: impersonatingOrg.id,
                         };
+                        activeProfile = impersonatedProfile;
                         setUserProfile(impersonatedProfile);
                         setOrganization(impersonatingOrg);
                     } else {
+                         activeProfile = profile;
                          setUserProfile(profile);
                     }
-
-                    if (userProfile) { // Check if userProfile is set
-                       await fetchData(user.uid, userProfile);
+                    
+                    if (activeProfile) {
+                       await fetchData(user.uid, activeProfile);
                     }
                 } else {
                     console.log("No user profile found, logging out.");
@@ -247,7 +253,7 @@ const App: React.FC = () => {
         });
 
         return () => unsubscribe();
-    }, [fetchData, impersonatingOrg, originalUserProfile, userProfile]);
+    }, [fetchData, impersonatingOrg, originalUserProfile]);
     
     // Check for upcoming reminders
     useEffect(() => {
@@ -667,19 +673,20 @@ const App: React.FC = () => {
                 />
                  <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                     <div key={viewKey} className="fade-in">
-                        {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile}/>}
+                        {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile} organization={organization} />}
                         {activeView === 'deals' && <DealsView budgets={budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status))} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={() => {}}/>}
                         {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} />}
                         {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateReport}/>}
                         {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)} />}
                         {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport}/>}
+                        {activeView === 'sales-report' && <SalesReportView budgets={budgets} clients={clients} />}
                         {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={async (reminderData) => {
                             if(!user || !userProfile) return;
                             const newReminder = { ...reminderData, userId: user.uid, organizationId: userProfile.organizationId, isDismissed: false, isCompleted: false };
                             const docRef = await addDoc(collection(db, 'reminders'), newReminder);
                             setReminders(prev => [...prev, {id: docRef.id, ...newReminder}]);
                         }}/>}
-                        {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget}/>}
+                        {activeView === 'tasks' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget}/>}
                         {activeView === 'map' && <MapView clients={clients}/>}
                         {activeView === 'users' && (userProfile.role === 'Admin' || userProfile.role === 'Manager') && <UsersView users={users} onUpdateRole={async (userId, newRole) => {
                             await updateDoc(doc(db, "users", userId), { role: newRole });

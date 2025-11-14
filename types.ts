@@ -26,6 +26,7 @@ export interface Organization {
   status: 'active' | 'suspended';
   logoUrl?: string;
   companyInfo?: string; // Could be used for address, phone, etc.
+  salesGoal?: number;
   // Campos para gerenciamento de assinatura
   subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'unpaid' | 'canceled';
 }

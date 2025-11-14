@@ -40,7 +40,7 @@ const KPICard = ({ title, value, icon, className = '', style }: { title: string,
     </div>
 );
 
-const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, style?: React.CSSProperties }> = ({ client, onSelectClient, onGenerateIdea, style }) => {
+const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, style?: React.CSSProperties, className?: string }> = ({ client, onSelectClient, onGenerateIdea, style, className }) => {
     const ActivityBadge = () => {
         switch (client.activityStatus) {
             case 'active':
@@ -53,7 +53,7 @@ const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string
     };
     
     return (
-        <div style={style} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600">
+        <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${className || ''}`}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="font-bold text-lg text-gray-800 dark:text-slate-100">{client.name}</h3>

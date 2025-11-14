@@ -1,10 +1,16 @@
 // lib/firebase.ts
-import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "firebase/firestore";
+
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
-// COLE A SUA CONFIGURAÇÃO DO FIREBASE AQUI
+// Explicitly import modules for their side-effects to prevent race conditions
+import "firebase/firestore";
+import "firebase/auth";
+import "firebase/storage";
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDWFSGVAFkdEJtKNLywDPgPdI2Kydbuo1M",
   authDomain: "followup-afac2.firebaseapp.com",
@@ -15,26 +21,22 @@ const firebaseConfig = {
   measurementId: "G-PW2QCCXXR4"
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase App
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-let db;
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-// Initialize Firestore with the new recommended offline persistence API.
-// This allows the app to work even when the user is offline by caching data.
-// It uses multi-tab persistence to sync state across open tabs.
-try {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  });
-} catch (err: any) {
-    console.warn('Firestore persistence with multi-tab support failed, falling back to in-memory cache.', err);
-    // This can happen if the browser doesn't support IndexedDB or other features.
-    // We fall back to in-memory cache to ensure the app still works.
-    db = initializeFirestore(app, {
-        localCache: memoryLocalCache()
-    });
-}
+// Enable Firestore persistence
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn('Firestore persistence failed: Multiple tabs open.');
+    } else if (err.code == 'unimplemented') {
+        console.warn('Firestore persistence not supported in this browser.');
+    } else {
+        console.error("Failed to enable Firestore persistence:", err);
+    }
+});
 
-export { db };
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+export { app, db, auth, storage };

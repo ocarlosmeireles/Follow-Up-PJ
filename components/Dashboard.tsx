@@ -1,7 +1,8 @@
 
 
+
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
+import type { Budget, Client, ThemeVariant, UserProfile, Organization } from '../types';
 import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 
@@ -11,6 +12,7 @@ interface DashboardProps {
   onSelectBudget: (id: string) => void;
   themeVariant: ThemeVariant;
   userProfile: UserProfile;
+  organization: Organization | null;
 }
 
 const formatCurrency = (value: number) => {
@@ -75,8 +77,52 @@ const DashboardMetricCard = ({ title, value, subValue, icon, gradient, style, cl
     </div>
 );
 
+const SalesGoalTracker: React.FC<{ revenue: number; goal: number | undefined }> = ({ revenue, goal }) => {
+    if (!goal || goal <= 0) {
+        return (
+            <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm text-center">
+                <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Acompanhe sua Meta Mensal</h3>
+                <p className="text-[var(--text-secondary)]">Um administrador pode definir uma meta de faturamento nas configurações para visualizar o progresso aqui.</p>
+            </div>
+        );
+    }
 
-const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant, userProfile }) => {
+    const progress = Math.min((revenue / goal) * 100, 100);
+    const achievedPercentage = (revenue / goal) * 100;
+    const goalMet = revenue >= goal;
+
+    return (
+        <div className="bg-[var(--background-secondary)] p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                <div>
+                    <h3 className="text-xl font-semibold text-[var(--text-primary)]">Meta de Faturamento do Mês</h3>
+                    <p className="text-[var(--text-secondary)] text-sm">Progresso em relação à meta definida.</p>
+                </div>
+                {goalMet && (
+                    <div className="flex items-center gap-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 font-bold px-4 py-2 rounded-lg mt-2 sm:mt-0">
+                        <TrophyIcon className="w-6 h-6"/>
+                        <span>Meta Batida!</span>
+                    </div>
+                )}
+            </div>
+            <div className="w-full bg-[var(--background-tertiary)] rounded-full h-6 overflow-hidden">
+                <div 
+                    className="bg-gradient-to-r from-blue-400 to-blue-600 dark:from-blue-500 dark:to-blue-700 h-full rounded-full flex items-center justify-center text-white font-bold text-sm transition-all duration-1000 ease-out"
+                    style={{ width: `${progress}%` }}
+                >
+                    {progress > 15 && `${achievedPercentage.toFixed(0)}%`}
+                </div>
+            </div>
+            <div className="flex justify-between items-center mt-2 text-sm font-semibold">
+                <span className="text-[var(--text-secondary)]">Faturado: <span className="text-[var(--text-primary)]">{formatCurrency(revenue)}</span></span>
+                <span className="text-[var(--text-secondary)]">Meta: <span className="text-[var(--text-primary)]">{formatCurrency(goal)}</span></span>
+            </div>
+        </div>
+    );
+};
+
+
+const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant, userProfile, organization }) => {
     const [timePeriod, setTimePeriod] = useState<'month' | '30days' | 'all'>('all');
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -120,6 +166,20 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
 
         return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
     }, [filteredBudgetsByTime, budgets]);
+
+    const currentMonthRevenue = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        return budgets
+            .filter(b => {
+                if (b.status !== BudgetStatus.INVOICED) return false;
+                const budgetDate = new Date(b.dateSent);
+                return budgetDate.getMonth() === currentMonth && budgetDate.getFullYear() === currentYear;
+            })
+            .reduce((sum, b) => sum + b.value, 0);
+    }, [budgets]);
     
     const nextTasks = useMemo(() => {
          const activeBudgetsWithFollowUp = budgets.filter(b =>
@@ -147,6 +207,8 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                 </div>
             </div>
             
+            <SalesGoalTracker revenue={currentMonthRevenue} goal={organization?.salesGoal} />
+
             {isDashboardTheme ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                     <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>

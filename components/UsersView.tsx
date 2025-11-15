@@ -6,7 +6,7 @@ import { UserGroupIcon, UserPlusIcon } from './icons';
 interface UsersViewProps {
   users: UserData[];
   onUpdateRole: (userId: string, newRole: UserRole) => void;
-  onInviteUserClick: () => void;
+  onAddUserClick: () => void;
 }
 
 const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
@@ -23,20 +23,20 @@ const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
     );
 };
 
-const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUserClick }) => {
+const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onAddUserClick }) => {
   return (
     <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">Gerenciar Usuários</h1>
-                <p className="text-gray-500 dark:text-gray-400">Convide e gerencie os membros da sua equipe.</p>
+                <p className="text-gray-500 dark:text-gray-400">Adicione e gerencie os membros da sua equipe.</p>
             </div>
             <button 
-                onClick={onInviteUserClick}
+                onClick={onAddUserClick}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm self-start md:self-center"
             >
                 <UserPlusIcon className="w-5 h-5 mr-2"/>
-                Convidar Usuário
+                Adicionar Usuário
             </button>
         </div>
 
@@ -98,6 +98,7 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onInviteUser
                             <RoleBadge role={user.role} />
                         </div>
                         <div className="mt-4">
+                            {/* FIX: Corrected typo in closing label tag from </glabel> to </label> */}
                             <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Alterar Cargo</label>
                             <select
                                 value={user.role}

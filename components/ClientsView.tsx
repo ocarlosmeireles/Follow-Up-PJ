@@ -53,7 +53,7 @@ const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string
     };
     
     return (
-        <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${className || ''}`}>
+        <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${className}`}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="font-bold text-lg text-gray-800 dark:text-slate-100">{client.name}</h3>
@@ -123,7 +123,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, o
                 activityStatus = daysSinceActivity > INACTIVE_THRESHOLD_DAYS ? 'inactive' : 'active';
             }
             
-            // FIX: Replaced BudgetStatus.WON with BudgetStatus.INVOICED to match the enum.
             const wonBudgets = clientBudgets.filter(b => b.status === BudgetStatus.INVOICED);
             const totalValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
 
@@ -185,7 +184,6 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                  config: { systemInstruction: "Você é um assistente de vendas especialista em reengajamento de clientes (CRM). Suas sugestões são proativas e focadas em criar valor." }
              });
 
-             // FIX: Safely handle potentially nullish `response.text` by providing a fallback empty string.
              setAiIdea({ client, idea: response.text || '', loading: false, error: null });
         } catch(error) {
             console.error("Erro ao gerar ideia com IA:", error);

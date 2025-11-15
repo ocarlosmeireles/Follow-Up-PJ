@@ -5,10 +5,10 @@ import { XMarkIcon, EnvelopeIcon } from './icons';
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: UserRole) => void;
+  onInviteUser: (email: string, role: UserRole) => void;
 }
 
-const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInvite }) => {
+const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInviteUser }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<UserRole>(UserRole.SALESPERSON);
     const [error, setError] = useState('');
@@ -30,7 +30,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInvite }
             return;
         }
         setError('');
-        onInvite(email.toLowerCase(), role);
+        onInviteUser(email.toLowerCase(), role);
     };
 
     if (!isOpen) return null;
@@ -45,11 +45,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInvite }
                     </button>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
-                    O usuário receberá um convite por e-mail para se cadastrar e entrar na sua organização.
+                    Um convite será gerado para o e-mail informado. O novo usuário precisará se cadastrar usando este e-mail para entrar na sua organização.
                 </p>
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor="user-email" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">E-mail do Convidado</label>
+                        <label htmlFor="user-email" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">E-mail do Usuário</label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                                 <EnvelopeIcon className="w-5 h-5 text-gray-400" />
@@ -74,6 +74,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInvite }
                         >
                             <option value={UserRole.SALESPERSON}>Vendedor(a)</option>
                             <option value={UserRole.MANAGER}>Gerente</option>
+                            <option value={UserRole.ADMIN}>Admin</option>
                         </select>
                     </div>
                      {error && <p className="text-red-500 text-sm">{error}</p>}

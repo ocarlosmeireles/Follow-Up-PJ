@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Organization, UserProfile, ProspectingStage, UserData } from '../types';
-import { BriefcaseIcon, PhotoIcon, PencilIcon, CheckCircleIcon, UserGroupIcon, TrashIcon, PlusIcon, FunnelIcon, BillingIcon, CurrencyDollarIcon } from './icons';
+import { BriefcaseIcon, PhotoIcon, PencilIcon, CheckCircleIcon, UserGroupIcon, TrashIcon, PlusIcon, FunnelIcon, BillingIcon } from './icons';
 import type { ActiveView } from '../App';
 
 interface AdminSettingsViewProps {
@@ -13,26 +13,6 @@ interface AdminSettingsViewProps {
     setActiveView: (view: ActiveView) => void;
 }
 
-const formatCurrencyForInput = (value: string): string => {
-    if (!value) return '';
-    const digitsOnly = value.replace(/\D/g, '');
-    if (digitsOnly === '') return '';
-    
-    const numberValue = parseInt(digitsOnly, 10) / 100;
-
-    return new Intl.NumberFormat('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(numberValue);
-};
-
-const unmaskCurrency = (maskedValue: string): number => {
-    if (!maskedValue) return 0;
-    const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
-    return parseFloat(numericString);
-};
-
-
 const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
     organization,
     stages,
@@ -43,7 +23,6 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
 }) => {
     // Organization State
     const [orgName, setOrgName] = useState('');
-    const [salesGoal, setSalesGoal] = useState('');
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +35,6 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
     useEffect(() => {
         setOrgName(organization.name);
         setLogoPreview(organization.logoUrl || null);
-        setSalesGoal(organization.salesGoal ? formatCurrencyForInput(String(organization.salesGoal * 100)) : '');
         setIsOrgDirty(false);
         setLogoFile(null);
     }, [organization]);
@@ -83,10 +61,6 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
         const orgUpdate: Partial<Omit<Organization, 'id'>> = {};
         if (orgName !== organization.name) {
             orgUpdate.name = orgName;
-        }
-        const numericGoal = unmaskCurrency(salesGoal);
-        if (numericGoal !== (organization.salesGoal || 0)) {
-            orgUpdate.salesGoal = numericGoal;
         }
         onSaveOrganization(orgUpdate, logoFile || undefined);
         setIsOrgDirty(false);
@@ -160,25 +134,6 @@ const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
                                     onChange={(e) => { setOrgName(e.target.value); setIsOrgDirty(true); }}
                                     className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2"
                                 />
-                            </div>
-                             <div>
-                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Meta Mensal de Faturamento</label>
-                                <div className="relative">
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                        <CurrencyDollarIcon className="w-5 h-5 text-[var(--text-tertiary)]" />
-                                    </span>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={salesGoal}
-                                        onChange={(e) => {
-                                            setSalesGoal(formatCurrencyForInput(e.target.value));
-                                            setIsOrgDirty(true);
-                                        }}
-                                        className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2 pl-10"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Logo</label>

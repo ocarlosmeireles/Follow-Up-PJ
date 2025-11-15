@@ -5,6 +5,7 @@ import { XMarkIcon } from './icons';
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // FIX: Changed onSave to accept a partial UserProfile, as only some fields are editable.
   onSave: (profile: Partial<UserProfile>) => void;
   userProfile: UserProfile;
 }

@@ -190,7 +190,6 @@ export const generateFollowUpReport = (
                                 <div class="followup-item">
                                     <p>Data: ${formatTimestamp(fu.date)} ${fu.status ? `| <strong>Status: ${fu.status}</strong>` : ''}</p>
                                     <p>${fu.notes ? fu.notes.replace(/\n/g, '<br>') : '<em>Nenhuma nota de texto.</em>'}</p>
-                                    ${fu.audioUrl ? '<p><em>- Contém nota de áudio -</em></p>' : ''}
                                 </div>
                             `).join('') : '<p class="no-followups">Nenhum follow-up registrado para este relatório.</p>'}
                         </div>

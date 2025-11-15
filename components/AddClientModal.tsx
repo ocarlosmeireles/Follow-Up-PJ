@@ -5,6 +5,7 @@ import { XMarkIcon, UserIcon } from './icons';
 interface AddClientModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // FIX: Aligned the onSave prop type with the handleAddClient function in App.tsx.
   onSave: (client: Omit<Client, 'id' | 'userId' | 'organizationId'>, contact?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>) => void;
 }
 

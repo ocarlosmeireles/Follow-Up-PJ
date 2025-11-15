@@ -1,16 +1,9 @@
-// lib/firebase.ts
-
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage";
 
-// Explicitly import modules for their side-effects to prevent race conditions
-import "firebase/firestore";
-import "firebase/auth";
-import "firebase/storage";
-
-// Your web app's Firebase configuration
+// TODO: Replace the following with your app's Firebase project configuration.
+// You can find this in your Firebase project console under Project settings.
 const firebaseConfig = {
   apiKey: "AIzaSyDWFSGVAFkdEJtKNLywDPgPdI2Kydbuo1M",
   authDomain: "followup-afac2.firebaseapp.com",
@@ -21,22 +14,11 @@ const firebaseConfig = {
   measurementId: "G-PW2QCCXXR4"
 };
 
-// Initialize Firebase App
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
+// Initialize and export Firebase Authentication
+export const auth = getAuth(app);
 
-// Enable Firestore persistence
-enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.warn('Firestore persistence failed: Multiple tabs open.');
-    } else if (err.code == 'unimplemented') {
-        console.warn('Firestore persistence not supported in this browser.');
-    } else {
-        console.error("Failed to enable Firestore persistence:", err);
-    }
-});
-
-export { app, db, auth, storage };
+// Initialize and export Cloud Firestore
+export const db = getFirestore(app);

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact } from '../types';
 import { BudgetStatus, FollowUpStatus } from '../types';
-import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, MicrophoneIcon, StopCircleIcon, TrashIcon, PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon } from './icons';
+import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon } from './icons';
 
 interface BudgetDetailModalProps {
     isOpen: boolean;
@@ -166,75 +166,26 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
     const [showWinPrompt, setShowWinPrompt] = useState(false);
     const [winValue, setWinValue] = useState('');
     
-    // Audio recording state
-    const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-
     // AI Email Generation
     const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
-            if(audioUrl) URL.revokeObjectURL(audioUrl);
-            setAudioUrl(null);
-            setRecordingStatus('idle');
             setShowWinPrompt(false);
             setWinValue('');
         }
-    }, [isOpen, audioUrl]);
+    }, [isOpen]);
 
     if (!budget || !isOpen) return null;
 
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            setRecordingStatus('recording');
-            mediaRecorderRef.current = new MediaRecorder(stream);
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                audioChunksRef.current.push(event.data);
-            };
-            mediaRecorderRef.current.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                const url = URL.createObjectURL(audioBlob);
-                setAudioUrl(url);
-                setRecordingStatus('recorded');
-                audioChunksRef.current = [];
-                stream.getTracks().forEach(track => track.stop());
-            };
-            mediaRecorderRef.current.start();
-        } catch (err) {
-            console.error("Error starting recording:", err);
-            alert("Não foi possível iniciar a gravação. Verifique as permissões do microfone.");
-            setRecordingStatus('idle');
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.stop();
-        }
-    };
-    
-    const deleteAudio = () => {
-        if(audioUrl) URL.revokeObjectURL(audioUrl);
-        setAudioUrl(null);
-        setRecordingStatus('idle');
-    }
-
     const handleAddFollowUp = () => {
-        if (!notes && !audioUrl) {
-            alert('Por favor, adicione uma nota de texto ou áudio ao follow-up.');
+        if (!notes) {
+            alert('Por favor, adicione uma nota ao follow-up.');
             return;
         }
 
         const followUpDate = new Date().toISOString();
         const followUpData: Omit<FollowUp, 'id'> = { date: followUpDate, notes, status: followUpStatus };
-
-        if (audioUrl) {
-            followUpData.audioUrl = audioUrl;
-        }
 
         let combinedNextDate: string | null = nextFollowUpDate || null;
         if (combinedNextDate && nextFollowUpTime) {
@@ -247,8 +198,6 @@ const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, 
         setNextFollowUpDate('');
         setNextFollowUpTime('');
         setFollowUpStatus(FollowUpStatus.WAITING_RESPONSE);
-        setAudioUrl(null);
-        setRecordingStatus('idle');
     };
 
     const handleGenerateEmail = async () => {
@@ -354,28 +303,7 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                     className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                                 />
 
-                                <div className="flex items-center flex-wrap gap-4">
-                                    {recordingStatus === 'idle' && (
-                                        <button onClick={startRecording} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold py-2 px-3 rounded-lg bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-900 transition">
-                                            <MicrophoneIcon className="w-5 h-5" /> Gravar Áudio
-                                        </button>
-                                    )}
-                                    {recordingStatus === 'recording' && (
-                                        <button onClick={stopRecording} className="flex items-center gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-semibold py-2 px-3 rounded-lg bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900 transition animate-pulse">
-                                            <StopCircleIcon className="w-5 h-5" /> Parar Gravação
-                                        </button>
-                                    )}
-                                    {recordingStatus === 'recorded' && audioUrl && (
-                                        <div className="flex items-center gap-2 bg-gray-200 dark:bg-slate-700 rounded-lg p-2 flex-grow">
-                                            <audio controls src={audioUrl} className="h-8 flex-grow"></audio>
-                                            <button onClick={deleteAudio} className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-1">
-                                                <TrashIcon className="w-5 h-5"/>
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    <div className="flex-grow"></div>
-                                    
+                                <div className="flex items-center justify-end flex-wrap gap-4">
                                      <button 
                                         onClick={handleGenerateEmail}
                                         disabled={isGeneratingEmail}
@@ -448,7 +376,6 @@ O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e ge
                                             {getFollowUpStatusPill(fu.status)}
                                         </div>
                                         {fu.notes && <p className="text-[var(--text-primary)] whitespace-pre-wrap">{fu.notes}</p>}
-                                        {fu.audioUrl && <audio controls src={fu.audioUrl} className="w-full mt-2 h-10"></audio>}
                                     </div>
                                 )) : <p className="text-gray-400 dark:text-slate-500 italic text-center p-4">Nenhum follow-up registrado.</p>}
                             </div>

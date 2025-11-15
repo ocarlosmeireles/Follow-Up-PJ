@@ -14,7 +14,6 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, user 
     
     const handleLogout = async () => {
         await signOut(auth);
-        window.location.reload(); // Force a full reload to clear state
     };
 
     const getStatusMessage = () => {
@@ -56,7 +55,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, user 
                             className="w-full mt-4 flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-slate-200"
                         >
                             <ArrowRightStartOnRectangleIcon className="w-4 h-4" />
-                            Sair da conta
+                            Sair da conta ({user?.email})
                         </button>
                     </div>
                 </div>

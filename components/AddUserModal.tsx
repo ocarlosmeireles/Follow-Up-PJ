@@ -5,10 +5,10 @@ import { XMarkIcon, EnvelopeIcon } from './icons';
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInviteUser: (email: string, role: UserRole) => void;
+  onAddUser: (email: string, role: UserRole) => void;
 }
 
-const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInviteUser }) => {
+const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onAddUser }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<UserRole>(UserRole.SALESPERSON);
     const [error, setError] = useState('');
@@ -24,13 +24,13 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInviteUs
         onClose();
     };
 
-    const handleInvite = () => {
+    const handleAdd = () => {
         if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             setError('Por favor, insira um e-mail válido.');
             return;
         }
         setError('');
-        onInviteUser(email.toLowerCase(), role);
+        onAddUser(email.toLowerCase(), role);
     };
 
     if (!isOpen) return null;
@@ -45,7 +45,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInviteUs
                     </button>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
-                    Um convite será gerado para o e-mail informado. O novo usuário precisará se cadastrar usando este e-mail para entrar na sua organização.
+                    Um convite será enviado para o e-mail informado. O usuário precisará criar uma conta para se juntar à sua organização.
                 </p>
                 <div className="space-y-4">
                     <div>
@@ -81,7 +81,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onInviteUs
                 </div>
                 <div className="mt-6 flex justify-end space-x-4">
                     <button onClick={handleClose} className="bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600">Cancelar</button>
-                    <button onClick={handleInvite} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Enviar Convite</button>
+                    <button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Enviar Convite</button>
                 </div>
             </div>
         </div>

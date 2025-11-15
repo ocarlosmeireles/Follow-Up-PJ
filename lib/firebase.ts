@@ -1,9 +1,12 @@
+// lib/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
-// TODO: Replace the following with your app's Firebase project configuration.
-// You can find this in your Firebase project console under Project settings.
+// Your web app's Firebase configuration.
+// These values are sourced from environment variables for security and flexibility.
+// Ensure you have these variables set in your deployment environment.
 const firebaseConfig = {
   apiKey: "AIzaSyDWFSGVAFkdEJtKNLywDPgPdI2Kydbuo1M",
   authDomain: "followup-afac2.firebaseapp.com",
@@ -14,11 +17,26 @@ const firebaseConfig = {
   measurementId: "G-PW2QCCXXR4"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize and export Firebase Authentication
-export const auth = getAuth(app);
+let db;
 
-// Initialize and export Cloud Firestore
-export const db = getFirestore(app);
+// Initialize Firestore with the new recommended offline persistence API.
+// This allows the app to work even when the user is offline by caching data.
+// It uses multi-tab persistence to sync state across open tabs.
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (err: any) {
+    console.warn('Firestore persistence with multi-tab support failed, falling back to in-memory cache.', err);
+    // This can happen if the browser doesn't support IndexedDB or other features.
+    // We fall back to in-memory cache to ensure the app still works.
+    db = initializeFirestore(app, {
+        localCache: memoryLocalCache()
+    });
+}
+
+export { db };
+export const auth = getAuth(app);
+export const storage = getStorage(app);

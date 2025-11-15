@@ -123,6 +123,7 @@ const SuperAdminView: React.FC<SuperAdminViewProps> = ({ organizations, users, c
             const orgClients = clients.filter(c => c.organizationId === org.id);
             const orgBudgets = budgets.filter(b => b.organizationId === org.id);
             const orgRevenue = orgBudgets
+                // FIX: Replaced BudgetStatus.WON with BudgetStatus.INVOICED to match the enum.
                 .filter(b => b.status === BudgetStatus.INVOICED)
                 .reduce((sum, b) => sum + b.value, 0);
 

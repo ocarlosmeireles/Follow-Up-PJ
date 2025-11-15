@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail, UserCredential } from 'firebase/auth';
-import { doc, setDoc, addDoc, collection, query, where, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import type { UserProfile, Invite } from '../types';
 import { UserRole } from '../types';
@@ -104,40 +104,20 @@ const Auth: React.FC = () => {
                 await setDoc(doc(db, "users", user.uid), invitedUserProfile);
                 await deleteDoc(doc(db, "invites", invite.docId));
             } else {
-                const batch = writeBatch(db);
-
-                // Create Organization
-                const orgRef = doc(collection(db, "organizations"));
-                batch.set(orgRef, {
+                const orgRef = await addDoc(collection(db, "organizations"), {
                     name: companyName,
                     status: 'active',
-                    subscriptionStatus: 'trial' // Start with a trial
+                    subscriptionStatus: 'trial' // Start new orgs on a trial
                 });
     
-                // Create User Profile
-                const userRef = doc(db, "users", user.uid);
                 const newUserProfile: UserProfile = {
                     name,
-                    matricula: '001',
+                    matricula: 'N/A',
                     email: user.email!,
                     role: UserRole.ADMIN,
                     organizationId: orgRef.id
                 };
-                batch.set(userRef, newUserProfile);
-
-                // Create Default Prospecting Stages
-                const defaultStages = [
-                    { name: 'Prospect Frio', order: 0 }, { name: 'Primeiro Contato', order: 1 },
-                    { name: 'Contato Respondido', order: 2 }, { name: 'Reunião Agendada', order: 3 },
-                    { name: 'Proposta Enviada', order: 4 }, { name: 'Negociação', order: 5 },
-                    { name: 'Perdido', order: 6 },
-                ];
-                defaultStages.forEach(stage => {
-                    const stageRef = doc(collection(db, "stages"));
-                    batch.set(stageRef, { ...stage, organizationId: orgRef.id });
-                });
-
-                await batch.commit();
+                await setDoc(doc(db, "users", user.uid), newUserProfile);
             }
         } catch (dbError: any) {
             await user.delete();

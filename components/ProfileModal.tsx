@@ -5,7 +5,6 @@ import { XMarkIcon } from './icons';
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // FIX: Changed onSave to accept a partial UserProfile, as only some fields are editable.
   onSave: (profile: Partial<UserProfile>) => void;
   userProfile: UserProfile;
 }
@@ -69,8 +68,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, onSave, us
                             type="email"
                             id="profile-email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-blue-500 focus:border-blue-500"
+                            readOnly
+                            className="w-full bg-gray-200 dark:bg-slate-900/50 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-500 dark:text-slate-400 cursor-not-allowed"
                         />
                     </div>
                 </div>

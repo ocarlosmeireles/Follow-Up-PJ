@@ -98,8 +98,7 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onAddUserCli
                             <RoleBadge role={user.role} />
                         </div>
                         <div className="mt-4">
-                            {/* FIX: Corrected typo in closing label tag from </glabel> to </label> */}
-                            <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Alterar Cargo</label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Alterar Cargo</glabel>
                             <select
                                 value={user.role}
                                 onChange={(e) => onUpdateRole(user.id, e.target.value as UserRole)}

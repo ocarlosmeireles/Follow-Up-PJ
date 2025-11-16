@@ -96,12 +96,30 @@ export interface Prospect {
   email?: string;
   phone?: string;
   cnpj?: string;
-  notes?: string;
+  notes?: string; // Observações estratégicas
   stageId: string;
-  source?: string;
+  source?: string; // Canal em que descobri
   createdAt: string;
   nextContactDate?: string | null;
+
+  // New fields from user request
+  segment?: string;
+  companySize?: 'Pequena' | 'Média' | 'Grande';
+  address?: string;
+  landline?: string;
+  website?: string;
+  socialMedia?: {
+    linkedin?: string;
+    instagram?: string;
+    facebook?: string;
+  };
+  role?: string; // Cargo
+  identifiedNeed?: string;
+  productsOfInterest?: string;
+  estimatedBudget?: number;
+  urgencyLevel?: 'Baixa' | 'Média' | 'Alta';
 }
+
 
 export interface Notification {
   id: string;

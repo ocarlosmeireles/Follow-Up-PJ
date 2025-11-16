@@ -361,7 +361,11 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => {
         if (!effectiveUserProfile || !effectiveOrganization) return;
         const initialStage = stages.find(s => s.order === 0);
-        if (!initialStage) return alert("Nenhuma etapa inicial de prospecção configurada.");
+        if (!initialStage) {
+            alert("Nenhuma etapa inicial de prospecção configurada.");
+            // FIX: Throw an error if initial stage is not found to prevent saving invalid data and provide clearer feedback.
+            throw new Error("Initial prospecting stage not found.");
+        }
         const newProspect: Omit<Prospect, 'id'> = {
             ...prospectData,
             userId: effectiveUserProfile.id,
@@ -374,6 +378,12 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
 
     const handleUpdateProspectStage = async (prospectId: string, newStageId: string) => {
         await updateDoc(doc(db, 'prospects', prospectId), { stageId: newStageId });
+    };
+
+    const handleDeleteProspect = async (prospectId: string) => {
+        if (window.confirm("Tem certeza que deseja marcar este prospect como perdido? Esta ação não pode ser desfeita.")) {
+            await deleteDoc(doc(db, 'prospects', prospectId));
+        }
     };
     
     const handleUpdateStages = async (updatedStages: ProspectingStage[]) => {
@@ -525,7 +535,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             case 'dashboard':
                 return <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={effectiveUserProfile} />;
             case 'prospecting':
-                return <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} />;
+                return <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect}/>;
             case 'budgeting':
                 return <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={(ids) => console.log('generate report', ids)} />;
             case 'deals':

@@ -52,10 +52,11 @@ const ScriptsView: React.FC<ScriptsViewProps> = ({ scripts, onAdd, onEdit, onDel
     };
 
     const allCategories = useMemo(() => {
-        const favoriteScripts = scripts.filter(s => favorites.has(s.id));
+        const favoriteScripts = scripts.filter(s => s && favorites.has(s.id));
         const favoritesCategory = { id: 'favorites', name: '⭐ Favoritos', scripts: favoriteScripts };
 
         const groupedByCategory = scripts.reduce((acc, script) => {
+            if (!script || favorites.has(script.id)) return acc;
             const category = script.category || 'Reengajamento'; // Fallback for old data
             if (!acc[category]) {
                 acc[category] = [];

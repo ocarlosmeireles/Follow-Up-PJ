@@ -150,9 +150,9 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             {useModernCards ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                     <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
-                    <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-purple-500 to-purple-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-purple-500 to-purple-700'}/>
                     <DashboardMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Conversão" value={metrics.conversionRate} subValue="de negócios fechados" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
-                    <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-teal-500 to-teal-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-teal-500 to-teal-700'}/>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">

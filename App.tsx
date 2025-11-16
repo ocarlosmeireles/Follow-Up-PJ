@@ -361,11 +361,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => {
         if (!effectiveUserProfile || !effectiveOrganization) return;
         const initialStage = stages.find(s => s.order === 0);
-        if (!initialStage) {
-            alert("Nenhuma etapa inicial de prospecção configurada.");
-            // FIX: Throw an error if initial stage is not found to prevent saving invalid data and provide clearer feedback.
-            throw new Error("Initial prospecting stage not found.");
-        }
+        if (!initialStage) return alert("Nenhuma etapa inicial de prospecção configurada.");
         const newProspect: Omit<Prospect, 'id'> = {
             ...prospectData,
             userId: effectiveUserProfile.id,

@@ -1,13 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
+import React, { useState, useRef, useEffect } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact } from '../types';
 import { BudgetStatus, FollowUpStatus } from '../types';
-// FIX: Imported TrophyIcon to resolve a reference error.
-import { 
-    XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, 
-    PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon, CurrencyDollarIcon, ClockIcon, 
-    HashtagIcon, LightBulbIcon, TrophyIcon
-} from './icons';
+import { XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, PauseCircleIcon, UserIcon, SparklesIcon, PencilIcon } from './icons';
 
 interface BudgetDetailModalProps {
     isOpen: boolean;
@@ -21,23 +16,70 @@ interface BudgetDetailModalProps {
     onUpdateBudget: (budgetId: string, updates: Partial<Budget>) => void;
 }
 
-// --- Helper Functions ---
-
-const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-const formatDisplayDate = (dateString: string | null | undefined) => {
+const formatDisplayDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Data inválida';
-    return date.toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Sao_Paulo' });
-};
-const formatTime = (dateString: string | null | undefined) => {
-    if (!dateString || !dateString.includes('T')) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Data inválida';
+
+        const hasTime = dateString.includes('T');
+
+        if (hasTime) {
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                timeZone: 'America/Sao_Paulo'
+            }).replace(',', ' às');
+        } else {
+            const [year, month, day] = dateString.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(year, month - 1, day));
+            return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        }
+    } catch (e) {
+        return 'Data inválida';
+    }
 };
 
-const cleanPhoneNumber = (phone?: string) => phone?.replace(/\D/g, '') || '';
+const formatCurrencyForInput = (value: number | string): string => {
+    let numberValue: number;
+    if (typeof value === 'number') {
+        numberValue = value;
+    } else {
+        const digitsOnly = String(value).replace(/\D/g, '');
+        if (digitsOnly === '') return '';
+        numberValue = parseInt(digitsOnly, 10) / 100;
+    }
+
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(numberValue);
+};
+
+const unmaskCurrency = (maskedValue: string): number => {
+    if (!maskedValue) return 0;
+    const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
+    return parseFloat(numericString) || 0;
+};
+
+
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+};
+
+const cleanPhoneNumber = (phone: string) => {
+    return phone.replace(/\D/g, '');
+};
+
+const isPhoneNumber = (contact: string) => {
+    const cleaned = cleanPhoneNumber(contact);
+    return cleaned.length >= 10 && /^\d+$/.test(cleaned);
+};
+
 const today = new Date().toISOString().split('T')[0];
 
 const getStatusPill = (status: BudgetStatus) => {
@@ -48,274 +90,393 @@ const getStatusPill = (status: BudgetStatus) => {
     [BudgetStatus.INVOICED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
     [BudgetStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
     [BudgetStatus.ON_HOLD]: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200',
-  };
+  }
   return <span className={`px-3 py-1 text-sm font-bold rounded-full whitespace-nowrap ${styles[status] || styles[BudgetStatus.ON_HOLD]}`}>{status}</span>;
-};
-
-// --- Sub-components ---
-
-const KPI: React.FC<{ icon: React.ReactNode; label: string; value: string | number; className?: string }> = ({ icon, label, value, className }) => (
-    <div className={`flex items-center gap-3 ${className}`}>
-        <div className="flex-shrink-0 bg-[var(--background-tertiary)] p-2 rounded-lg">{icon}</div>
-        <div>
-            <p className="text-xs text-[var(--text-secondary)]">{label}</p>
-            <p className="font-bold text-sm text-[var(--text-primary)]">{value}</p>
-        </div>
-    </div>
-);
-
-const TimelineItem: React.FC<{ icon: React.ReactNode; date: string; time?: string; title: string; content?: string; isLast?: boolean; }> = ({ icon, date, time, title, content, isLast }) => (
-    <div className="relative pl-8">
-        {!isLast && <div className="absolute left-3.5 top-5 h-full w-px bg-[var(--border-primary)]"></div>}
-        <div className="absolute left-0 top-2 w-7 h-7 bg-[var(--background-secondary-hover)] rounded-full flex items-center justify-center border-2 border-[var(--border-primary)]">
-            {icon}
-        </div>
-        <div className="flex items-baseline gap-2">
-            <p className="font-semibold text-sm text-[var(--text-primary)]">{title}</p>
-            <p className="text-xs text-[var(--text-tertiary)]">{date} {time && `às ${time}`}</p>
-        </div>
-        {content && <p className="text-sm text-[var(--text-secondary)] mt-1 whitespace-pre-wrap">{content}</p>}
-    </div>
-);
-
-interface AIAnalysis {
-    healthScore: number;
-    rationale: string;
-    nextAction: string;
 }
 
-const HealthIndicator: React.FC<{ score: number }> = ({ score }) => {
-    const getRingColor = () => {
-        if (score > 70) return 'text-green-500';
-        if (score > 40) return 'text-yellow-500';
-        return 'text-red-500';
+const getFollowUpStatusPill = (status: FollowUpStatus | undefined) => {
+  if (!status) return null;
+  const styles: {[key in FollowUpStatus]: string} = {
+    [FollowUpStatus.COMPLETED]: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    [FollowUpStatus.WAITING_RESPONSE]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    [FollowUpStatus.RESCHEDULED]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+  }
+  return <span className={`px-2 py-0.5 text-xs font-bold rounded-full whitespace-nowrap ${styles[status]}`}>{status}</span>;
+};
+
+// --- Editable Field Component ---
+const EditableField = ({ label, value: initialValue, onSave, type = 'text', renderDisplay }: { label: string, value: string | number, onSave: (newValue: string | number) => void, type?: 'text' | 'textarea' | 'date' | 'currency', renderDisplay?: (value: any) => React.ReactNode }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [value, setValue] = useState(initialValue);
+    const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    const handleSave = () => {
+        if (type === 'currency') {
+            onSave(unmaskCurrency(String(value)));
+        } else {
+            onSave(value);
+        }
+        setIsEditing(false);
     };
-    return (
-        <div className="relative w-24 h-24">
-            <svg className="w-full h-full" viewBox="0 0 36 36">
-                <path className="text-slate-200 dark:text-slate-700" strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
-                <path className={`${getRingColor()} transition-all duration-1000`} strokeWidth="3" strokeDasharray={`${score}, 100`} strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold text-[var(--text-primary)]">{score}<span className="text-lg">%</span></span>
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && type !== 'textarea') {
+            handleSave();
+        }
+        if (e.key === 'Escape') {
+            setValue(initialValue);
+            setIsEditing(false);
+        }
+    };
+    
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                {type === 'textarea' ? (
+                     <textarea ref={inputRef} value={String(value)} onChange={e => setValue(e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)]" rows={4} />
+                ) : (
+                    <input ref={inputRef} type={type === 'currency' ? 'text' : type} value={String(value)} onChange={e => setValue(type === 'currency' ? formatCurrencyForInput(e.target.value) : e.target.value)} onKeyDown={handleKeyDown} onBlur={handleSave} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] dark:[color-scheme:dark]" />
+                )}
             </div>
-        </div>
+        );
+    }
+
+    return (
+         <div className="group relative" onClick={() => setIsEditing(true)}>
+             <div className="flex items-start justify-between cursor-pointer">
+                {renderDisplay ? renderDisplay(initialValue) : <p>{initialValue}</p>}
+                <PencilIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0" />
+            </div>
+         </div>
     );
 };
 
-// --- Main Modal Component ---
 const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onConfirmWin, onUpdateBudget }) => {
-    // State
     const [notes, setNotes] = useState('');
     const [nextFollowUpDate, setNextFollowUpDate] = useState('');
     const [nextFollowUpTime, setNextFollowUpTime] = useState('');
+    const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>(FollowUpStatus.WAITING_RESPONSE);
     const [showWinPrompt, setShowWinPrompt] = useState(false);
     const [winValue, setWinValue] = useState('');
-    const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
-    const [isAiLoading, setIsAiLoading] = useState(true);
-
-    // Memos & Calculations
-    const daysInPipeline = useMemo(() => Math.ceil((new Date().getTime() - new Date(budget.dateSent).getTime()) / (1000 * 60 * 60 * 24)), [budget.dateSent]);
-    const lastContactDate = useMemo(() => budget.followUps.length > 0 ? new Date(budget.followUps[budget.followUps.length - 1].date) : new Date(budget.dateSent), [budget]);
-    const isFinalStatus = [BudgetStatus.INVOICED, BudgetStatus.LOST].includes(budget.status);
     
-    const timelineEvents = useMemo(() => {
-        const creationEvent = {
-            date: new Date(budget.dateSent),
-            type: 'creation',
-            title: 'Orçamento Criado e Enviado',
-            content: `Valor: ${formatCurrency(budget.value)}`
-        };
-        const followUpEvents = budget.followUps.map(fu => ({
-            date: new Date(fu.date),
-            type: 'follow-up',
-            title: `Follow-up: ${fu.status || 'Registrado'}`,
-            content: fu.notes
-        }));
-        return [creationEvent, ...followUpEvents].sort((a,b) => b.date.getTime() - a.date.getTime());
-    }, [budget]);
+    // AI Email Generation
+    const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
 
-    // Effects
     useEffect(() => {
         if (!isOpen) {
             setShowWinPrompt(false);
             setWinValue('');
-            setAiAnalysis(null);
-            setIsAiLoading(true);
+        }
+    }, [isOpen]);
+
+    if (!budget || !isOpen) return null;
+
+    const handleAddFollowUp = () => {
+        if (!notes) {
+            alert('Por favor, adicione uma nota ao follow-up.');
             return;
         }
 
-        const analyzeOpportunity = async () => {
-            setIsAiLoading(true);
-            try {
-                 if (!process.env.API_KEY) throw new Error("A chave da API não está configurada.");
-                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-                 const prompt = `Analise este negócio e retorne um JSON com "healthScore" (probabilidade de ganho de 0 a 100), "rationale" (justificativa curta) e "nextAction" (próxima ação tática e clara). Dados: Orçamento "${budget.title}" de ${formatCurrency(budget.value)} para ${client.name}, aberto há ${daysInPipeline} dias. Status: ${budget.status}. Último contato: ${lastContactDate.toLocaleDateString()}. Follow-ups: ${budget.followUps.length}. Próximo agendado: ${budget.nextFollowUpDate ? formatDisplayDate(budget.nextFollowUpDate) : 'Nenhum'}.`;
-                 const response = await ai.models.generateContent({
-                     model: 'gemini-2.5-flash', contents: prompt,
-                     config: {
-                         responseMimeType: 'application/json',
-                         responseSchema: {
-                             type: Type.OBJECT, properties: {
-                                healthScore: { type: Type.NUMBER },
-                                rationale: { type: Type.STRING },
-                                nextAction: { type: Type.STRING },
-                             }, required: ['healthScore', 'rationale', 'nextAction'],
-                         }
-                     }
-                 });
-                 setAiAnalysis(JSON.parse(response.text || '{}'));
-            } catch (error) {
-                console.error("AI Analysis failed:", error);
-                setAiAnalysis({ healthScore: 0, rationale: "Não foi possível analisar.", nextAction: "Verifique o histórico manualmente." });
-            } finally {
-                setIsAiLoading(false);
-            }
-        };
+        const followUpDate = new Date().toISOString();
+        const followUpData: Omit<FollowUp, 'id'> = { date: followUpDate, notes, status: followUpStatus };
 
-        if (!isFinalStatus) analyzeOpportunity();
-        else setIsAiLoading(false);
-
-    }, [isOpen, budget, client, daysInPipeline, lastContactDate]);
-
-    // Handlers
-    const handleAddFollowUp = () => {
-        if (!notes) return alert('Adicione uma nota ao follow-up.');
         let combinedNextDate: string | null = nextFollowUpDate || null;
-        if (combinedNextDate && nextFollowUpTime) combinedNextDate = `${nextFollowUpDate}T${nextFollowUpTime}`;
-        onAddFollowUp(budget.id, { date: new Date().toISOString(), notes, status: FollowUpStatus.COMPLETED }, combinedNextDate);
-        setNotes(''); setNextFollowUpDate(''); setNextFollowUpTime('');
+        if (combinedNextDate && nextFollowUpTime) {
+            combinedNextDate = `${nextFollowUpDate}T${nextFollowUpTime}`;
+        }
+
+        onAddFollowUp(budget.id, followUpData, combinedNextDate);
+        
+        setNotes('');
+        setNextFollowUpDate('');
+        setNextFollowUpTime('');
+        setFollowUpStatus(FollowUpStatus.WAITING_RESPONSE);
+    };
+
+    const handleGenerateEmail = async () => {
+        setIsGeneratingEmail(true);
+        try {
+            if (!process.env.API_KEY) {
+                alert('A chave de API do Gemini não foi configurada.');
+                return;
+            }
+    
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            
+            const history = budget.followUps.length > 0
+                ? budget.followUps.map(f => `- ${formatDisplayDate(f.date)}: ${f.notes}`).join('\n')
+                : 'Nenhum contato anterior registrado.';
+    
+            const contactName = contact?.name || 'Cliente';
+            const prompt = `Gere um e-mail de follow-up para o orçamento '${budget.title}' no valor de ${formatCurrency(budget.value)}, enviado para ${contactName} da empresa ${client.name}.
+
+O status atual do orçamento é: '${budget.status}'.
+
+Histórico de contatos anteriores:
+${history}
+
+O objetivo do e-mail é reengajar o cliente, entender se há alguma dúvida e gentilmente buscar os próximos passos. Mantenha o e-mail conciso e termine com uma pergunta clara para incentivar uma resposta. Não inclua placeholders como '[Seu Nome]' ou '[Sua Empresa]', apenas o corpo do e-mail. Comece com uma saudação como "Olá ${contactName}," ou "Prezado(a) ${contactName},".`;
+    
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction: "Você é um assistente de vendas especialista em CRM e follow-ups. Seu tom é profissional, mas amigável e proativo. Escreva em português do Brasil.",
+                }
+            });
+    
+            setNotes(response.text || '');
+    
+        } catch (error) {
+            console.error("Erro ao gerar e-mail com IA:", error);
+            alert("Ocorreu um erro ao gerar o e-mail. Verifique o console para mais detalhes e tente novamente.");
+        } finally {
+            setIsGeneratingEmail(false);
+        }
     };
     
-    const handleConfirmWin = () => {
-        const finalValue = parseFloat(winValue.replace(/\./g, '').replace(',', '.'));
-        if (isNaN(finalValue) || finalValue <= 0) return alert("Insira um valor de fechamento válido.");
+    const isFinalStatus = [BudgetStatus.INVOICED, BudgetStatus.LOST].includes(budget.status);
+    const contactPhone = contact?.phone || '';
+    const canContactOnWhatsApp = isPhoneNumber(contactPhone);
+
+    const handleSendWhatsApp = () => {
+        if (!canContactOnWhatsApp || !contact) return;
+
+        const phoneNumber = `55${cleanPhoneNumber(contactPhone)}`;
+        const message = `Olá ${contact.name}, tudo bem?\n\nReferente à proposta *${budget.title}* para a empresa ${client.name}.\n\n*Valor:* ${formatCurrency(budget.value)}\n\nQualquer dúvida, estou à disposição!`;
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+        
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleConfirmWinClick = () => {
+        const finalValue = unmaskCurrency(winValue);
+        if (isNaN(finalValue) || finalValue <= 0) {
+            alert("Por favor, insira um valor de fechamento válido.");
+            return;
+        }
         onConfirmWin(budget.id, finalValue);
         onClose();
     };
 
-    if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-900/70 flex justify-center items-center z-50 p-4 fade-in">
-            <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all duration-300">
+        <div className="fixed inset-0 bg-gray-900/50 dark:bg-black/70 flex justify-center items-center z-50 p-2 sm:p-4">
+            <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col transform transition-all">
                 {/* Header */}
-                <div className="p-4 sm:p-6 flex justify-between items-start border-b border-[var(--border-primary)] flex-shrink-0">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--border-primary)] flex-shrink-0">
                     <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">{budget.title}</h2>
+                        <EditableField
+                            label="Título"
+                            value={budget.title}
+                            onSave={newTitle => onUpdateBudget(budget.id, { title: newTitle as string })}
+                            renderDisplay={value => <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">{value}</h2>}
+                        />
                         <p className="text-md text-[var(--text-accent)] font-semibold">{client.name}</p>
+                        <p className="text-sm text-[var(--text-secondary)] mt-1">{client.cnpj || 'CNPJ não cadastrado'}</p>
                     </div>
-                    <div className="text-right flex-shrink-0 ml-4">
-                        <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(budget.value)}</p>
-                        {getStatusPill(budget.status)}
-                    </div>
-                     <button onClick={onClose} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors ml-4 -mr-2">
+                    <button onClick={onClose} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                         <XMarkIcon className="w-7 h-7" />
                     </button>
                 </div>
                 
-                <div className="flex-grow overflow-hidden flex flex-col md:flex-row">
-                    {/* Left Panel: KPIs & Info */}
-                    <div className="w-full md:w-64 lg:w-72 p-4 border-b md:border-b-0 md:border-r border-[var(--border-primary)] flex-shrink-0 space-y-5">
-                        <h3 className="font-semibold text-[var(--text-secondary)]">Painel Rápido</h3>
-                        <KPI icon={<ClockIcon className="w-6 h-6 text-yellow-500"/>} label="Dias no Funil" value={daysInPipeline} />
-                        <KPI icon={<ArrowPathIcon className="w-6 h-6 text-blue-500"/>} label="Follow-ups" value={budget.followUps.length} />
-                        <KPI icon={<CalendarIcon className="w-6 h-6 text-purple-500"/>} label="Último Contato" value={lastContactDate.toLocaleDateString('pt-BR')} />
+                <div className="flex-grow overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
+                    {/* Main Content (Left) */}
+                    <div className="lg:w-3/5 space-y-6">
+                        {!isFinalStatus && (
+                         <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                            <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Adicionar Novo Follow-up</h3>
+                            <div className="space-y-4">
+                                <textarea 
+                                    value={notes} 
+                                    onChange={e => setNotes(e.target.value)} 
+                                    rows={5} 
+                                    placeholder="Descreva o contato com o cliente ou gere um e-mail com IA..." 
+                                    className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                />
+
+                                <div className="flex items-center justify-end flex-wrap gap-4">
+                                     <button 
+                                        onClick={handleGenerateEmail}
+                                        disabled={isGeneratingEmail}
+                                        className="flex items-center gap-2 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-semibold py-2 px-3 rounded-lg bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-200 dark:hover:bg-purple-900/50 disabled:opacity-50 disabled:cursor-wait transition"
+                                    >
+                                        {isGeneratingEmail ? (
+                                            <svg className="animate-spin h-5 w-5 text-purple-600 dark:text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        ) : (
+                                            <SparklesIcon className="w-5 h-5" />
+                                        )}
+                                        <span className="ml-1">{isGeneratingEmail ? 'Gerando...' : 'Gerar E-mail com IA'}</span>
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-wrap items-end gap-4">
+                                     <div className="flex-grow min-w-[150px]">
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status do Contato</label>
+                                        <select 
+                                            value={followUpStatus}
+                                            onChange={e => setFollowUpStatus(e.target.value as FollowUpStatus)}
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                        >
+                                            {Object.values(FollowUpStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex-grow min-w-[150px]">
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Próximo Follow-up</label>
+                                        <input 
+                                            type="date" 
+                                            value={nextFollowUpDate} 
+                                            onChange={e => {
+                                                setNextFollowUpDate(e.target.value);
+                                                if (e.target.value && !nextFollowUpTime) {
+                                                    setNextFollowUpTime('09:00');
+                                                } else if (!e.target.value) {
+                                                    setNextFollowUpTime('');
+                                                }
+                                            }}
+                                            min={today}
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] dark:[color-scheme:dark]"
+                                        />
+                                    </div>
+                                    <div className="flex-grow min-w-[120px]">
+                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Horário</label>
+                                        <input 
+                                            type="time" 
+                                            value={nextFollowUpTime} 
+                                            onChange={e => setNextFollowUpTime(e.target.value)}
+                                            disabled={!nextFollowUpDate}
+                                            className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] dark:[color-scheme:dark] disabled:bg-[var(--background-tertiary)] disabled:dark:bg-slate-800"
+                                        />
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                        <button onClick={handleAddFollowUp} className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg">Registrar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        )}
+                        <div>
+                            <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)] flex items-center"><ArrowPathIcon className="w-5 h-5 mr-2 text-[var(--text-accent)]"/> Histórico de Follow-ups</h3>
+                            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {budget.followUps.length > 0 ? budget.followUps.slice().reverse().map(fu => (
+                                    <div key={fu.id} className="bg-[var(--background-tertiary)] p-3 rounded-lg border border-[var(--border-secondary)]">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="font-semibold text-sm text-[var(--text-secondary)]">{formatDisplayDate(fu.date)}</p>
+                                            {getFollowUpStatusPill(fu.status)}
+                                        </div>
+                                        {fu.notes && <p className="text-[var(--text-primary)] whitespace-pre-wrap">{fu.notes}</p>}
+                                    </div>
+                                )) : <p className="text-gray-400 dark:text-slate-500 italic text-center p-4">Nenhum follow-up registrado.</p>}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Sidebar (Right) */}
+                    <div className="lg:w-2/5 space-y-6">
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)] space-y-4">
+                            <h3 className="font-semibold text-lg text-[var(--text-primary)]">Detalhes do Orçamento</h3>
+                            
+                            <div>
+                                <label className="text-sm text-[var(--text-secondary)] block mb-1">Status</label>
+                                <div className="flex items-center gap-4">
+                                    {getStatusPill(budget.status)}
+                                    <select
+                                        value={budget.status}
+                                        onChange={(e) => onChangeStatus(budget.id, e.target.value as BudgetStatus)}
+                                        className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-[var(--text-primary)] font-semibold focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] text-sm"
+                                    >
+                                        {Object.values(BudgetStatus).map(status => (
+                                            <option key={status} value={status}>{status}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                               <label className="text-sm text-[var(--text-secondary)] block mb-1">Valor</label>
+                               <EditableField label="Valor" value={formatCurrencyForInput(budget.value)} onSave={(newValue) => onUpdateBudget(budget.id, { value: newValue as number})} type="currency" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">R$ {v}</p>} />
+                            </div>
+
+                            <div>
+                               <label className="text-sm text-[var(--text-secondary)] block mb-1">Enviado em</label>
+                               <EditableField label="Enviado em" value={budget.dateSent.split('T')[0]} onSave={(newDate) => onUpdateBudget(budget.id, { dateSent: newDate as string})} type="date" renderDisplay={(v) => <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(v as string)}</p>} />
+                            </div>
+
+                             <div>
+                                <label className="text-sm text-[var(--text-secondary)] block mb-1">Próximo Contato</label>
+                                <p className="font-semibold text-lg text-[var(--text-primary)]">{formatDisplayDate(budget.nextFollowUpDate)}</p>
+                            </div>
+                        </div>
                         
-                        <div className="pt-4 border-t border-[var(--border-primary)]">
-                            <h3 className="font-semibold text-[var(--text-secondary)] mb-2">Contato</h3>
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                             <h3 className="font-semibold text-lg mb-3 text-[var(--text-primary)]">Informações do Contato</h3>
                              <div className="space-y-2 text-sm">
-                                <p className="font-bold text-[var(--text-primary)] flex items-center gap-2"><UserIcon className="w-4 h-4"/>{contact?.name || 'N/A'}</p>
-                                {contact?.phone && (
-                                    <a href={`https://wa.me/55${cleanPhoneNumber(contact.phone)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-green-600 hover:text-green-700 font-semibold">
-                                        <WhatsAppIcon className="w-4 h-4"/> Chamar no WhatsApp
-                                    </a>
+                                <p><strong className="text-[var(--text-secondary)] w-20 inline-block">Comprador:</strong> <span className="text-[var(--text-primary)] font-semibold">{contact?.name || 'N/A'}</span></p>
+                                {canContactOnWhatsApp && (
+                                     <button 
+                                        onClick={handleSendWhatsApp} 
+                                        className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg w-full transition-colors"
+                                    >
+                                        <WhatsAppIcon className="w-5 h-5" /> Contatar via WhatsApp
+                                    </button>
                                 )}
                              </div>
                         </div>
-                    </div>
 
-                    {/* Center Panel: Timeline */}
-                    <div className="flex-grow p-4 sm:p-6 overflow-y-auto custom-scrollbar">
-                         <div className="space-y-6">
-                            {timelineEvents.map((event, index) => (
-                                <TimelineItem
-                                    key={index}
-                                    isLast={index === timelineEvents.length - 1}
-                                    icon={event.type === 'creation' ? <CurrencyDollarIcon className="w-4 h-4 text-green-500"/> : <ArrowPathIcon className="w-4 h-4 text-blue-500"/>}
-                                    date={formatDisplayDate(event.date.toISOString())}
-                                    time={formatTime(event.date.toISOString())}
-                                    title={event.title}
-                                    content={event.content}
-                                />
-                            ))}
+                        <div className="bg-[var(--background-secondary-hover)] p-4 rounded-lg border border-[var(--border-primary)]">
+                            <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">Observações</h3>
+                            <EditableField 
+                                label="Observações" 
+                                value={budget.observations || ''} 
+                                onSave={(newObs) => onUpdateBudget(budget.id, { observations: newObs as string })} 
+                                type="textarea" 
+                                renderDisplay={(v) => <div className="bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/50 text-sm min-h-[40px] whitespace-pre-wrap">{v || 'Clique para adicionar...'}</div>} 
+                            />
                         </div>
-                    </div>
-
-                    {/* Right Panel: Actions & AI */}
-                    <div className="w-full md:w-72 lg:w-80 p-4 bg-[var(--background-secondary-hover)] border-t md:border-t-0 md:border-l border-[var(--border-primary)] flex-shrink-0 overflow-y-auto custom-scrollbar">
-                        {!isFinalStatus ? (
-                            <div className="space-y-6">
-                                <div>
-                                    <h3 className="font-semibold text-[var(--text-secondary)] mb-2 flex items-center gap-2"><SparklesIcon className="w-5 h-5 text-purple-500"/> Cockpit de Análise</h3>
-                                    {isAiLoading ? (
-                                        <div className="text-center p-4"><p className="text-sm animate-pulse">Analisando...</p></div>
-                                    ) : aiAnalysis && (
-                                        <div className="bg-[var(--background-secondary)] p-3 rounded-lg border border-[var(--border-secondary)] space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <HealthIndicator score={aiAnalysis.healthScore} />
-                                                <div>
-                                                    <p className="text-xs text-[var(--text-secondary)]">Saúde do Negócio</p>
-                                                    <p className="text-sm font-bold">{aiAnalysis.rationale}</p>
-                                                </div>
-                                            </div>
-                                            <div className="bg-purple-50 dark:bg-purple-900/40 p-2 rounded-md border border-dashed border-purple-200 dark:border-purple-800/50">
-                                                <p className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5"><LightBulbIcon className="w-4 h-4"/>AÇÃO RECOMENDADA</p>
-                                                <p className="text-sm font-semibold mt-1">{aiAnalysis.nextAction}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-[var(--text-secondary)] mb-2">Registrar Ação</h3>
-                                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Descreva o contato..." className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2"/>
-                                    <div className="flex gap-2 mt-2">
-                                        <input type="date" value={nextFollowUpDate} onChange={e => setNextFollowUpDate(e.target.value)} min={today} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm dark:[color-scheme:dark]"/>
-                                        <input type="time" value={nextFollowUpTime} onChange={e => setNextFollowUpTime(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] rounded-lg p-2 text-sm dark:[color-scheme:dark]"/>
+                        
+                        <div className="space-y-2 pt-4 border-t border-[var(--border-primary)]">
+                             {showWinPrompt ? (
+                                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                    <label className="block text-sm font-medium text-emerald-800 dark:text-emerald-200 mb-2">Qual o valor final do fechamento?</label>
+                                    <input
+                                        type="text"
+                                        value={winValue}
+                                        onChange={e => setWinValue(formatCurrencyForInput(e.target.value))}
+                                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-gray-900 dark:text-slate-100 focus:ring-emerald-500 focus:border-emerald-500"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-2 mt-3">
+                                        <button onClick={handleConfirmWinClick} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Confirmar Ganho</button>
+                                        <button onClick={() => setShowWinPrompt(false)} className="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 text-sm">Cancelar</button>
                                     </div>
-                                    <button onClick={handleAddFollowUp} className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-3 rounded-lg mt-2">Registrar Follow-up</button>
                                 </div>
-                                <div>
-                                    <h3 className="font-semibold text-[var(--text-secondary)] mb-2">Atualizar Status</h3>
-                                    {showWinPrompt ? (
-                                         <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                                            <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200 mb-1 block">Valor Final do Fechamento</label>
-                                            <input type="text" value={winValue} onChange={e => setWinValue(e.target.value)} className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2" autoFocus />
-                                            <div className="flex gap-2 mt-2">
-                                                <button onClick={handleConfirmWin} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg text-sm">Confirmar</button>
-                                                <button onClick={() => setShowWinPrompt(false)} className="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-3 rounded-lg border border-gray-300 text-sm">Cancelar</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                             <button onClick={() => { setShowWinPrompt(true); setWinValue(formatCurrency(budget.value)); }} className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg"><CheckCircleIcon className="w-5 h-5"/> Ganho</button>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg"><XCircleIcon className="w-5 h-5"/> Perdido</button>
-                                                <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex-1 flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-3 rounded-lg"><PauseCircleIcon className="w-5 h-5"/> Congelar</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                             <div className="text-center p-8 flex flex-col items-center justify-center h-full">
-                                <div className="w-16 h-16 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 mb-4">
-                                     {budget.status === BudgetStatus.INVOICED ? <TrophyIcon className="w-8 h-8 text-green-500"/> : <XCircleIcon className="w-8 h-8 text-red-500"/>}
-                                </div>
-                                <h3 className="font-bold text-lg text-[var(--text-primary)]">Negócio Finalizado</h3>
-                                <p className="text-sm text-[var(--text-secondary)]">Este orçamento foi marcado como <strong>{budget.status}</strong> e arquivado.</p>
-                            </div>
-                        )}
+                            ) : (
+                                <>
+                                    <button onClick={() => { setShowWinPrompt(true); setWinValue(formatCurrencyForInput(budget.value)); }} className="w-full flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg">
+                                        <CheckCircleIcon className="w-5 h-5 mr-2" /> Ganho
+                                    </button>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex-1 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                                            <XCircleIcon className="w-5 h-5 mr-2" /> Perdido
+                                        </button>
+                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex-1 flex items-center justify-center bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-800 dark:text-slate-100 font-bold py-2 px-4 rounded-lg">
+                                            <PauseCircleIcon className="w-5 h-5 mr-2" /> Congelar
+                                        </button>
+                                    </div>
+                                </>
+                             )}
+                        </div>
                     </div>
                 </div>
             </div>

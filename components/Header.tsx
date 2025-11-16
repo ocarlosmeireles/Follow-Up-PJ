@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon } from './icons';
+import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon } from './icons';
 import type { Notification, UserProfile, Theme, ThemeVariant, Reminder } from '../types';
 import { UserRole } from '../types';
 
@@ -113,18 +113,17 @@ const Header: React.FC<HeaderProps> = ({
           <>
             <button
               onClick={onAddProspect}
-              className={`${isDashboardTheme ? 'bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)]' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'} text-[var(--text-secondary)] font-semibold py-2 px-4 rounded-lg border border-[var(--border-secondary)] flex items-center transition-all duration-200 shadow-sm hover:shadow-md text-sm`}
+              className={`${isDashboardTheme ? 'bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)]' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'} text-[var(--text-secondary)] font-semibold p-2 sm:py-2 sm:px-4 rounded-lg border border-[var(--border-secondary)] flex items-center transition-all duration-200 shadow-sm hover:shadow-md text-sm`}
             >
+              <FunnelIcon className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Novo Prospect</span>
-              <span className="sm:hidden">Prospect</span>
             </button>
             <button
               onClick={onAddBudget}
-              className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-[var(--text-on-accent)] font-bold py-2 px-4 rounded-lg flex items-center transition-all duration-200 shadow-md hover:shadow-lg text-sm"
+              className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-[var(--text-on-accent)] font-bold p-2 sm:py-2 sm:px-4 rounded-lg flex items-center transition-all duration-200 shadow-md hover:shadow-lg text-sm"
             >
-              <PlusIcon className="w-4 h-4 mr-2" />
+              <PlusIcon className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Novo Orçamento</span>
-              <span className="sm:hidden">Novo</span>
             </button>
           </>
         )}

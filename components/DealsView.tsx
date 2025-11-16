@@ -334,7 +334,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
             {/* --- PIPELINE COMPLETO --- */}
             <section className="flex-1 flex flex-col min-h-0 animated-item" style={{animationDelay: '200ms'}}>
                 <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-3">Pipeline Completo</h3>
-                <div className="flex-1 flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
+                <div className="flex-1 flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 custom-scrollbar">
                     {columns.map(status => (
                         <KanbanColumn
                             key={status}

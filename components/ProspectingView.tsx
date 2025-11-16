@@ -106,7 +106,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                 </div>
             </div>
 
-            <div className="flex gap-6 pb-4 flex-grow overflow-x-auto -mx-4 px-4">
+            <div className="flex gap-6 pb-4 flex-grow overflow-x-auto -mx-4 px-4 custom-scrollbar">
                 {sortedStages.map((stage, index) => {
                     const stageProspects = prospectsByStage[stage.id] || [];
                     return (

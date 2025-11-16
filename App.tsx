@@ -62,6 +62,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [organization, setOrganization] = useState<Organization | null>(null);
     const [activeView, setActiveView] = useState<ActiveView>('dashboard');
     const [viewKey, setViewKey] = useState(0);
+    const [impersonatingOrg, setImpersonatingOrg] = useState<Organization | null>(null);
+
 
     // Data states
     const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
@@ -96,6 +98,45 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
 
+    // Derived states for impersonation
+    const effectiveUserProfile = useMemo<UserData | null>(() => {
+        if (impersonatingOrg && userProfile?.role === UserRole.SUPER_ADMIN) {
+            return {
+                ...userProfile,
+                role: UserRole.ADMIN, // Act as an Admin within the org
+                organizationId: impersonatingOrg.id,
+            };
+        }
+        return userProfile;
+    }, [userProfile, impersonatingOrg]);
+
+    const effectiveOrganization = useMemo<Organization | null>(() => {
+        return impersonatingOrg || organization;
+    }, [impersonatingOrg, organization]);
+
+    const handleImpersonate = useCallback((org: Organization) => {
+        if (userProfile?.role !== UserRole.SUPER_ADMIN) return;
+        setLoading(true);
+        // Clear old data
+        setBudgets([]); setClients([]); setContacts([]); setProspects([]);
+        setStages([]); setReminders([]); setUsers([]);
+        
+        setImpersonatingOrg(org);
+        setActiveView('dashboard');
+        setViewKey(prev => prev + 1);
+    }, [userProfile]);
+
+    const handleExitImpersonation = useCallback(() => {
+        setLoading(true);
+        setImpersonatingOrg(null);
+        // Clear org data
+        setBudgets([]); setClients([]); setContacts([]); setProspects([]);
+        setStages([]); setReminders([]); setUsers([]);
+        
+        setActiveView('organizations');
+        setViewKey(prev => prev + 1);
+    }, []);
+
     // Fetch user profile and organization
     useEffect(() => {
         const fetchUserData = async () => {
@@ -105,12 +146,22 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                 const profile = { id: userDocSnap.id, ...userDocSnap.data() } as UserData;
                 setUserProfile(profile);
 
-                const orgDocRef = doc(db, "organizations", profile.organizationId);
-                const orgDocSnap = await getDoc(orgDocRef);
-                if (orgDocSnap.exists()) {
-                    setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
+                if (profile.role === UserRole.SUPER_ADMIN) {
+                    return;
+                }
+
+                if (profile.organizationId) {
+                    const orgDocRef = doc(db, "organizations", profile.organizationId);
+                    const orgDocSnap = await getDoc(orgDocRef);
+                    if (orgDocSnap.exists()) {
+                        setOrganization({ id: orgDocSnap.id, ...orgDocSnap.data() } as Organization);
+                    } else {
+                        console.error("Organization not found!");
+                        await signOut(auth);
+                    }
                 } else {
-                    console.error("Organization not found!");
+                    console.error("User is not a super admin and has no organizationId!");
+                    await signOut(auth);
                 }
             } else {
                 console.error("User profile not found in Firestore!");
@@ -122,20 +173,22 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
 
     // Data subscriptions
     useEffect(() => {
-        if (!userProfile) return;
+        if (!effectiveUserProfile) return;
     
         let unsubscribers: (() => void)[] = [];
     
         const subscribeToCollection = (collectionName: string, setState: React.Dispatch<any>, customQuery?: any) => {
-            const q = customQuery || query(collection(db, collectionName), where("organizationId", "==", userProfile.organizationId));
+            const q = customQuery || query(collection(db, collectionName), where("organizationId", "==", effectiveUserProfile.organizationId));
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setState(data);
+            }, (error) => {
+                console.error(`Error fetching ${collectionName}: `, error);
             });
             unsubscribers.push(unsubscribe);
         };
     
-        if (userProfile.role === UserRole.SUPER_ADMIN) {
+        if (userProfile?.role === UserRole.SUPER_ADMIN && !impersonatingOrg) {
             setActiveView('organizations');
             const collectionsToFetch = [
                 { name: 'organizations', setter: setAllOrganizations },
@@ -147,11 +200,13 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                  const unsubscribe = onSnapshot(collection(db, c.name), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     c.setter(data);
-                });
+                 }, (error) => {
+                    console.error(`Error fetching all ${c.name}: `, error);
+                 });
                 unsubscribers.push(unsubscribe);
             });
             setLoading(false);
-        } else if (organization) {
+        } else if (effectiveOrganization) {
             subscribeToCollection('budgets', setBudgets);
             subscribeToCollection('clients', setClients);
             subscribeToCollection('contacts', setContacts);
@@ -163,7 +218,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         }
     
         return () => unsubscribers.forEach(unsub => unsub());
-    }, [userProfile, organization]);
+    }, [userProfile, impersonatingOrg, effectiveOrganization, effectiveUserProfile]);
 
 
     useEffect(() => {
@@ -179,11 +234,15 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const changeView = (view: ActiveView) => {
         setActiveView(view);
         setViewKey(prev => prev + 1);
+        // Fecha a sidebar em telas móveis após a seleção de um item do menu
+        if (window.innerWidth < 768) { // O ponto de quebra 'md' do Tailwind é 768px
+            setSidebarOpen(false);
+        }
     };
 
     // Check for upcoming reminders & notifications
     useEffect(() => {
-        if (loading || !userProfile) return;
+        if (loading || !effectiveUserProfile) return;
 
         const now = new Date();
         const upcomingReminder = reminders.find(r => {
@@ -207,10 +266,13 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             }
         });
         setNotifications(newNotifications);
-    }, [budgets, clients, reminders, activeReminder, loading, userProfile]);
+    }, [budgets, clients, reminders, activeReminder, loading, effectiveUserProfile]);
 
     const handleLogout = async () => {
         if (window.confirm("Deseja realmente sair?")) {
+            if (impersonatingOrg) {
+                handleExitImpersonation();
+            }
             await signOut(auth);
         }
     };
@@ -222,10 +284,10 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
         contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'> }
     ) => {
-        if (!userProfile || !organization) return;
+        if (!effectiveUserProfile || !effectiveOrganization) return;
         let clientId = clientInfo.existingId;
         if (clientInfo.newClientData) {
-            const newClient = { ...clientInfo.newClientData, userId: userProfile.id, organizationId: organization.id };
+            const newClient = { ...clientInfo.newClientData, userId: effectiveUserProfile.id, organizationId: effectiveOrganization.id };
             const clientRef = await addDoc(collection(db, "clients"), newClient);
             clientId = clientRef.id;
         }
@@ -234,15 +296,15 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
 
         let contactId = contactInfo.existingId;
         if (contactInfo.newContactData) {
-            const newContact = { ...contactInfo.newContactData, clientId, organizationId: organization.id };
+            const newContact = { ...contactInfo.newContactData, clientId, organizationId: effectiveOrganization.id };
             const contactRef = await addDoc(collection(db, "contacts"), newContact);
             contactId = contactRef.id;
         }
 
         const newBudget: Omit<Budget, 'id'> = {
             ...budgetData,
-            userId: userProfile.id,
-            organizationId: organization.id,
+            userId: effectiveUserProfile.id,
+            organizationId: effectiveOrganization.id,
             clientId,
             contactId: contactId || null,
             status: BudgetStatus.SENT,
@@ -297,13 +359,13 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handleAddProspect = async (prospectData: Omit<Prospect, 'id' | 'stageId' | 'userId' | 'organizationId' | 'createdAt'>) => {
-        if (!userProfile || !organization) return;
+        if (!effectiveUserProfile || !effectiveOrganization) return;
         const initialStage = stages.find(s => s.order === 0);
         if (!initialStage) return alert("Nenhuma etapa inicial de prospecção configurada.");
         const newProspect: Omit<Prospect, 'id'> = {
             ...prospectData,
-            userId: userProfile.id,
-            organizationId: organization.id,
+            userId: effectiveUserProfile.id,
+            organizationId: effectiveOrganization.id,
             stageId: initialStage.id,
             createdAt: new Date().toISOString(),
         };
@@ -335,21 +397,21 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         clientData: Omit<Client, 'id' | 'userId' | 'organizationId'>,
         contactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'>
     ) => {
-        if (!userProfile || !organization) return;
-        const newClient = { ...clientData, userId: userProfile.id, organizationId: organization.id };
+        if (!effectiveUserProfile || !effectiveOrganization) return;
+        const newClient = { ...clientData, userId: effectiveUserProfile.id, organizationId: effectiveOrganization.id };
         const clientRef = await addDoc(collection(db, 'clients'), newClient);
         
         if(contactData) {
-            const newContact = { ...contactData, clientId: clientRef.id, organizationId: organization.id };
+            const newContact = { ...contactData, clientId: clientRef.id, organizationId: effectiveOrganization.id };
             await addDoc(collection(db, 'contacts'), newContact);
         }
     };
 
     const handleUpdateClient = async (clientId: string, updates: Partial<Client>, logoFile?: File) => {
-        if (!organization) return;
+        if (!effectiveOrganization) return;
         let finalUpdates = { ...updates };
         if (logoFile) {
-            const storageRef = ref(storage, `organizations/${organization.id}/logos/${clientId}_${logoFile.name}`);
+            const storageRef = ref(storage, `organizations/${effectiveOrganization.id}/logos/${clientId}_${logoFile.name}`);
             await uploadBytes(storageRef, logoFile);
             finalUpdates.logoUrl = await getDownloadURL(storageRef);
         }
@@ -357,19 +419,19 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handleSaveOrganization = async (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => {
-        if(!organization) return;
+        if(!effectiveOrganization) return;
         let finalUpdate = { ...orgUpdate };
         if (logoFile) {
-            const storageRef = ref(storage, `organizations/${organization.id}/logos/org_logo_${logoFile.name}`);
+            const storageRef = ref(storage, `organizations/${effectiveOrganization.id}/logos/org_logo_${logoFile.name}`);
             await uploadBytes(storageRef, logoFile);
             finalUpdate.logoUrl = await getDownloadURL(storageRef);
         }
-        await updateDoc(doc(db, "organizations", organization.id), finalUpdate);
+        await updateDoc(doc(db, "organizations", effectiveOrganization.id), finalUpdate);
     };
 
     const handleAddUserInvite = async (email: string, role: UserRole) => {
-        if (!organization) return;
-        const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase()), where('organizationId', '==', organization.id));
+        if (!effectiveOrganization) return;
+        const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase()), where('organizationId', '==', effectiveOrganization.id));
         const existingUsers = await getDocs(q);
         if (!existingUsers.empty) {
             alert('Um usuário com este e-mail já existe nesta organização.');
@@ -378,7 +440,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         await addDoc(collection(db, 'invites'), {
             email: email.toLowerCase(),
             role,
-            organizationId: organization.id,
+            organizationId: effectiveOrganization.id,
             status: 'pending'
         });
         alert(`Convite enviado para ${email}! O usuário pode agora se cadastrar.`);
@@ -386,7 +448,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     };
     
     const handleUpdateUserProfile = async (profileUpdate: Partial<UserProfile>) => {
-        await updateDoc(doc(db, "users", userProfile!.id), profileUpdate);
+        if (!userProfile) return;
+        await updateDoc(doc(db, "users", userProfile.id), profileUpdate);
         setProfileModalOpen(false);
     };
 
@@ -402,11 +465,11 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     };
     
     const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => {
-        if (!userProfile || !organization) return;
+        if (!effectiveUserProfile || !effectiveOrganization) return;
         const newReminder: Omit<Reminder, 'id'> = {
             ...reminderData,
-            userId: userProfile.id,
-            organizationId: organization.id,
+            userId: effectiveUserProfile.id,
+            organizationId: effectiveOrganization.id,
             isDismissed: false,
             isCompleted: false
         };
@@ -438,64 +501,106 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             setClientDetailModalOpen(true);
         }
     };
-    
-    const handleAddBudgetForClient = (client: Client) => {
-        setInitialClientIdForBudget(client.id);
-        setClientDetailModalOpen(false);
-        setAddBudgetModalOpen(true);
-    };
-    
-     const handleGenerateReport = (selectedIds: string[]) => {
-        const reportItems = selectedIds.map(id => {
-            const budget = budgets.find(b => b.id === id);
-            if (!budget) return null;
-            const client = clients.find(c => c.id === budget.clientId);
-            const contact = contacts.find(c => c.id === budget.contactId);
-            return (client && contact) ? { budget, client, contact, followUps: budget.followUps } : null;
-        }).filter(Boolean);
-
-        if (reportItems.length > 0 && userProfile) {
-            generateFollowUpReport(`Relatório de Orçamentos`, reportItems as any, userProfile, organization);
-        } else {
-            alert('Não foi possível gerar o relatório. Dados de cliente ou contato ausentes.');
-        }
-    };
-
-    const handleGenerateDailyReport = () => {
-        if (!userProfile) return;
-        const todayStr = new Date().toDateString();
-        const dailyBudgets = budgets.filter(b => b.nextFollowUpDate && new Date(b.nextFollowUpDate).toDateString() === todayStr);
-        handleGenerateReport(dailyBudgets.map(b => b.id));
-        if (dailyBudgets.length === 0) alert('Nenhum follow-up agendado para hoje.');
-    };
 
     // --- RENDER LOGIC ---
 
-    if (loading || !userProfile || !organization) {
-        return <div className="h-screen w-screen flex items-center justify-center bg-[var(--background-primary)]">Carregando...</div>;
+    const MemoizedSidebar = React.memo(Sidebar);
+
+    const renderView = useCallback(() => {
+        if (!userProfile || !effectiveUserProfile) return null; 
+
+        if (userProfile.role === UserRole.SUPER_ADMIN && !impersonatingOrg) {
+             return <SuperAdminView 
+                        organizations={allOrganizations} 
+                        users={allUsers} 
+                        clients={allClients} 
+                        budgets={allBudgets} 
+                        onImpersonate={handleImpersonate} 
+                        onToggleStatus={(id, status) => console.log("Toggle", id, status)} 
+                        onDelete={(id, name) => console.log("Delete", id, name)} 
+                    />;
+        }
+
+        switch (activeView) {
+            case 'dashboard':
+                return <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={effectiveUserProfile} />;
+            case 'prospecting':
+                return <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} />;
+            case 'budgeting':
+                return <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={(ids) => console.log('generate report', ids)} />;
+            case 'deals':
+                return <DealsView budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={(id, date) => console.log('schedule fup', id, date)} />;
+            case 'clients':
+                return <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)} />;
+            case 'reports':
+                return <ReportsView budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={() => console.log('daily report')} />;
+            case 'calendar':
+                return <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />;
+            case 'action-plan':
+                return <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />;
+            case 'map':
+                return <MapView clients={clients} />;
+            case 'users':
+                return <UsersView users={users} onUpdateRole={handleUpdateUserRole} onAddUserClick={() => setAddUserModalOpen(true)} />;
+            case 'settings':
+                return <AdminSettingsView organization={effectiveOrganization!} userProfile={effectiveUserProfile} stages={stages} users={users} onSaveOrganization={handleSaveOrganization} onUpdateStages={handleUpdateStages} setActiveView={changeView} />;
+            default:
+                return <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={effectiveUserProfile} />;
+        }
+    }, [activeView, userProfile, effectiveUserProfile, budgets, clients, contacts, prospects, stages, reminders, users, effectiveOrganization, allOrganizations, allUsers, allClients, allBudgets, themeVariant, impersonatingOrg, handleImpersonate]);
+
+    if (loading || !effectiveUserProfile || (userProfile?.role !== UserRole.SUPER_ADMIN && !organization)) {
+        return (
+            <div className="w-screen h-screen flex justify-center items-center bg-[var(--background-primary)]">
+                <div className="text-center">
+                    <svg className="animate-spin h-8 w-8 text-[var(--text-accent)] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="mt-4 text-lg font-semibold text-[var(--text-secondary)]">Carregando...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    if (userProfile.role !== UserRole.SUPER_ADMIN && effectiveOrganization?.status === 'suspended') {
+        return <SubscriptionView organization={effectiveOrganization} user={user} />;
     }
 
-    if (userProfile.role !== UserRole.SUPER_ADMIN && organization.subscriptionStatus !== 'active' && organization.subscriptionStatus !== 'trial') {
-        return <SubscriptionView organization={organization} user={user} />;
-    }
-    
-    const selectedClientBudgets = selectedClient ? budgets.filter(b => b.clientId === selectedClient.id) : [];
-    const selectedClientContacts = selectedClient ? contacts.filter(c => c.clientId === selectedClient.id) : [];
-    
     return (
-        <div className={`flex h-screen overflow-hidden ${themeVariant === 'dashboard' ? 'bg-[var(--background-primary)]' : 'bg-[var(--background-primary)]'}`}>
-            {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
-            <Sidebar activeView={activeView} setActiveView={changeView} isOpen={isSidebarOpen} userProfile={userProfile} organization={organization} themeVariant={themeVariant}/>
+        <div className={`flex h-screen bg-[var(--background-primary)] ${themeVariant === 'dashboard' ? 'font-sans' : ''}`}>
+            <MemoizedSidebar 
+                activeView={activeView}
+                setActiveView={changeView}
+                isOpen={isSidebarOpen}
+                userProfile={effectiveUserProfile}
+                organization={effectiveOrganization}
+                themeVariant={themeVariant}
+            />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header 
-                    onAddBudget={() => setAddBudgetModalOpen(true)} 
+                {impersonatingOrg && (
+                    <div className="bg-yellow-400 text-yellow-900 font-bold p-2 text-center text-sm z-30 flex justify-center items-center gap-4 flex-shrink-0">
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 inline-block mr-2"><path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" /></svg>
+                            Você está visualizando como admin da <strong>{impersonatingOrg.name}</strong>.
+                        </span>
+                        <button
+                            onClick={handleExitImpersonation}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-1 px-3 rounded-md text-xs"
+                        >
+                            Sair da Visualização
+                        </button>
+                    </div>
+                )}
+                <Header
+                    onAddBudget={() => setAddBudgetModalOpen(true)}
                     onAddProspect={() => setAddProspectModalOpen(true)}
-                    onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+                    onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
                     theme={theme}
-                    toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                    toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                     notifications={notifications}
                     onNotificationClick={handleSelectBudget}
-                    userProfile={userProfile}
+                    userProfile={effectiveUserProfile}
                     onEditProfile={() => setProfileModalOpen(true)}
                     onSettings={() => setSettingsModalOpen(true)}
                     onLogout={handleLogout}
@@ -505,99 +610,51 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     onDeleteReminder={handleDeleteReminder}
                     onToggleReminderStatus={handleToggleReminder}
                 />
-                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                    <div key={viewKey} className="fade-in">
-                        {activeView === 'dashboard' && <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={userProfile}/>}
-                        {activeView === 'deals' && <DealsView budgets={budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status))} clients={clients} onSelectBudget={handleSelectBudget} onUpdateStatus={handleUpdateBudgetStatus} onScheduleFollowUp={() => {}}/>}
-                        {activeView === 'prospecting' && <ProspectingView prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} />}
-                        {activeView === 'budgeting' && <BudgetingView budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={handleSelectBudget} onGenerateReport={handleGenerateReport}/>}
-                        {activeView === 'clients' && <ClientsView clients={clients} contacts={contacts} budgets={budgets} onSelectClient={handleSelectClient} onAddClientClick={() => setAddClientModalOpen(true)} />}
-                        {activeView === 'reports' && <ReportsView budgets={budgets} clients={clients} userProfile={userProfile} onGenerateDailyReport={handleGenerateDailyReport}/>}
-                        {activeView === 'calendar' && <CalendarView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} onAddReminder={handleAddReminder} />}
-                        {activeView === 'action-plan' && <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget}/>}
-                        {activeView === 'map' && <MapView clients={clients}/>}
-                        {activeView === 'users' && (userProfile.role === 'Admin' || userProfile.role === 'Manager') && <UsersView users={users} onUpdateRole={handleUpdateUserRole} onAddUserClick={() => setAddUserModalOpen(true)}/>}
-                        {activeView === 'settings' && (userProfile.role === 'Admin' || userProfile.role === 'Manager') && organization && (
-                            <AdminSettingsView
-                                organization={organization}
-                                userProfile={userProfile}
-                                stages={stages}
-                                users={users}
-                                onSaveOrganization={handleSaveOrganization}
-                                onUpdateStages={handleUpdateStages}
-                                setActiveView={changeView}
-                            />
-                        )}
-                        {activeView === 'organizations' && userProfile.role === UserRole.SUPER_ADMIN && (
-                             <SuperAdminView
-                                organizations={allOrganizations}
-                                users={allUsers}
-                                clients={allClients}
-                                budgets={allBudgets}
-                                onImpersonate={(org) => alert(`Impersonate not implemented for ${org.name}.`)}
-                                onToggleStatus={(orgId, status) => updateDoc(doc(db, 'organizations', orgId), { status: status === 'active' ? 'suspended' : 'active' })}
-                                onDelete={(orgId, orgName) => { if(window.confirm(`Tem certeza que quer deletar ${orgName}? Essa ação é irreversível.`)) alert(`Delete not implemented for ${orgId}`)}}
-                            />
-                        )}
-                    </div>
+                <main key={viewKey} className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 fade-in">
+                    {renderView()}
                 </main>
-                 {activeReminder && (
-                    <ReminderNotification 
-                        reminder={activeReminder}
-                        onDismiss={() => handleDismissReminder(activeReminder.id)}
-                    />
-                )}
             </div>
             
-            {/* Modals */}
-            <AddBudgetModal 
-                isOpen={isAddBudgetModalOpen} 
-                onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }} 
-                onSave={handleAddBudget} 
-                clients={clients} 
-                contacts={contacts}
-                prospectData={prospectToConvert ? { 
-                    clientName: prospectToConvert.company, 
-                    contactName: prospectToConvert.name, 
-                    contactInfo: prospectToConvert.email || prospectToConvert.phone || '',
-                    clientCnpj: prospectToConvert.cnpj 
-                } : null}
-                initialClientId={initialClientIdForBudget}
-            />
-            {selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} onUpdateBudget={handleUpdateBudget} />}
-            <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />
-            {selectedClient && <ClientDetailModal isOpen={isClientDetailModalOpen} onClose={() => setClientDetailModalOpen(false)} client={selectedClient} contacts={selectedClientContacts} budgets={selectedClientBudgets} onSelectBudget={handleSelectBudget} onAddBudgetForClient={handleAddBudgetForClient} onUpdateClient={handleUpdateClient} />}
-            <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} userProfile={userProfile} onSave={handleUpdateUserProfile} />
-            <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} />
-            <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />
-            <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onAddUser={handleAddUserInvite} />
+            {isAddBudgetModalOpen && <AddBudgetModal isOpen={isAddBudgetModalOpen} onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }} onSave={handleAddBudget} clients={clients} contacts={contacts} prospectData={prospectToConvert ? { clientName: prospectToConvert.company, contactName: prospectToConvert.name, contactInfo: prospectToConvert.email || prospectToConvert.phone || '', clientCnpj: prospectToConvert.cnpj } : null} initialClientId={initialClientIdForBudget} />}
+            {isBudgetDetailModalOpen && selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} onUpdateBudget={handleUpdateBudget} />}
+            {isAddProspectModalOpen && <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />}
+            {isClientDetailModalOpen && selectedClient && <ClientDetailModal isOpen={isClientDetailModalOpen} onClose={() => setClientDetailModalOpen(false)} client={selectedClient} contacts={contacts.filter(c => c.clientId === selectedClient.id)} budgets={budgets.filter(b => b.clientId === selectedClient.id)} onSelectBudget={handleSelectBudget} onAddBudgetForClient={(client) => { setInitialClientIdForBudget(client.id); setAddBudgetModalOpen(true); }} onUpdateClient={handleUpdateClient} />}
+            {isProfileModalOpen && userProfile && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} onSave={handleUpdateUserProfile} userProfile={userProfile} />}
+            {isSettingsModalOpen && <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} />}
+            {isAddClientModalOpen && <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />}
+            {isAddUserModalOpen && <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onAddUser={handleAddUserInvite} />}
+            {activeReminder && <ReminderNotification reminder={activeReminder} onDismiss={() => handleDismissReminder(activeReminder.id)} />}
         </div>
     );
 };
 
+// --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
-    const [authState, setAuthState] = useState<{ state: 'loading' | 'authenticated' | 'unauthenticated', user: User | null }>({ state: 'loading', user: null });
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, user => {
-            if (user) {
-                setAuthState({ state: 'authenticated', user });
-            } else {
-                setAuthState({ state: 'unauthenticated', user: null });
-            }
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setUser(user);
+            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
 
-    if (authState.state === 'loading') {
-        return <div className="h-screen w-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">Carregando autenticação...</div>;
-    }
-
-    if (authState.state === 'unauthenticated' || !authState.user) {
-        return <Auth />;
+    if (loading) {
+        return (
+            <div className="w-screen h-screen flex justify-center items-center bg-[var(--background-primary)]">
+                <div className="text-center">
+                     <svg className="animate-spin h-8 w-8 text-[var(--text-accent)] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+            </div>
+        );
     }
     
-    return <AuthenticatedApp user={authState.user} />;
-}
+    return user ? <AuthenticatedApp user={user} /> : <Auth />;
+};
 
 export default App;

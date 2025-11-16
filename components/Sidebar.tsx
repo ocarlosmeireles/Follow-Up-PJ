@@ -15,6 +15,7 @@ import {
     UserGroupIcon as UsersIcon,
     Cog6ToothIcon,
     BillingIcon,
+    ChatBubbleLeftRightIcon,
 } from './icons';
 
 interface SidebarProps {
@@ -120,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                         {renderSection("Organização", <>
                             {renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)}
                             {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
+                            {renderLink('scripts', "Central de Scripts", <ChatBubbleLeftRightIcon className="w-6 h-6" />)}
                         </>)}
                          
                         {renderSection("Análise", <>
@@ -131,8 +133,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                             renderSection("Admin", <>
                                 {renderLink('users', "Gerenciar Usuários", <UsersIcon className="w-6 h-6" />)}
                                 {renderLink('settings', "Configurações", <Cog6ToothIcon className="w-6 h-6" />)}
-                            </>)
-                        )}
+                            </>))
+                        }
                     </>
                 )}
             </nav>

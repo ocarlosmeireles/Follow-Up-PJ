@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon, ChartPieIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
@@ -90,6 +90,21 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         }));
     }, [budgets, clientMap, contactMap]);
 
+    const kpis = useMemo(() => {
+        const wonBudgets = budgets.filter(b => b.status === BudgetStatus.INVOICED);
+        const lostBudgets = budgets.filter(b => b.status === BudgetStatus.LOST);
+        const activeBudgets = budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+        
+        const wonValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
+        const pipelineValue = activeBudgets.reduce((sum, b) => sum + b.value, 0);
+        const averageTicket = wonBudgets.length > 0 ? wonValue / wonBudgets.length : 0;
+        
+        const totalClosed = wonBudgets.length + lostBudgets.length;
+        const conversionRate = totalClosed > 0 ? `${((wonBudgets.length / totalClosed) * 100).toFixed(1)}%` : 'N/A';
+        
+        return { wonValue, pipelineValue, averageTicket, conversionRate };
+    }, [budgets]);
+
     const filteredAndSortedBudgets = useMemo(() => {
         let filtered = formattedBudgets;
 
@@ -134,15 +149,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         return filtered;
     }, [formattedBudgets, statusFilter, searchTerm, sortConfig]);
 
-    const kpis = useMemo(() => {
-        const wonBudgets = budgets.filter(b => b.status === BudgetStatus.INVOICED);
-        const activeBudgets = budgets.filter(b => ![BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
-        const wonValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
-        const pipelineValue = activeBudgets.reduce((sum, b) => sum + b.value, 0);
-        const averageTicket = wonBudgets.length > 0 ? wonValue / wonBudgets.length : 0;
-        return { wonValue, pipelineValue, averageTicket };
-    }, [budgets]);
-    
     const requestSort = (key: SortKey) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -172,17 +178,18 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Hub de Orçamentos</h2>
-                <p className="text-[var(--text-secondary)]">Uma visão completa e estratégica de suas propostas comerciais.</p>
+                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Central de Propostas Estratégicas</h2>
+                <p className="text-[var(--text-secondary)]">Uma visão completa e inteligente de suas propostas comerciais.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <KPICard style={{animationDelay: '100ms'}} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(kpis.pipelineValue)}`} icon={<CurrencyDollarIcon className="w-7 h-7 text-blue-500"/>} />
                 <KPICard style={{animationDelay: '200ms'}} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(kpis.wonValue)}`} icon={<TrophyIcon className="w-7 h-7 text-green-500"/>} />
-                <KPICard style={{animationDelay: '300ms'}} className="animated-item" title="Ticket Médio (Ganhos)" value={`R$ ${formatCurrency(kpis.averageTicket)}`} icon={<ArrowTrendingUpIcon className="w-7 h-7 text-yellow-500"/>} />
+                <KPICard style={{animationDelay: '300ms'}} className="animated-item" title="Ticket Médio" value={`R$ ${formatCurrency(kpis.averageTicket)}`} icon={<ArrowTrendingUpIcon className="w-7 h-7 text-yellow-500"/>} />
+                <KPICard style={{animationDelay: '400ms'}} className="animated-item" title="Taxa de Conversão" value={kpis.conversionRate} icon={<ChartPieIcon className="w-7 h-7 text-purple-500"/>} />
             </div>
             
-            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '400ms' }}>
+            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '500ms' }}>
                  <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                     <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg self-start w-full md:w-auto overflow-x-auto">
                         {(['all', 'active', 'won', 'lost'] as const).map(filter => (

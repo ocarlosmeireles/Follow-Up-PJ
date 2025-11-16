@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 // FIX: Imported `getDocs` from 'firebase/firestore' to resolve 'Cannot find name' error.
-import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from './lib/firebase';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder, Script, ScriptCategory } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Auth from './components/Auth';
 import Header from './components/Header';
@@ -32,6 +32,10 @@ import AdminSettingsView from './components/AdminSettingsView';
 import { generateFollowUpReport } from './lib/reportGenerator';
 import AddUserModal from './components/AddUserModal';
 import ReminderNotification from './components/ReminderNotification';
+import ScriptsView from './components/ScriptsView';
+import ScriptModal from './components/ScriptModal';
+import { scriptData } from './lib/scripts';
+
 
 export type ActiveView = 
     | 'dashboard'
@@ -45,7 +49,8 @@ export type ActiveView =
     | 'map'
     | 'users'
     | 'settings'
-    | 'organizations';
+    | 'organizations'
+    | 'scripts';
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -78,11 +83,12 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [stages, setStages] = useState<ProspectingStage[]>([]);
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);
+    const [scripts, setScripts] = useState<Script[]>([]);
     
     // UI states
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
-    const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'dashboard');
+    const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'aurora');
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [activeReminder, setActiveReminder] = useState<Reminder | null>(null);
     const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
@@ -97,6 +103,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
     const [initialClientIdForBudget, setInitialClientIdForBudget] = useState<string | null>(null);
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
+    const [isScriptModalOpen, setScriptModalOpen] = useState(false);
+    const [scriptToEdit, setScriptToEdit] = useState<Script | null>(null);
 
     // Derived states for impersonation
     const effectiveUserProfile = useMemo<UserData | null>(() => {
@@ -119,7 +127,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setLoading(true);
         // Clear old data
         setBudgets([]); setClients([]); setContacts([]); setProspects([]);
-        setStages([]); setReminders([]); setUsers([]);
+        setStages([]); setReminders([]); setUsers([]); setScripts([]);
         
         setImpersonatingOrg(org);
         setActiveView('dashboard');
@@ -131,7 +139,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setImpersonatingOrg(null);
         // Clear org data
         setBudgets([]); setClients([]); setContacts([]); setProspects([]);
-        setStages([]); setReminders([]); setUsers([]);
+        setStages([]); setReminders([]); setUsers([]); setScripts([]);
         
         setActiveView('organizations');
         setViewKey(prev => prev + 1);
@@ -214,11 +222,48 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             subscribeToCollection('prospectingStages', setStages);
             subscribeToCollection('reminders', setReminders);
             subscribeToCollection('users', setUsers);
+            subscribeToCollection('scripts', setScripts);
             setLoading(false);
         }
     
         return () => unsubscribers.forEach(unsub => unsub());
     }, [userProfile, impersonatingOrg, effectiveOrganization, effectiveUserProfile]);
+
+    // Seeding default scripts for new organizations
+    useEffect(() => {
+        if (loading || !effectiveOrganization || !effectiveUserProfile) return;
+
+        const checkAndSeedScripts = async () => {
+            const scriptsQuery = query(collection(db, 'scripts'), where("organizationId", "==", effectiveOrganization.id), limit(1));
+            const snapshot = await getDocs(scriptsQuery);
+
+            if (snapshot.empty) {
+                console.log(`No scripts found for organization ${effectiveOrganization.id}. Seeding default scripts...`);
+                const batch = writeBatch(db);
+                scriptData.forEach(category => {
+                    category.scripts.forEach(script => {
+                        const scriptRef = doc(collection(db, 'scripts'));
+                        const newScript: Omit<Script, 'id'> = {
+                            organizationId: effectiveOrganization.id,
+                            userId: effectiveUserProfile.id,
+                            title: script.title,
+                            content: script.content,
+                            category: category.name as ScriptCategory
+                        };
+                        batch.set(scriptRef, newScript);
+                    });
+                });
+                try {
+                    await batch.commit();
+                    console.log("Default scripts seeded successfully.");
+                } catch (error) {
+                    console.error("Error seeding default scripts:", error);
+                }
+            }
+        };
+
+        checkAndSeedScripts();
+    }, [loading, effectiveOrganization, effectiveUserProfile]);
 
 
     useEffect(() => {
@@ -490,6 +535,26 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         await updateDoc(doc(db, 'reminders', reminderId), { isDismissed: true });
         setActiveReminder(null);
     };
+    
+    const handleSaveScript = async (scriptData: Omit<Script, 'id' | 'organizationId' | 'userId'>, scriptId: string | null) => {
+        if (!effectiveUserProfile || !effectiveOrganization) return;
+        if (scriptId) {
+            await updateDoc(doc(db, 'scripts', scriptId), scriptData as any);
+        } else {
+            const newScript = {
+                ...scriptData,
+                organizationId: effectiveOrganization.id,
+                userId: effectiveUserProfile.id,
+            };
+            await addDoc(collection(db, 'scripts'), newScript);
+        }
+    };
+
+    const handleDeleteScript = async (scriptId: string) => {
+        if (window.confirm("Tem certeza que deseja excluir este script?")) {
+            await deleteDoc(doc(db, 'scripts', scriptId));
+        }
+    };
 
      // UI functions
     const handleSelectBudget = (budgetId: string) => {
@@ -546,6 +611,13 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                 return <TasksView budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={handleSelectBudget} />;
             case 'map':
                 return <MapView clients={clients} />;
+            case 'scripts':
+                return <ScriptsView 
+                    scripts={scripts}
+                    onAdd={() => { setScriptToEdit(null); setScriptModalOpen(true); }}
+                    onEdit={(script) => { setScriptToEdit(script); setScriptModalOpen(true); }}
+                    onDelete={handleDeleteScript}
+                />;
             case 'users':
                 return <UsersView users={users} onUpdateRole={handleUpdateUserRole} onAddUserClick={() => setAddUserModalOpen(true)} />;
             case 'settings':
@@ -553,7 +625,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             default:
                 return <Dashboard budgets={budgets} clients={clients} onSelectBudget={handleSelectBudget} themeVariant={themeVariant} userProfile={effectiveUserProfile} />;
         }
-    }, [activeView, userProfile, effectiveUserProfile, budgets, clients, contacts, prospects, stages, reminders, users, effectiveOrganization, allOrganizations, allUsers, allClients, allBudgets, themeVariant, impersonatingOrg, handleImpersonate]);
+    }, [activeView, userProfile, effectiveUserProfile, budgets, clients, contacts, prospects, stages, reminders, users, scripts, effectiveOrganization, allOrganizations, allUsers, allClients, allBudgets, themeVariant, impersonatingOrg, handleImpersonate]);
 
     if (loading || !effectiveUserProfile || (userProfile?.role !== UserRole.SUPER_ADMIN && !organization)) {
         return (
@@ -622,7 +694,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             </div>
             
             {isAddBudgetModalOpen && <AddBudgetModal isOpen={isAddBudgetModalOpen} onClose={() => { setAddBudgetModalOpen(false); setProspectToConvert(null); setInitialClientIdForBudget(null); }} onSave={handleAddBudget} clients={clients} contacts={contacts} prospectData={prospectToConvert ? { clientName: prospectToConvert.company, contactName: prospectToConvert.name, contactInfo: prospectToConvert.email || prospectToConvert.phone || '', clientCnpj: prospectToConvert.cnpj } : null} initialClientId={initialClientIdForBudget} />}
-            {isBudgetDetailModalOpen && selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} onUpdateBudget={handleUpdateBudget} />}
+            {isBudgetDetailModalOpen && selectedBudget && <BudgetDetailModal isOpen={isBudgetDetailModalOpen} onClose={() => setBudgetDetailModalOpen(false)} budget={selectedBudget} client={clients.find(c => c.id === selectedBudget.clientId)!} contact={contacts.find(c => c.id === selectedBudget.contactId)} onAddFollowUp={handleAddFollowUp} onChangeStatus={handleUpdateBudgetStatus} onConfirmWin={handleConfirmWin} onUpdateBudget={handleUpdateBudget} scripts={scripts} />}
             {isAddProspectModalOpen && <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />}
             {isClientDetailModalOpen && selectedClient && <ClientDetailModal isOpen={isClientDetailModalOpen} onClose={() => setClientDetailModalOpen(false)} client={selectedClient} contacts={contacts.filter(c => c.clientId === selectedClient.id)} budgets={budgets.filter(b => b.clientId === selectedClient.id)} onSelectBudget={handleSelectBudget} onAddBudgetForClient={(client) => { setInitialClientIdForBudget(client.id); setAddBudgetModalOpen(true); }} onUpdateClient={handleUpdateClient} />}
             {isProfileModalOpen && userProfile && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} onSave={handleUpdateUserProfile} userProfile={userProfile} />}
@@ -630,6 +702,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             {isAddClientModalOpen && <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />}
             {isAddUserModalOpen && <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onAddUser={handleAddUserInvite} />}
             {activeReminder && <ReminderNotification reminder={activeReminder} onDismiss={() => handleDismissReminder(activeReminder.id)} />}
+            {isScriptModalOpen && <ScriptModal isOpen={isScriptModalOpen} onClose={() => { setScriptModalOpen(false); setScriptToEdit(null); }} onSave={handleSaveScript} scriptToEdit={scriptToEdit} />}
         </div>
     );
 };

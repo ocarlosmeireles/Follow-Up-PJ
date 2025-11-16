@@ -130,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             .slice(0, 5);
     }, [budgets]);
     
-    const isDashboardTheme = themeVariant === 'dashboard';
+    const useModernCards = themeVariant === 'dashboard' || themeVariant === 'aurora';
 
     return (
         <div className="space-y-8">
@@ -147,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                 </div>
             </div>
             
-            {isDashboardTheme ? (
+            {useModernCards ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                     <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
                     <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-purple-500 to-purple-700"/>

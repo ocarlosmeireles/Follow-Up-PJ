@@ -808,7 +808,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     themeVariant={themeVariant}
                 />
             )}
-            <div className="flex-1 flex flex-col bg-[var(--background-primary)]">
+            <div className="flex-1 flex flex-col bg-[var(--background-primary)] min-w-0">
                 <Header 
                     onAddBudget={() => { setInitialClientIdForBudget(null); setAddBudgetModalOpen(true); }}
                     onAddProspect={() => setAddProspectModalOpen(true)}

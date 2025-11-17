@@ -1,9 +1,11 @@
 
 
+
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
+import InfoBar from './InfoBar';
 
 interface DashboardProps {
   budgets: Budget[];
@@ -104,11 +106,13 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
         const totalActiveValue = activeBudgets.reduce((sum, b) => sum + b.value, 0);
         const totalInvoicedValue = invoicedBudgets.reduce((sum, b) => sum + b.value, 0);
 
-        const totalClosed = invoicedBudgets.length + lostBudgets.length;
-        const conversionRateRaw = totalClosed > 0 ? (invoicedBudgets.length / totalClosed) : 0;
-        const conversionRate = totalClosed > 0 ? (conversionRateRaw * 100).toFixed(1) + '%' : 'N/A';
+        const totalWon = invoicedBudgets.length;
+        const totalLost = lostBudgets.length;
+        const totalDecided = totalWon + totalLost;
+        const closingRate = totalDecided > 0 ? (totalWon / totalDecided * 100).toFixed(1) + '%' : 'N/A';
+        const pipelineConversion = budgets.length > 0 ? (totalWon / budgets.length * 100).toFixed(1) + '%' : 'N/A';
         
-        const forecastValue = totalActiveValue * conversionRateRaw;
+        const forecastValue = totalActiveValue * (totalDecided > 0 ? totalWon / totalDecided : 0);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -118,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)
         ).length;
 
-        return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
+        return { totalActiveValue, totalWonValue: totalInvoicedValue, closingRate, pipelineConversion, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
     }, [filteredBudgetsByTime, budgets]);
     
     const { monthlyAchieved, monthlyGoal, goalProgress } = useMemo(() => {
@@ -158,6 +162,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
 
     return (
         <div className="space-y-8">
+            <InfoBar />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                  <div>
                     <h2 className="text-xl font-medium text-[var(--text-secondary)]">Olá, {userProfile.name}!</h2>
@@ -172,18 +177,19 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             </div>
             
             {useModernCards ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6">
                     <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
                     <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-purple-500 to-purple-700'}/>
-                    <DashboardMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Conversão" value={metrics.conversionRate} subValue="de negócios fechados" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
-                    <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-teal-500 to-teal-700'}/>
+                    <DashboardMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Taxa de Fechamento" value={metrics.closingRate} subValue="de negócios decididos" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Conversão Pipeline" value={metrics.pipelineConversion} subValue="do total de orçamentos" icon={<ArrowTrendingUpIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-cyan-500 to-cyan-700"/>
+                    <DashboardMetricCard style={{ animationDelay: '500ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-teal-500 to-teal-700'}/>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                    <ClassicMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Total Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
                     <ClassicMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500" />} />
                     <ClassicMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
-                    <ClassicMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
+                    <ClassicMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Taxa de Fechamento" value={metrics.closingRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
                     <ClassicMetricCard style={{ animationDelay: '500ms' }} className="animated-item" title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
                 </div>
             )}

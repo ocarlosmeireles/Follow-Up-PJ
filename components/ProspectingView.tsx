@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Prospect, ProspectingStage } from '../types';
-import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon } from './icons';
+import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon, SparklesIcon, EllipsisVerticalIcon, AcademicCapIcon, ChatBubbleLeftRightIcon } from './icons';
 
 // --- PROPS & TYPES ---
 interface ProspectingViewProps {
@@ -10,6 +10,7 @@ interface ProspectingViewProps {
   onUpdateProspectStage: (prospectId: string, newStageId: string) => void;
   onConvertProspect: (prospectId: string) => void;
   onDeleteProspect: (prospectId: string) => void;
+  onOpenAIModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
 }
 
 // --- SUB-COMPONENTS ---
@@ -17,7 +18,10 @@ interface ProspectingViewProps {
 const ProspectCard: React.FC<{ 
     prospect: Prospect; 
     isDragging: boolean;
-}> = ({ prospect, isDragging }) => {
+    onOpenAIModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
+}> = ({ prospect, isDragging, onOpenAIModal }) => {
+    const [isMenuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     
     const isNextContactOverdue = useMemo(() => {
         if (!prospect.nextContactDate) return false;
@@ -27,12 +31,40 @@ const ProspectCard: React.FC<{
         return prospectDate < today;
     }, [prospect.nextContactDate]);
 
+     useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
         <div className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-grab active:cursor-grabbing border border-[var(--border-secondary)] hover:border-[var(--accent-primary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-3 shadow-xl' : 'hover:-translate-y-0.5'}`}>
             <div className="flex justify-between items-start">
                 <div className="flex-1 overflow-hidden">
                     <h4 className="font-bold text-[var(--text-primary)] text-base truncate" title={prospect.company}>{prospect.company}</h4>
                     <p className="text-sm text-[var(--text-accent)] font-semibold truncate" title={prospect.name}>{prospect.name}</p>
+                </div>
+                <div className="relative" ref={menuRef}>
+                    <button onClick={(e) => { e.stopPropagation(); setMenuOpen(prev => !prev); }} className="p-1 rounded-full text-[var(--text-tertiary)] hover:bg-[var(--background-tertiary)]">
+                        <SparklesIcon className="w-5 h-5" />
+                    </button>
+                    {isMenuOpen && (
+                        <div className="absolute top-full right-0 mt-1 w-48 bg-[var(--background-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] z-20">
+                            <button onClick={() => { onOpenAIModal(prospect, 'research'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
+                                <AcademicCapIcon className="w-4 h-4 text-sky-500" /> Pesquisar Empresa
+                            </button>
+                            <button onClick={() => { onOpenAIModal(prospect, 'icebreaker'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
+                                <ChatBubbleLeftRightIcon className="w-4 h-4 text-violet-500" /> Sugerir Abordagem
+                            </button>
+                            <button onClick={() => { onOpenAIModal(prospect, 'strategy'); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
+                                <SparklesIcon className="w-4 h-4 text-emerald-500" /> Criar Estratégia
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
             
@@ -58,7 +90,8 @@ const Column: React.FC<{
     isDraggingOver: boolean;
     onConvertProspect: (id: string) => void;
     onDeleteProspect: (id: string) => void;
-}> = ({ stage, prospects, onDragOver, onDrop, setDraggingProspectId, draggingProspectId, isDraggingOver, onConvertProspect, onDeleteProspect }) => {
+    onOpenAIModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
+}> = ({ stage, prospects, onDragOver, onDrop, setDraggingProspectId, draggingProspectId, isDraggingOver, onConvertProspect, onDeleteProspect, onOpenAIModal }) => {
     
     const totalValue = useMemo(() => {
         return prospects.reduce((sum, p) => sum + (p.estimatedBudget || 0), 0)
@@ -92,6 +125,7 @@ const Column: React.FC<{
                         <ProspectCard 
                             prospect={prospect} 
                             isDragging={draggingProspectId === prospect.id}
+                            onOpenAIModal={onOpenAIModal}
                         />
                     </div>
                 ))}
@@ -129,7 +163,7 @@ const Column: React.FC<{
 
 // --- MAIN VIEW COMPONENT ---
 
-export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onConvertProspect, onDeleteProspect }) => {
+export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onConvertProspect, onDeleteProspect, onOpenAIModal }) => {
     const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
     const [draggingOverStageId, setDraggingOverStageId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -207,6 +241,7 @@ export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, sta
                             isDraggingOver={draggingOverStageId === stage.id}
                             onConvertProspect={onConvertProspect}
                             onDeleteProspect={onDeleteProspect}
+                            onOpenAIModal={onOpenAIModal}
                         />
                     ))
                 ) : (

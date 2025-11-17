@@ -56,7 +56,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-[var(--background-secondary)] rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="bg-[var(--background-secondary)] rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-3xl m-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-[var(--text-primary)]">Configurações</h2>
                     <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
@@ -68,11 +68,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Theme Settings */}
                     <div>
                         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Tema da Aplicação</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <ThemePreview variant="aurora" name="Aurora" isActive={currentThemeVariant === 'aurora'} onClick={() => setThemeVariant('aurora')} />
                             <ThemePreview variant="dashboard" name="Painel" isActive={currentThemeVariant === 'dashboard'} onClick={() => setThemeVariant('dashboard')} />
                             <ThemePreview variant="classic" name="Clássico" isActive={currentThemeVariant === 'classic'} onClick={() => setThemeVariant('classic')} />
                             <ThemePreview variant="flow" name="Fluxo" isActive={currentThemeVariant === 'flow'} onClick={() => setThemeVariant('flow')} />
+                            <ThemePreview variant="vibrant" name="Vibrante" isActive={currentThemeVariant === 'vibrant'} onClick={() => setThemeVariant('vibrant')} />
                         </div>
                     </div>
                 </div>

@@ -37,6 +37,8 @@ import ScriptsView from './components/ScriptsView';
 import ScriptModal from './components/ScriptModal';
 import { scriptData } from './lib/scripts';
 import ReportDetailModal from './components/ReportDetailModal';
+import ProspectAIModal from './components/ProspectAIModal';
+import BudgetAIAnalysisModal from './components/BudgetAIAnalysisModal';
 
 
 export type ActiveView = 
@@ -116,6 +118,9 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [scriptToEdit, setScriptToEdit] = useState<Script | null>(null);
     const [isReportDetailModalOpen, setReportDetailModalOpen] = useState(false);
     const [reportModalData, setReportModalData] = useState<{ title: string; budgets: Budget[] } | null>(null);
+    const [prospectAIModalState, setProspectAIModalState] = useState<{isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | 'strategy'}>({isOpen: false, prospect: null, mode: 'research'});
+    const [budgetAIAnalysisModalState, setBudgetAIAnalysisModalState] = useState<{isOpen: boolean, budget: Budget | null}>({isOpen: false, budget: null});
+
     
     // Global Search State
     const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -808,6 +813,14 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setReportDetailModalOpen(true);
     };
 
+    const handleOpenProspectAIModal = (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => {
+        setProspectAIModalState({ isOpen: true, prospect, mode });
+    };
+
+    const handleOpenBudgetAIAnalysisModal = (budget: Budget) => {
+        setBudgetAIAnalysisModalState({ isOpen: true, budget });
+    };
+
 
     // --- RENDER LOGIC ---
     if (loading || !effectiveUserProfile) {
@@ -865,7 +878,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto">
                     {/* Render active view based on state */}
                     {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile}/>}
-                    {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect}/>}
+                    {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect} onOpenAIModal={handleOpenProspectAIModal} />}
                     {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
                     {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
                     {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)} onBulkDelete={handleBulkDeleteClients} />}
@@ -908,6 +921,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                         onConfirmWin={handleConfirmWin}
                         onUpdateBudget={handleUpdateBudget}
                         scripts={scripts}
+                        onOpenAIAnalysis={() => handleOpenBudgetAIAnalysisModal(selectedBudget)}
                     />
                 )}
                 {isAddProspectModalOpen && <AddProspectModal isOpen={isAddProspectModalOpen} onClose={() => setAddProspectModalOpen(false)} onSave={handleAddProspect} />}
@@ -941,6 +955,23 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                         }}
                     />
                 )}
+
+                 {prospectAIModalState.isOpen && prospectAIModalState.prospect && (
+                    <ProspectAIModal
+                        isOpen={prospectAIModalState.isOpen}
+                        onClose={() => setProspectAIModalState({ isOpen: false, prospect: null, mode: 'research' })}
+                        prospect={prospectAIModalState.prospect}
+                        mode={prospectAIModalState.mode}
+                    />
+                 )}
+                 {budgetAIAnalysisModalState.isOpen && budgetAIAnalysisModalState.budget && (
+                     <BudgetAIAnalysisModal
+                        isOpen={budgetAIAnalysisModalState.isOpen}
+                        onClose={() => setBudgetAIAnalysisModalState({ isOpen: false, budget: null })}
+                        budget={budgetAIAnalysisModalState.budget}
+                        clientName={clients.find(c => c.id === budgetAIAnalysisModalState.budget?.clientId)?.name || 'Cliente'}
+                    />
+                 )}
 
                 {activeReminder && <ReminderNotification reminder={activeReminder} onDismiss={() => { updateDoc(doc(db, 'reminders', activeReminder.id), { isDismissed: true }); setActiveReminder(null); }}/>}
             </div>

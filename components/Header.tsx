@@ -120,8 +120,10 @@ const Header: React.FC<HeaderProps> = ({
     .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
 
   const renderSearchResults = () => {
-    // FIX: Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly
+    // FIX: Property 'map' does not exist on type 'unknown'.
+    // Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly
     // infers the type of `groupedResults` and resolves the error where `.map` was being called on a value of type `unknown`.
+    // FIX: Provide a type for the initial value of the reduce function to correctly infer the type of `groupedResults`.
     const groupedResults = globalSearchResults.reduce((acc, result) => {
       const key = result.type;
       if (!acc[key]) {

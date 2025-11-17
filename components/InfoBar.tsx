@@ -43,14 +43,14 @@ const InfoBar: React.FC = () => {
         // --- Buscar Cotações ---
         const fetchCurrencies = async () => {
             try {
-                const response = await fetch('https://brasilapi.com.br/api/taxas/v1');
+                const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL');
                 if (!response.ok) throw new Error('Falha ao buscar cotações');
                 const data = await response.json();
-                const usdRate = data.find((rate: any) => rate.nome === 'DOLAR');
-                const eurRate = data.find((rate: any) => rate.nome === 'EURO');
+                const usdRate = data.USDBRL?.bid;
+                const eurRate = data.EURBRL?.bid;
                 setCurrencies({
-                    usd: usdRate?.valor || null,
-                    eur: eurRate?.valor || null,
+                    usd: usdRate ? parseFloat(usdRate) : null,
+                    eur: eurRate ? parseFloat(eurRate) : null,
                     lastUpdated: new Date().toLocaleTimeString('pt-BR'),
                 });
             } catch (e) {

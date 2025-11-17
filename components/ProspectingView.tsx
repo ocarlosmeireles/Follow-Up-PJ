@@ -203,7 +203,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                  <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} className="flex-grow min-w-[150px] bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 px-3"><option value="all">Toda Urgência</option><option value="Baixa">Baixa</option><option value="Média">Média</option><option value="Alta">Alta</option></select>
             </div>
 
-            <div className="flex-grow flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="flex-grow flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-0">
                 {sortedStages.map((stage) => {
                     const stageProspects = prospectsByStage[stage.id] || [];
                     return (

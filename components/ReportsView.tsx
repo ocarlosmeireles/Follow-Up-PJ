@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { Budget, Client, UserProfile } from '../types';
 import { BudgetStatus } from '../types';
-import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon, CalendarIcon } from './icons';
+import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon, CalendarIcon, ExclamationTriangleIcon } from './icons';
 
 interface ReportsViewProps {
   budgets: Budget[];
@@ -124,6 +124,30 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                 value: totalValue
             }));
     }, [budgets, clientMap]);
+
+    const lostReasonAnalysis = useMemo(() => {
+        const lostBudgets = budgets.filter(b => b.status === BudgetStatus.LOST && b.lostReason);
+        if (lostBudgets.length === 0) {
+            return { data: [], maxValue: 0, totalLost: 0 };
+        }
+
+        // FIX: Use type assertion on the initial value of `reduce` to properly type the accumulator.
+        // This ensures `reasonCounts` is correctly typed as Record<string, number>,
+        // which resolves subsequent type errors.
+        const reasonCounts = lostBudgets.reduce((acc, budget) => {
+            const reason = budget.lostReason!;
+            acc[reason] = (acc[reason] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const data = Object.entries(reasonCounts)
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((a, b) => b.count - a.count);
+        
+        const maxValue = Math.max(...data.map(d => d.count), 0);
+
+        return { data, maxValue, totalLost: lostBudgets.length };
+    }, [budgets]);
 
     const handleExport = () => {
         const date = new Date().toLocaleString('pt-BR');
@@ -287,41 +311,68 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                 )}
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '600ms' }}>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
-                        <FunnelIcon className="w-6 h-6 mr-3 text-blue-500 dark:text-blue-400"/>
-                        Funil de Vendas
-                    </h2>
-                    <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-                        {salesFunnelData.map((stage, index) => (
-                            <div key={stage.name}>
-                                {index > 0 && (
-                                    <div className="text-center my-2">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto text-gray-400 dark:text-slate-500">
-                                            <path d="M12 5V19M12 19L7 14M12 19L17 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                        <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">{stage.conversionRate.toFixed(1)}%</span>
-                                    </div>
-                                )}
-                                <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
-                                    <div className="flex justify-between items-center text-sm font-semibold mb-2">
-                                        <span className="text-gray-800 dark:text-slate-200">{stage.name}</span>
-                                        <div className="text-right">
-                                            <span className="text-blue-600 dark:text-blue-400">{formatCurrency(stage.value)}</span>
-                                            <span className="text-gray-500 dark:text-gray-400 ml-2">({stage.count})</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-gray-200 dark:bg-slate-600 rounded-full h-3">
-                                        <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${stage.widthPercentage}%` }}></div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '600ms' }}>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
+                    <FunnelIcon className="w-6 h-6 mr-3 text-blue-500 dark:text-blue-400"/>
+                    Funil de Vendas
+                </h2>
+                <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    {salesFunnelData.map((stage, index) => (
+                        <div key={stage.name}>
+                            {index > 0 && (
+                                <div className="text-center my-2">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto text-gray-400 dark:text-slate-500">
+                                        <path d="M12 5V19M12 19L7 14M12 19L17 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                    <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">{stage.conversionRate.toFixed(1)}%</span>
+                                </div>
+                            )}
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+                                <div className="flex justify-between items-center text-sm font-semibold mb-2">
+                                    <span className="text-gray-800 dark:text-slate-200">{stage.name}</span>
+                                    <div className="text-right">
+                                        <span className="text-blue-600 dark:text-blue-400">{formatCurrency(stage.value)}</span>
+                                        <span className="text-gray-500 dark:text-gray-400 ml-2">({stage.count})</span>
                                     </div>
                                 </div>
+                                <div className="bg-gray-200 dark:bg-slate-600 rounded-full h-3">
+                                    <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${stage.widthPercentage}%` }}></div>
+                                </div>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
                 </div>
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '700ms' }}>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
+                        <ExclamationTriangleIcon className="w-6 h-6 mr-3 text-red-500 dark:text-red-400"/>
+                        Análise de Perdas ({lostReasonAnalysis.totalLost} negócios)
+                    </h2>
+                    {lostReasonAnalysis.data.length > 0 ? (
+                        <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                            {lostReasonAnalysis.data.map(item => {
+                                const percentage = lostReasonAnalysis.maxValue > 0 ? (item.count / lostReasonAnalysis.maxValue) * 100 : 0;
+                                return (
+                                    <div key={item.reason} className="flex items-center gap-3 text-sm">
+                                        <span className="w-40 text-gray-600 dark:text-slate-400 truncate font-medium">{item.reason}</span>
+                                        <div className="flex-grow bg-gray-200 dark:bg-slate-700 rounded-full h-4">
+                                            <div className="bg-red-400 dark:bg-red-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div>
+                                        </div>
+                                        <span className="w-8 text-right font-bold text-gray-800 dark:text-slate-200">{item.count}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-center py-16 text-gray-400 dark:text-slate-500 border-t border-gray-200 dark:border-slate-700">
+                            <p>Nenhum negócio perdido com motivo registrado.</p>
+                            <p className="text-xs">Quando um negócio for perdido, registre o motivo para ver a análise aqui.</p>
+                        </div>
+                    )}
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '800ms' }}>
                     <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
                         <UserGroupIcon className="w-6 h-6 mr-3 text-yellow-500 dark:text-yellow-400"/>
                         Top 5 Clientes por Faturamento

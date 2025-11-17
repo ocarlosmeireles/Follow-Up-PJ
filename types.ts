@@ -78,6 +78,8 @@ export interface Budget {
   nextFollowUpDate: string | null;
   followUps: FollowUp[];
   observations?: string;
+  lostReason?: string;
+  lostNotes?: string;
 }
 
 export interface ProspectingStage {
@@ -180,4 +182,12 @@ export interface Script {
   title: string;
   content: string;
   category: ScriptCategory;
+}
+
+export interface DailyBriefing {
+  greeting: string;
+  priorities: { text: string; budgetId?: string }[];
+  warnings: { text: string; budgetId?: string }[];
+  quickWins: { text: string; budgetId?: string }[];
+  motivation: string;
 }

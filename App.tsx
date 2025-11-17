@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 // FIX: Imported `getDocs` from 'firebase/firestore' to resolve 'Cannot find name' error.
 import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit } from 'firebase/firestore';
@@ -60,6 +60,13 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+type SearchResult = {
+  type: 'client' | 'budget' | 'prospect' | 'contact';
+  id: string;
+  title: string;
+  subtitle: string;
+};
+
 // --- AUTHENTICATED APP WRAPPER ---
 const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [loading, setLoading] = useState(true);
@@ -105,6 +112,11 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
     const [isScriptModalOpen, setScriptModalOpen] = useState(false);
     const [scriptToEdit, setScriptToEdit] = useState<Script | null>(null);
+    
+    // Global Search State
+    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+    const [globalSearchResults, setGlobalSearchResults] = useState<SearchResult[]>([]);
+    const searchDebounceRef = useRef<number | null>(null);
 
     // Derived states for impersonation
     const effectiveUserProfile = useMemo<UserData | null>(() => {
@@ -313,6 +325,94 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setNotifications(newNotifications);
     }, [budgets, clients, reminders, activeReminder, loading, effectiveUserProfile]);
 
+    // --- Global Search Logic ---
+    const handleGlobalSearch = useCallback((term: string) => {
+        setGlobalSearchTerm(term);
+    
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+        }
+    
+        if (!term.trim()) {
+            setGlobalSearchResults([]);
+            return;
+        }
+    
+        searchDebounceRef.current = window.setTimeout(() => {
+            const lowerTerm = term.toLowerCase();
+            const results: SearchResult[] = [];
+    
+            clients.forEach(c => {
+                if (c.name.toLowerCase().includes(lowerTerm) || (c.cnpj && c.cnpj.replace(/\D/g, '').includes(lowerTerm.replace(/\D/g, '')))) {
+                    results.push({ type: 'client', id: c.id, title: c.name, subtitle: c.cnpj || 'Cliente' });
+                }
+            });
+    
+            budgets.forEach(b => {
+                if (b.title.toLowerCase().includes(lowerTerm)) {
+                    const clientName = clients.find(c => c.id === b.clientId)?.name;
+                    results.push({ type: 'budget', id: b.id, title: b.title, subtitle: `Em ${clientName}` || 'Orçamento' });
+                }
+            });
+            
+            prospects.forEach(p => {
+                if (p.company.toLowerCase().includes(lowerTerm) || p.name.toLowerCase().includes(lowerTerm)) {
+                    results.push({ type: 'prospect', id: p.id, title: p.company, subtitle: `Prospect: ${p.name}` });
+                }
+            });
+    
+            contacts.forEach(ct => {
+                if (ct.name.toLowerCase().includes(lowerTerm)) {
+                    const clientName = clients.find(c => c.id === ct.clientId)?.name;
+                    results.push({ type: 'contact', id: ct.clientId, title: ct.name, subtitle: `Contato em ${clientName || 'Cliente'}` });
+                }
+            });
+    
+            setGlobalSearchResults(results.slice(0, 10));
+        }, 300);
+    }, [clients, budgets, prospects, contacts]);
+    
+    const handleClearSearch = useCallback(() => {
+        setGlobalSearchTerm('');
+        setGlobalSearchResults([]);
+    }, []);
+
+    const handleSearchResultClick = (result: SearchResult) => {
+        handleClearSearch();
+        
+        switch (result.type) {
+            case 'client': {
+                const client = clients.find(c => c.id === result.id);
+                if (client) {
+                    setSelectedClient(client);
+                    setClientDetailModalOpen(true);
+                }
+                break;
+            }
+            case 'budget': {
+                const budget = budgets.find(b => b.id === result.id);
+                if (budget) {
+                    setSelectedBudget(budget);
+                    setBudgetDetailModalOpen(true);
+                }
+                break;
+            }
+            case 'prospect': {
+                changeView('prospecting');
+                break;
+            }
+            case 'contact': {
+                const client = clients.find(c => c.id === result.id); // Note: contact search result ID is the clientId
+                 if (client) {
+                    setSelectedClient(client);
+                    setClientDetailModalOpen(true);
+                 }
+                break;
+            }
+        }
+    };
+
+
     const handleLogout = async () => {
         if (window.confirm("Deseja realmente sair?")) {
             if (impersonatingOrg) {
@@ -362,13 +462,28 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         await updateDoc(doc(db, "budgets", budgetId), updates);
     };
 
+    const handleBulkUpdateBudgets = async (budgetIds: string[], updates: Partial<Budget>) => {
+        if (!effectiveOrganization) return;
+        const batch = writeBatch(db);
+        budgetIds.forEach(id => {
+            const budgetRef = doc(db, "budgets", id);
+            batch.update(budgetRef, updates);
+        });
+        try {
+            await batch.commit();
+        } catch (error) {
+            console.error("Error performing bulk update:", error);
+            alert("Ocorreu um erro ao atualizar os orçamentos.");
+        }
+    };
+
     const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
         const budget = budgets.find(b => b.id === budgetId);
         if (!budget) return;
 
         const newFollowUp = { ...followUp, id: crypto.randomUUID() };
         const updatedFollowUps = [...budget.followUps, newFollowUp];
-        // FIX: Replaced 'Budget' type with 'BudgetStatus.FOLLOWING_UP' value and added 'nextFollowUpDate'.
+        // FIX: Replaced invalid status string 'Budget' with the correct enum value `BudgetStatus.FOLLOWING_UP`.
         await updateDoc(doc(db, "budgets", budgetId), {
             followUps: updatedFollowUps,
             status: BudgetStatus.FOLLOWING_UP,
@@ -660,18 +775,23 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     onAddReminder={handleAddReminder}
                     onDeleteReminder={handleDeleteReminder}
                     onToggleReminderStatus={handleToggleReminderStatus}
+                    globalSearchTerm={globalSearchTerm}
+                    globalSearchResults={globalSearchResults}
+                    onGlobalSearch={handleGlobalSearch}
+                    onClearGlobalSearch={handleClearSearch}
+                    onSearchResultClick={handleSearchResultClick}
                 />
                 
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto">
                     {/* Render active view based on state */}
                     {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile}/>}
                     {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect}/>}
-                    {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport}/>}
+                    {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
                     {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
                     {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)}/>}
                     {activeView === 'reports' && <ReportsView key={viewKey} budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport}/>}
                     {activeView === 'calendar' && <CalendarView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onAddReminder={handleAddReminder}/>}
-                    {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }}/>}
+                    {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} userProfile={effectiveUserProfile} />}
                     {activeView === 'map' && <MapView key={viewKey} clients={clients} />}
                     {activeView === 'scripts' && <ScriptsView key={viewKey} scripts={scripts} onAdd={() => { setScriptToEdit(null); setScriptModalOpen(true); }} onEdit={(script) => { setScriptToEdit(script); setScriptModalOpen(true); }} onDelete={handleDeleteScript}/>}
                     

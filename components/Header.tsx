@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon } from './icons';
+import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon, MagnifyingGlassIcon, UserIcon, BriefcaseIcon } from './icons';
 import type { Notification, UserProfile, Theme, ThemeVariant, Reminder } from '../types';
 import { UserRole } from '../types';
+
+type SearchResult = {
+  type: 'client' | 'budget' | 'prospect' | 'contact';
+  id: string;
+  title: string;
+  subtitle: string;
+};
 
 interface HeaderProps {
   onAddBudget: () => void;
@@ -20,6 +27,11 @@ interface HeaderProps {
   onAddReminder: (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => void;
   onDeleteReminder: (reminderId: string) => void;
   onToggleReminderStatus: (reminderId: string) => void;
+  globalSearchTerm: string;
+  globalSearchResults: SearchResult[];
+  onGlobalSearch: (term: string) => void;
+  onClearGlobalSearch: () => void;
+  onSearchResultClick: (result: SearchResult) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -39,6 +51,11 @@ const Header: React.FC<HeaderProps> = ({
     onAddReminder,
     onDeleteReminder,
     onToggleReminderStatus,
+    globalSearchTerm,
+    globalSearchResults,
+    onGlobalSearch,
+    onClearGlobalSearch,
+    onSearchResultClick,
 }) => {
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
@@ -47,6 +64,7 @@ const Header: React.FC<HeaderProps> = ({
   const notificationsRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const remindersRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   
   const [newReminderTitle, setNewReminderTitle] = useState('');
   const [newReminderDate, setNewReminderDate] = useState('');
@@ -65,10 +83,15 @@ const Header: React.FC<HeaderProps> = ({
         if (remindersRef.current && !remindersRef.current.contains(event.target as Node)) {
             setRemindersOpen(false);
         }
+        if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+            if (globalSearchTerm.length > 0) {
+                onClearGlobalSearch();
+            }
+        }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [globalSearchTerm, onClearGlobalSearch]);
 
   const handleNotificationItemClick = (budgetId: string) => {
     onNotificationClick(budgetId);
@@ -96,21 +119,89 @@ const Header: React.FC<HeaderProps> = ({
     .filter(r => !r.isDismissed)
     .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
 
+  const renderSearchResults = () => {
+    // FIX: Explicitly typed the initial value for the `reduce` method to correctly infer the type of the accumulator.
+    // This ensures TypeScript correctly infers `groupedResults` and resolves the error where `results.map` was called on `unknown`.
+    const groupedResults = globalSearchResults.reduce((acc, result) => {
+      const key = result.type;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(result);
+      return acc;
+    }, {} as Record<string, SearchResult[]>);
+
+    const getIconForType = (type: string) => {
+        switch(type) {
+            case 'client': return <UserIcon className="w-5 h-5 text-blue-500" />;
+            case 'budget': return <BriefcaseIcon className="w-5 h-5 text-green-500" />;
+            case 'prospect': return <FunnelIcon className="w-5 h-5 text-purple-500" />;
+            case 'contact': return <UserIcon className="w-5 h-5 text-yellow-500" />;
+            default: return null;
+        }
+    }
+
+    const getTypeName = (type: string) => {
+        switch(type) {
+            case 'client': return 'Clientes';
+            case 'budget': return 'Orçamentos';
+            case 'prospect': return 'Prospects';
+            case 'contact': return 'Contatos';
+            default: return 'Resultados';
+        }
+    }
+
+    return Object.entries(groupedResults).map(([type, results]) => (
+      <div key={type}>
+        <h3 className="px-4 py-2 text-xs font-bold uppercase text-[var(--text-tertiary)] bg-[var(--background-tertiary)]">{getTypeName(type)}</h3>
+        <ul>
+          {results.map(result => (
+            <li key={`${result.type}-${result.id}`} onClick={() => onSearchResultClick(result)} className="px-4 py-3 hover:bg-[var(--background-tertiary)] cursor-pointer border-b border-[var(--border-primary)]/50 last:border-b-0">
+              <div className="flex items-center gap-3">
+                {getIconForType(type)}
+                <div>
+                  <p className="font-semibold text-sm text-[var(--text-primary)]">{result.title}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{result.subtitle}</p>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ));
+  };
+
 
   return (
-    <header className={`p-4 flex justify-between items-center flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-20 shadow-sm'}`}>
+    <header className={`p-4 flex items-center gap-2 sm:gap-4 flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-20 shadow-sm'}`}>
       <button onClick={onToggleSidebar} className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] md:hidden">
         <Bars3Icon className="w-6 h-6" />
       </button>
 
-      <div className="hidden md:block flex-1">
-        {/* Can be used for breadcrumbs or other context info later */}
+      <div className="flex-1 flex justify-center" ref={searchRef}>
+          <div className="relative w-full max-w-xl">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" />
+            </div>
+            <input
+                type="text"
+                placeholder="Busca global..."
+                value={globalSearchTerm}
+                onChange={(e) => onGlobalSearch(e.target.value)}
+                className="w-full bg-[var(--background-tertiary)] border border-transparent focus:border-[var(--border-secondary)] rounded-lg py-2 pl-10 pr-4 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition-all"
+            />
+            {globalSearchResults.length > 0 && (
+                <div className="absolute top-full mt-2 w-full bg-[var(--background-secondary)] rounded-lg shadow-2xl border border-[var(--border-primary)] z-50 max-h-96 overflow-y-auto custom-scrollbar">
+                    {renderSearchResults()}
+                </div>
+            )}
+          </div>
       </div>
 
-      <div className="flex justify-end items-center gap-2 sm:gap-4 flex-wrap">
+      <div className="flex justify-end items-center gap-2 sm:gap-4">
         {/* Action Buttons */}
         {userProfile.role !== UserRole.SUPER_ADMIN && (
-          <>
+          <div className="hidden sm:flex items-center gap-2 sm:gap-4">
             <button
               onClick={onAddProspect}
               className={`${isDashboardTheme ? 'bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)]' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'} text-[var(--text-secondary)] font-semibold p-2 sm:py-2 sm:px-4 rounded-lg border border-[var(--border-secondary)] flex items-center transition-all duration-200 shadow-sm hover:shadow-md text-sm`}
@@ -125,10 +216,10 @@ const Header: React.FC<HeaderProps> = ({
               <PlusIcon className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Novo Orçamento</span>
             </button>
-          </>
+          </div>
         )}
         
-        <div className={`flex items-center gap-1 ${isDashboardTheme ? 'pl-2 sm:pl-4' : 'border-l border-[var(--border-primary)] pl-2 sm:pl-4'}`}>
+        <div className={`flex items-center gap-1 ${isDashboardTheme ? '' : 'border-l border-[var(--border-primary)] pl-2 sm:pl-4'}`}>
             {/* Theme Toggle */}
             <button onClick={toggleTheme} className="p-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] transition-colors">
                 {theme === 'dark' ? <SunIcon className="w-6 h-6 text-yellow-400" /> : <MoonIcon className="w-6 h-6 text-slate-500" />}
@@ -181,7 +272,11 @@ const Header: React.FC<HeaderProps> = ({
             <div className="relative" ref={notificationsRef}>
                 <button onClick={() => setNotificationsOpen(prev => !prev)} className="p-2 relative rounded-full text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] transition-colors">
                     <BellIcon className="w-6 h-6" />
-                    {notifications.length > 0 && <span className="absolute top-1.5 right-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--background-secondary)]"></span>}
+                    {notifications.length > 0 && (
+                        <span className="absolute top-1 right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white border-2 border-[var(--background-secondary)]">
+                            {notifications.length}
+                        </span>
+                    )}
                 </button>
                 <div className={`absolute top-full right-0 mt-2 w-80 bg-[var(--background-secondary)] rounded-xl shadow-2xl border border-[var(--border-primary)] overflow-hidden z-40 transition-all transform duration-300 ease-in-out ${isNotificationsOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                    <div className="p-4 border-b border-[var(--border-primary)]">
@@ -209,7 +304,7 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* User Info */}
             <div className="relative" ref={userMenuRef}>
-              <button onClick={() => setUserMenuOpen(prev => !prev)} className={`flex items-center gap-3 ${isDashboardTheme ? 'pl-2 sm:pl-4' : 'border-l border-[var(--border-primary)] pl-2 sm:pl-4'}`}>
+              <button onClick={() => setUserMenuOpen(prev => !prev)} className={`flex items-center gap-3 pl-2 sm:pl-4`}>
                   <div className="text-right hidden sm:block">
                       <span className="font-semibold text-sm text-[var(--text-primary)]">{userProfile.name}</span>
                       <span className="block text-xs text-[var(--text-tertiary)] capitalize">{userProfile.role}</span>

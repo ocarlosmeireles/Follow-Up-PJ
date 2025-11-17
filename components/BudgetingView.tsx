@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon, ChartPieIcon } from './icons';
+import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon, ChartPieIcon, PencilSquareIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
@@ -9,6 +9,7 @@ interface BudgetingViewProps {
   contacts: Contact[];
   onSelectBudget: (id: string) => void;
   onGenerateReport: (selectedIds: string[]) => void;
+  onBulkUpdate: (ids: string[], updates: Partial<Budget>) => void;
 }
 
 // --- TYPES & INTERFACES ---
@@ -73,11 +74,13 @@ const SortableHeader: React.FC<{
 };
 
 // --- MAIN VIEW COMPONENT ---
-const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget, onGenerateReport }) => {
+const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contacts, onSelectBudget, onGenerateReport, onBulkUpdate }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>({ key: 'dateSent', direction: 'desc' });
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'won' | 'lost'>('all');
+    const [showStatusChanger, setShowStatusChanger] = useState(false);
+    const statusChangerRef = useRef<HTMLDivElement>(null);
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
     const contactMap = useMemo(() => new Map(contacts.map(c => [c.id, c])), [contacts]);
@@ -173,7 +176,16 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         }
     };
 
+    const handleBulkStatusChange = (status: BudgetStatus) => {
+        if (selectedBudgetIds.size > 0) {
+            onBulkUpdate(Array.from(selectedBudgetIds), { status });
+            setSelectedBudgetIds(new Set());
+            setShowStatusChanger(false);
+        }
+    };
+
     const isAllSelected = selectedBudgetIds.size > 0 && selectedBudgetIds.size === filteredAndSortedBudgets.length;
+    const isAnySelected = selectedBudgetIds.size > 0;
 
     return (
         <div className="space-y-6">
@@ -203,18 +215,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                              <span className="absolute inset-y-0 left-0 flex items-center pl-3"><MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></span>
                             <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg p-2 pl-10 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"/>
                         </div>
-                        <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-                             <div className="flex items-center gap-2">
-                                <input type="checkbox" id="select-all-budgets" checked={isAllSelected} onChange={handleSelectAll} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
-                                <label htmlFor="select-all-budgets" className="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">Sel. Todos</label>
-                            </div>
-                            {selectedBudgetIds.size > 0 && (
-                                <button onClick={() => onGenerateReport(Array.from(selectedBudgetIds))} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200 shadow-sm">
-                                    <PrinterIcon className="w-5 h-5" />
-                                    <span className="hidden sm:inline">Relatório</span> ({selectedBudgetIds.size})
-                                </button>
-                            )}
-                        </div>
                     </div>
                 </div>
 
@@ -223,7 +223,9 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                      <table className="w-full text-left text-sm">
                         <thead className="bg-[var(--background-tertiary)] text-[var(--text-secondary)] uppercase text-xs">
                             <tr>
-                                <th className="p-3 w-10"></th>
+                                <th className="p-3 w-10">
+                                    <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} disabled={filteredAndSortedBudgets.length === 0} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                                </th>
                                 <SortableHeader label="Orçamento" sortKey="title" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Cliente" sortKey="client.name" sortConfig={sortConfig} requestSort={requestSort} />
                                 <SortableHeader label="Valor" sortKey="value" sortConfig={sortConfig} requestSort={requestSort} className="text-right" />
@@ -235,7 +237,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                             {filteredAndSortedBudgets.map((budget, index) => (
                                 <tr 
                                     key={budget.id} 
-                                    className={`hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item border-l-4 ${getStatusStyles(budget.status).bar}`}
+                                    className={`hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item border-l-4 ${getStatusStyles(budget.status).bar} ${selectedBudgetIds.has(budget.id) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
                                     style={{ animationDelay: `${index * 30}ms`}}
                                 >
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
@@ -262,7 +264,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                 {/* --- CARD VIEW for small screens --- */}
                 <div className="space-y-3 md:hidden">
                     {filteredAndSortedBudgets.map((budget, index) => (
-                        <div key={budget.id} className={`bg-[var(--background-secondary-hover)] p-3 rounded-lg border-l-4 animated-item ${getStatusStyles(budget.status).bar}`} style={{ animationDelay: `${index * 30}ms`}}>
+                        <div key={budget.id} className={`bg-[var(--background-secondary-hover)] p-3 rounded-lg border-l-4 animated-item ${getStatusStyles(budget.status).bar} ${selectedBudgetIds.has(budget.id) ? 'ring-2 ring-blue-500' : ''}`} style={{ animationDelay: `${index * 30}ms`}}>
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-start gap-3">
                                     <input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
@@ -301,6 +303,32 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                     </div>
                 )}
             </div>
+
+             {isAnySelected && (
+                <div className="fixed bottom-0 left-0 md:left-64 right-0 z-30 transform translate-y-0 transition-transform duration-300">
+                    <div className="bg-[var(--background-secondary)] p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] border-t border-[var(--border-primary)] flex justify-between items-center">
+                        <span className="font-semibold text-sm">{selectedBudgetIds.size} selecionado(s)</span>
+                        <div className="flex items-center gap-2">
+                             <div className="relative" ref={statusChangerRef}>
+                                <button onClick={() => setShowStatusChanger(p => !p)} className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 font-semibold py-2 px-3 rounded-lg flex items-center gap-2 text-sm">
+                                    <PencilSquareIcon className="w-4 h-4" /> Alterar Status
+                                </button>
+                                {showStatusChanger && (
+                                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-[var(--background-secondary)] rounded-lg shadow-lg border border-[var(--border-primary)] overflow-hidden">
+                                        {[BudgetStatus.ON_HOLD, BudgetStatus.LOST].map(status => (
+                                            <button key={status} onClick={() => handleBulkStatusChange(status)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--background-tertiary)]">{status}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button onClick={() => onGenerateReport(Array.from(selectedBudgetIds))} className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 font-semibold py-2 px-3 rounded-lg flex items-center gap-2 text-sm">
+                                <PrinterIcon className="w-4 h-4" /> Relatório
+                            </button>
+                            <button onClick={() => setSelectedBudgetIds(new Set())} className="text-sm font-semibold py-2 px-3">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

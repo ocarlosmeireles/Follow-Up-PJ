@@ -123,7 +123,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, o
                 activityStatus = daysSinceActivity > INACTIVE_THRESHOLD_DAYS ? 'inactive' : 'active';
             }
             
-            // FIX: Replaced BudgetStatus.WON with BudgetStatus.INVOICED to match the enum.
+            // FIX: Replaced non-existent `BudgetStatus.WON` with `BudgetStatus.INVOICED` to correctly filter for won budgets.
             const wonBudgets = clientBudgets.filter(b => b.status === BudgetStatus.INVOICED);
             const totalValue = wonBudgets.reduce((sum, b) => sum + b.value, 0);
 

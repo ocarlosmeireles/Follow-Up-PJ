@@ -8,6 +8,7 @@ import {
     ClipboardDocumentListIcon, PhoneIcon, EnvelopeIcon, StarIcon, ChevronDownIcon, TrophyIcon
 } from './icons';
 import BudgetAIAnalysisModal from './BudgetAIAnalysisModal';
+import LostReasonModal from './LostReasonModal';
 
 interface BudgetDetailModalProps {
     isOpen: boolean;
@@ -104,6 +105,7 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
     
     const [scriptCategory, setScriptCategory] = useState<ScriptCategory>('Follow-up Pós-Envio');
     const [selectedScript, setSelectedScript] = useState<Script | null>(null);
+    const [isLostReasonModalOpen, setLostReasonModalOpen] = useState(false);
 
     const filteredScripts = useMemo(() => scripts.filter(s => s.category === scriptCategory), [scripts, scriptCategory]);
     
@@ -122,8 +124,20 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
             setIsEditing(false);
             setScriptCategory('Follow-up Pós-Envio');
             setSelectedScript(null);
+            setLostReasonModalOpen(false);
         }
     }, [isOpen, budget]);
+
+    const handleConfirmLoss = (reason: string, notes: string) => {
+        onUpdateBudget(budget.id, {
+            status: BudgetStatus.LOST,
+            lostReason: reason,
+            lostNotes: notes,
+            nextFollowUpDate: null // Clear next follow up when lost
+        });
+        setLostReasonModalOpen(false);
+        onClose(); // Also close the main modal after confirming loss
+    };
 
     const handleSaveFollowUp = () => {
         if (newFollowUpNote.trim()) {
@@ -340,7 +354,7 @@ O tom deve ser profissional, mas pessoal.`;
                                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.FOLLOWING_UP)} className="w-full text-left bg-yellow-100 hover:bg-yellow-200 text-yellow-800 dark:bg-yellow-900/50 dark:hover:bg-yellow-900 dark:text-yellow-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><ArrowPathIcon className="w-5 h-5"/> Em Follow-up</button>
                                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="w-full text-left bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 dark:text-slate-200 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><PauseCircleIcon className="w-5 h-5"/> Congelar</button>
                                     <button onClick={() => setIsConfirmingWin(true)} className="w-full text-left bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/50 dark:hover:bg-green-900 dark:text-green-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><TrophyIcon className="w-5 h-5"/> Ganho/Faturado</button>
-                                    <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="w-full text-left bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900/50 dark:hover:bg-red-900 dark:text-red-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><XCircleIcon className="w-5 h-5"/> Perdido</button>
+                                    <button onClick={() => setLostReasonModalOpen(true)} className="w-full text-left bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900/50 dark:hover:bg-red-900 dark:text-red-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><XCircleIcon className="w-5 h-5"/> Perdido</button>
                                 </div>
                             )}
                             {isConfirmingWin && (
@@ -363,6 +377,13 @@ O tom deve ser profissional, mas pessoal.`;
                     onClose={() => setAIModalOpen(false)}
                     budget={budget}
                     clientName={client.name}
+                />
+            )}
+            {isLostReasonModalOpen && (
+                <LostReasonModal
+                    isOpen={isLostReasonModalOpen}
+                    onClose={() => setLostReasonModalOpen(false)}
+                    onConfirm={handleConfirmLoss}
                 />
             )}
         </>

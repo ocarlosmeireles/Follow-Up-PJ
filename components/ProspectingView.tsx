@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Prospect, ProspectingStage } from '../types';
-import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon, EllipsisVerticalIcon, SparklesIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, UserGroupIcon } from './icons';
+import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon, EllipsisVerticalIcon, SparklesIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, UserGroupIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, ChartBarIcon } from './icons';
 import ProspectAIModal from './ProspectAIModal';
 
 // --- PROPS & TYPES ---
@@ -174,8 +174,8 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
     }
     
     return (
-        <div className="flex flex-col h-full w-full">
-            <div className="flex-shrink-0 mb-6">
+        <div className="flex flex-col h-full w-full -mx-4 sm:-mx-6">
+            <div className="flex-shrink-0 mb-6 px-4 sm:px-6">
                 <h2 className="text-3xl font-bold text-[var(--text-primary)]">Central de Prospecção e Geração de Leads</h2>
                 <p className="text-[var(--text-secondary)]">Encontre novos clientes, valide oportunidades, registre dados críticos e acompanhe o funil até virar venda.</p>
                  <div className="flex justify-end">
@@ -186,14 +186,14 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 px-4 sm:px-6">
                 <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Total de Leads</p><p className="text-2xl font-bold">{metrics.total}</p></div>
                 <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Leads Qualificados</p><p className="text-2xl font-bold">{metrics.qualified}</p></div>
                 <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Valor em Negociação</p><p className="text-2xl font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(metrics.negotiationValue)}</p></div>
                 <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Leads sem Follow-up (&gt;7d)</p><p className="text-2xl font-bold text-yellow-500">{metrics.idleLeads}</p></div>
             </div>
 
-             <div className="bg-[var(--background-secondary)] p-3 rounded-lg border border-[var(--border-primary)] mb-4 flex flex-wrap items-center gap-4">
+             <div className="bg-[var(--background-secondary)] p-3 rounded-lg border border-[var(--border-primary)] mb-4 flex flex-wrap items-center gap-4 mx-4 sm:mx-6">
                  <div className="relative flex-grow min-w-[200px]">
                     <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2"/>
                     <input type="text" placeholder="Buscar por empresa, contato..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 pl-10 pr-3"/>
@@ -203,7 +203,7 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                  <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} className="flex-grow min-w-[150px] bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 px-3"><option value="all">Toda Urgência</option><option value="Baixa">Baixa</option><option value="Média">Média</option><option value="Alta">Alta</option></select>
             </div>
 
-            <div className="flex-grow flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-0">
+            <div className="flex-grow flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-0 px-4 sm:px-6">
                 {sortedStages.map((stage) => {
                     const stageProspects = prospectsByStage[stage.id] || [];
                     return (
@@ -239,8 +239,18 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                  </div>
             </div>
             
-            <footer className="text-center text-xs text-[var(--text-tertiary)] mt-4 border-t border-[var(--border-primary)] pt-2">
-                Ações rápidas do rodapé: Importar Lista | Exportar Leads | Gerar Relatórios (Em breve)
+            <footer className="flex-shrink-0 flex items-center justify-center gap-4 sm:gap-6 text-sm text-[var(--text-secondary)] mt-4 border-t border-[var(--border-primary)] py-4 px-4 sm:px-6">
+                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <ArrowUpTrayIcon className="w-5 h-5" /> Importar Lista
+                </button>
+                <span className="text-[var(--border-secondary)]">|</span>
+                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <ArrowDownTrayIcon className="w-5 h-5" /> Exportar Leads
+                </button>
+                <span className="text-[var(--border-secondary)]">|</span>
+                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <ChartBarIcon className="w-5 h-5" /> Gerar Relatórios
+                </button>
             </footer>
 
             {aiModal.isOpen && selectedProspect && (

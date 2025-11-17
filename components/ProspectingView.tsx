@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Prospect, ProspectingStage } from '../types';
-import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon, EllipsisVerticalIcon, SparklesIcon, AcademicCapIcon, ChatBubbleLeftRightIcon, UserGroupIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, ChartBarIcon } from './icons';
-import ProspectAIModal from './ProspectAIModal';
+import { PlusIcon, CalendarIcon, TrophyIcon, FunnelIcon, XCircleIcon, MagnifyingGlassIcon } from './icons';
 
 // --- PROPS & TYPES ---
 interface ProspectingViewProps {
@@ -17,22 +16,8 @@ interface ProspectingViewProps {
 
 const ProspectCard: React.FC<{ 
     prospect: Prospect; 
-    onOpenAIModal: (mode: 'research' | 'icebreaker' | 'strategy') => void;
     isDragging: boolean;
-}> = ({ prospect, onOpenAIModal, isDragging }) => {
-    
-    const [isMenuOpen, setMenuOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+}> = ({ prospect, isDragging }) => {
     
     const isNextContactOverdue = useMemo(() => {
         if (!prospect.nextContactDate) return false;
@@ -48,24 +33,6 @@ const ProspectCard: React.FC<{
                 <div className="flex-1 overflow-hidden">
                     <h4 className="font-bold text-[var(--text-primary)] text-base truncate" title={prospect.company}>{prospect.company}</h4>
                     <p className="text-sm text-[var(--text-accent)] font-semibold truncate" title={prospect.name}>{prospect.name}</p>
-                </div>
-                <div className="relative" ref={menuRef}>
-                    <button onClick={() => setMenuOpen(p => !p)} className="p-1 rounded-full text-[var(--text-tertiary)] hover:bg-[var(--background-tertiary)]">
-                        <EllipsisVerticalIcon className="w-5 h-5"/>
-                    </button>
-                    {isMenuOpen && (
-                         <div className="absolute top-full right-0 mt-1 w-48 bg-[var(--background-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] z-10">
-                             <button onClick={() => onOpenAIModal('research')} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
-                                 <AcademicCapIcon className="w-4 h-4 text-sky-500"/> Pesquisar
-                             </button>
-                             <button onClick={() => onOpenAIModal('icebreaker')} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
-                                 <ChatBubbleLeftRightIcon className="w-4 h-4 text-violet-500"/> Gerar Abordagem
-                             </button>
-                             <button onClick={() => onOpenAIModal('strategy')} className="w-full text-left flex items-center gap-2 p-2 text-sm hover:bg-[var(--background-tertiary)]">
-                                <SparklesIcon className="w-4 h-4 text-emerald-500"/> Sugerir Estratégia
-                             </button>
-                         </div>
-                    )}
                 </div>
             </div>
             
@@ -91,8 +58,7 @@ const Column: React.FC<{
     isDraggingOver: boolean;
     onConvertProspect: (id: string) => void;
     onDeleteProspect: (id: string) => void;
-    onOpenAIModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
-}> = ({ stage, prospects, onDragOver, onDrop, setDraggingProspectId, draggingProspectId, isDraggingOver, onConvertProspect, onDeleteProspect, onOpenAIModal }) => {
+}> = ({ stage, prospects, onDragOver, onDrop, setDraggingProspectId, draggingProspectId, isDraggingOver, onConvertProspect, onDeleteProspect }) => {
     
     const totalValue = useMemo(() => {
         return prospects.reduce((sum, p) => sum + (p.estimatedBudget || 0), 0)
@@ -126,7 +92,6 @@ const Column: React.FC<{
                         <ProspectCard 
                             prospect={prospect} 
                             isDragging={draggingProspectId === prospect.id}
-                            onOpenAIModal={(mode) => onOpenAIModal(prospect, mode)}
                         />
                     </div>
                 ))}
@@ -168,7 +133,6 @@ export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, sta
     const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
     const [draggingOverStageId, setDraggingOverStageId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [aiModalState, setAiModalState] = useState<{ isOpen: boolean; prospect: Prospect | null; mode: 'research' | 'icebreaker' | 'strategy' }>({ isOpen: false, prospect: null, mode: 'research' });
 
     const sortedStages = useMemo(() => stages.sort((a, b) => a.order - b.order), [stages]);
 
@@ -197,10 +161,6 @@ export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, sta
         const prospectId = e.dataTransfer.getData('prospectId');
         onUpdateProspectStage(prospectId, stageId);
         setDraggingOverStageId(null);
-    };
-
-    const handleOpenAIModal = (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => {
-        setAiModalState({ isOpen: true, prospect, mode });
     };
 
     return (
@@ -247,7 +207,6 @@ export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, sta
                             isDraggingOver={draggingOverStageId === stage.id}
                             onConvertProspect={onConvertProspect}
                             onDeleteProspect={onDeleteProspect}
-                            onOpenAIModal={handleOpenAIModal}
                         />
                     ))
                 ) : (
@@ -258,15 +217,6 @@ export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, sta
                     </div>
                 )}
             </div>
-
-            {aiModalState.isOpen && aiModalState.prospect && (
-                <ProspectAIModal 
-                    isOpen={aiModalState.isOpen}
-                    onClose={() => setAiModalState({ isOpen: false, prospect: null, mode: 'research'})}
-                    prospect={aiModalState.prospect}
-                    mode={aiModalState.mode}
-                />
-            )}
         </div>
     );
 };

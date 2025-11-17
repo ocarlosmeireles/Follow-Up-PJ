@@ -131,8 +131,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
-        // FIX: Use type assertion on the initial value of `reduce` to properly type the accumulator as `Record<string, number>`.
-        // This resolves subsequent type errors where arithmetic operations were attempted on values inferred as `unknown`.
+        // FIX: Explicitly typed the initial value for the `reduce` method's accumulator. This resolves type errors
+        // where arithmetic operations were attempted on `unknown` values and `Math.max` received an `unknown` argument.
         const reasonCounts = lostBudgets.reduce((acc, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;

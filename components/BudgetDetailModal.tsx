@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact, Script, ScriptCategory } from '../types';
 import { BudgetStatus, FollowUpStatus, scriptCategories } from '../types';
 import { 
     XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, 
-    PauseCircleIcon, SparklesIcon, PencilIcon, ClockIcon, CurrencyDollarIcon, 
+    PauseCircleIcon, PencilIcon, ClockIcon, CurrencyDollarIcon, 
     ClipboardDocumentListIcon, PhoneIcon, EnvelopeIcon, StarIcon, ChevronDownIcon, TrophyIcon
 } from './icons';
-import BudgetAIAnalysisModal from './BudgetAIAnalysisModal';
 import LostReasonModal from './LostReasonModal';
 
 interface BudgetDetailModalProps {
@@ -94,14 +92,11 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
     const [newFollowUpNote, setNewFollowUpNote] = useState('');
     const [newFollowUpStatus, setNewFollowUpStatus] = useState<FollowUpStatus>(FollowUpStatus.WAITING_RESPONSE);
     const [nextFollowUpDate, setNextFollowUpDate] = useState<string | null>(null);
-    const [isLoadingAI, setIsLoadingAI] = useState(false);
-    const [generatedScript, setGeneratedScript] = useState('');
     const [closingValue, setClosingValue] = useState('');
     const [isConfirmingWin, setIsConfirmingWin] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(budget.title);
     const [editableValue, setEditableValue] = useState(formatCurrency(budget.value));
-    const [isAIModalOpen, setAIModalOpen] = useState(false);
     
     const [scriptCategory, setScriptCategory] = useState<ScriptCategory>('Follow-up Pós-Envio');
     const [selectedScript, setSelectedScript] = useState<Script | null>(null);
@@ -115,8 +110,6 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
         if (isOpen) {
             setNewFollowUpNote('');
             setNextFollowUpDate(null);
-            setGeneratedScript('');
-            setIsLoadingAI(false);
             setClosingValue(formatCurrency(budget.value));
             setIsConfirmingWin(false);
             setEditableTitle(budget.title);
@@ -168,37 +161,11 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
         setNewFollowUpNote('');
     };
 
-    const handleGenerateScript = async () => {
-        setIsLoadingAI(true);
-        setGeneratedScript('');
-        try {
-            if (!process.env.API_KEY) throw new Error("A chave da API não foi configurada.");
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `Gere um texto curto e amigável para um follow-up de orçamento.
-Cliente: ${client.name}
-Contato: ${contact?.name || 'Prezado(a)'}
-Orçamento: ${budget.title}
-Valor: ${formatCurrency(budget.value)}
-Histórico: ${budget.followUps.length > 0 ? budget.followUps.map(f => f.notes).join(' | ') : 'Primeiro follow-up.'}
-Objetivo: Manter a conversa ativa e buscar o próximo passo.
-O tom deve ser profissional, mas pessoal.`;
-
-            const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-            setGeneratedScript(response.text || 'Não foi possível gerar um script.');
-        } catch (error) {
-            console.error(error);
-            setGeneratedScript('Erro ao gerar script. Verifique sua chave de API.');
-        } finally {
-            setIsLoadingAI(false);
-        }
-    };
-
     const handleApplyScript = (content: string) => {
         let finalContent = content;
         if (contact?.name) finalContent = finalContent.replace(/\[Nome do Cliente\]/g, contact.name.split(' ')[0]);
         if (budget.title) finalContent = finalContent.replace(/\[Título da Proposta\]/g, `"${budget.title}"`);
         setNewFollowUpNote(finalContent);
-        setGeneratedScript('');
         setSelectedScript(null);
     };
 
@@ -264,23 +231,11 @@ O tom deve ser profissional, mas pessoal.`;
                                     value={newFollowUpNote}
                                     onChange={(e) => setNewFollowUpNote(e.target.value)}
                                     rows={4}
-                                    placeholder="Digite sua anotação ou gere um script com a IA..."
+                                    placeholder="Digite sua anotação ou use um script..."
                                     className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
-                                {generatedScript && (
-                                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-md">
-                                        <p className="text-sm whitespace-pre-wrap text-blue-800 dark:text-blue-200">{generatedScript}</p>
-                                        <div className="flex gap-2 mt-2">
-                                            <button onClick={() => handleApplyScript(generatedScript)} className="text-sm bg-blue-500 text-white px-2 py-1 rounded">Aplicar</button>
-                                            <button onClick={() => setGeneratedScript('')} className="text-sm bg-gray-200 px-2 py-1 rounded">Descartar</button>
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
                                     <div className="flex flex-wrap gap-2 items-center">
-                                         <button onClick={handleGenerateScript} disabled={isLoadingAI} className="text-sm bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-semibold py-1 px-3 rounded-lg flex items-center gap-1.5 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors">
-                                            <SparklesIcon className={`w-4 h-4 ${isLoadingAI ? 'animate-pulse' : ''}`}/> {isLoadingAI ? 'Gerando...' : 'Gerar com IA'}
-                                        </button>
                                         <select value={scriptCategory} onChange={e => {setScriptCategory(e.target.value as ScriptCategory); setSelectedScript(null);}} className="text-sm bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded-lg py-1 px-2">
                                             {scriptCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
@@ -329,9 +284,6 @@ O tom deve ser profissional, mas pessoal.`;
                              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 space-y-3">
                                 <div className="flex justify-between items-center">
                                     <span className={`px-3 py-1 text-sm font-bold rounded-full ${getStatusBadgeColor(budget.status)}`}>{budget.status}</span>
-                                     <button onClick={() => setAIModalOpen(true)} className="text-sm bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-semibold py-1 px-3 rounded-lg flex items-center gap-1.5 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors">
-                                        <SparklesIcon className="w-4 h-4"/> Analisar
-                                    </button>
                                 </div>
                                  {isEditing ? (
                                     <input type="text" value={editableValue} onChange={e => setEditableValue(formatCurrencyForInput(e.target.value))} className="text-3xl font-bold text-gray-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 p-1 -m-1 rounded-md w-full"/>
@@ -371,14 +323,6 @@ O tom deve ser profissional, mas pessoal.`;
                     </div>
                 </div>
             </div>
-            {isAIModalOpen && (
-                <BudgetAIAnalysisModal 
-                    isOpen={isAIModalOpen}
-                    onClose={() => setAIModalOpen(false)}
-                    budget={budget}
-                    clientName={client.name}
-                />
-            )}
             {isLostReasonModalOpen && (
                 <LostReasonModal
                     isOpen={isLostReasonModalOpen}

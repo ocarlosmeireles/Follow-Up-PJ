@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, UserPlusIcon, UserGroupIcon, CurrencyDollarIcon, SparklesIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, Squares2X2Icon, ViewColumnsIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownTrayIcon, TrashIcon } from './icons';
+import { MagnifyingGlassIcon, UserPlusIcon, UserGroupIcon, CurrencyDollarIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, Squares2X2Icon, ViewColumnsIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownTrayIcon, TrashIcon } from './icons';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -60,7 +59,7 @@ const ActivityBadge: React.FC<{ status: ExtendedClient['activityStatus'], showTe
     );
 };
 
-const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, isSelected: boolean, onToggleSelect: (id: string) => void, style?: React.CSSProperties, className?: string }> = ({ client, onSelectClient, onGenerateIdea, isSelected, onToggleSelect, style, className }) => {
+const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, isSelected: boolean, onToggleSelect: (id: string) => void, style?: React.CSSProperties, className?: string }> = ({ client, onSelectClient, isSelected, onToggleSelect, style, className }) => {
     
     return (
         <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${isSelected ? 'border-blue-500 ring-2 ring-blue-500' : ''} ${className || ''}`}>
@@ -106,11 +105,6 @@ const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string
                 <button onClick={() => onSelectClient(client.id)} className="w-full text-sm bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-200 font-semibold py-2 px-3 rounded-md transition-colors">
                     Ver Detalhes
                 </button>
-                {client.activityStatus === 'inactive' && (
-                    <button onClick={() => onGenerateIdea(client)} title="Gerar ideia para reengajar" className="flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-200 dark:hover:bg-purple-900 text-purple-600 dark:text-purple-400 font-semibold py-2 px-3 rounded-md transition-colors">
-                        <SparklesIcon className="w-5 h-5"/>
-                    </button>
-                )}
             </div>
         </div>
     );
@@ -132,7 +126,6 @@ const SortableHeader: React.FC<{ label: string; sortKey: SortKey; sortConfig: { 
 const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, onSelectClient, onAddClientClick, onBulkDelete }) => {
     const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [searchTerm, setSearchTerm] = useState('');
-    const [aiIdea, setAiIdea] = useState<{ client: ExtendedClient | null, idea: string, loading: boolean, error: string | null }>({ client: null, idea: '', loading: false, error: null });
     const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>({ key: 'totalValue', direction: 'desc' });
     const [selectedClientIds, setSelectedClientIds] = useState(new Set<string>());
@@ -225,38 +218,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, o
     
     const isAllSelected = sortedAndFilteredClients.length > 0 && selectedClientIds.size === sortedAndFilteredClients.length;
 
-     const handleGenerateIdea = useCallback(async (client: ExtendedClient) => {
-        setAiIdea({ client, idea: '', loading: true, error: null });
-        try {
-             if (!process.env.API_KEY) throw new Error('A chave da API não está configurada.');
-             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-             const prompt = `Gere uma ideia para reengajar um cliente inativo.
-Nome do Cliente: ${client.name}
-Inativo há: ${client.daysSinceActivity} dias.
-Histórico de projetos ganhos: ${client.wonBudgets.map(b => b.title).join(', ') || 'Nenhum'}
-
-A ideia deve ser curta, amigável e profissional, com o objetivo de iniciar uma nova conversa.
-Sugira o texto para um e-mail ou uma mensagem de WhatsApp.
-Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem introduções ou despedidas genéricas como "[Seu Nome]".`;
-
-             const response = await ai.models.generateContent({
-                 model: 'gemini-2.5-flash',
-                 contents: prompt,
-                 config: { systemInstruction: "Você é um assistente de vendas especialista em reengajamento de clientes (CRM). Suas sugestões são proativas e focadas em criar valor." }
-             });
-             
-             if (response.text) {
-                setAiIdea({ client, idea: response.text, loading: false, error: null });
-             } else {
-                 throw new Error("Resposta da IA vazia.");
-             }
-        } catch(error) {
-            console.error("Erro ao gerar ideia com IA:", error);
-            setAiIdea({ client, idea: '', loading: false, error: 'Falha ao gerar sugestão. Tente novamente.' });
-        }
-    }, []);
-
     const handleToggleSelect = (clientId: string) => {
         setSelectedClientIds(prev => {
             const newSet = new Set(prev);
@@ -348,20 +309,11 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                      </div>
                 </div>
 
-                 {aiIdea.client && (
-                    <div className="mb-4 bg-purple-50 border border-purple-200 dark:bg-purple-900/40 dark:border-purple-800/50 p-4 rounded-lg">
-                        <h4 className="font-bold text-purple-800 dark:text-purple-200">Sugestão para {aiIdea.client.name}:</h4>
-                        {aiIdea.loading && <p className="text-sm text-purple-700 dark:text-purple-300 animate-pulse">Gerando ideia...</p>}
-                        {aiIdea.error && <p className="text-sm text-red-600 dark:text-red-400">{aiIdea.error}</p>}
-                        {aiIdea.idea && <div className="prose prose-sm dark:prose-invert text-gray-800 dark:text-slate-200 mt-2 whitespace-pre-wrap">{aiIdea.idea}</div>}
-                    </div>
-                 )}
-
                 {sortedAndFilteredClients.length > 0 ? (
                     viewMode === 'card' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             {sortedAndFilteredClients.map((client, index) => (
-                                <ClientCard style={{ animationDelay: `${index * 50}ms` }} className="animated-item" key={client.id} client={client} onSelectClient={onSelectClient} onGenerateIdea={handleGenerateIdea} isSelected={selectedClientIds.has(client.id)} onToggleSelect={handleToggleSelect} />
+                                <ClientCard style={{ animationDelay: `${index * 50}ms` }} className="animated-item" key={client.id} client={client} onSelectClient={onSelectClient} isSelected={selectedClientIds.has(client.id)} onToggleSelect={handleToggleSelect} />
                             ))}
                         </div>
                     ) : (

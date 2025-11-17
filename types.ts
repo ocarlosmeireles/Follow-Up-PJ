@@ -158,13 +158,6 @@ export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard' | 'auror
 // FIX: Moved Theme type here to be accessible globally and fix import errors.
 export type Theme = 'light' | 'dark';
 
-export interface PriorityDeal {
-    budgetId: string;
-    priorityScore: number;
-    nextBestAction: string;
-    rationale: string;
-}
-
 export type ScriptCategory = 'Prospecção Fria' | 'Follow-up Pós-Envio' | 'Reuniões e Apresentações' | 'Reengajamento' | 'Negociação e Fechamento' | 'Pós-Venda';
 
 export const scriptCategories: ScriptCategory[] = [
@@ -183,12 +176,4 @@ export interface Script {
   title: string;
   content: string;
   category: ScriptCategory;
-}
-
-export interface DailyBriefing {
-  greeting: string;
-  priorities: { text: string; budgetId?: string }[];
-  warnings: { text: string; budgetId?: string }[];
-  quickWins: { text: string; budgetId?: string }[];
-  motivation: string;
 }

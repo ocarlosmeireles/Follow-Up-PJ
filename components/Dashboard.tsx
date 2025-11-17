@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useMemo } from 'react';
 import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
 import { BudgetStatus } from '../types';

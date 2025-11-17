@@ -109,6 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
                     </>
                 ) : (
                     <>
+                        {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
                         {renderLink('dashboard', "Painel", <DashboardIcon className="w-6 h-6" />)}
                         
                         {renderSection("Vendas", <>
@@ -120,7 +121,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, us
 
                         {renderSection("Organização", <>
                             {renderLink('calendar', "Calendário", <CalendarDaysIcon className="w-6 h-6" />)}
-                            {renderLink('action-plan', "Plano de Ação", <ClipboardDocumentListIcon className="w-6 h-6" />)}
                             {renderLink('scripts', "Central de Scripts", <ChatBubbleLeftRightIcon className="w-6 h-6" />)}
                         </>)}
                          

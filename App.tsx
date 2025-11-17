@@ -11,7 +11,8 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DealsView from './components/DealsView';
-import ProspectingView from './components/ProspectingView';
+// FIX: `ProspectingView` is not a default export. It is imported as a named export.
+import { ProspectingView } from './components/ProspectingView';
 import CalendarView from './components/CalendarView';
 import TasksView from './components/TasksView';
 import MapView from './components/MapView';
@@ -72,7 +73,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [userProfile, setUserProfile] = useState<UserData | null>(null);
     const [organization, setOrganization] = useState<Organization | null>(null);
-    const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+    const [activeView, setActiveView] = useState<ActiveView>('action-plan');
     const [viewKey, setViewKey] = useState(0);
     const [impersonatingOrg, setImpersonatingOrg] = useState<Organization | null>(null);
 
@@ -142,7 +143,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setStages([]); setReminders([]); setUsers([]); setScripts([]);
         
         setImpersonatingOrg(org);
-        setActiveView('dashboard');
+        setActiveView('action-plan');
         setViewKey(prev => prev + 1);
     }, [userProfile]);
 
@@ -481,7 +482,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         const budget = budgets.find(b => b.id === budgetId);
         if (!budget) return;
 
-        const newFollowUp = { ...followUp, id: crypto.randomUUID() };
+        const newFollowUp = { ...followUp, id: `followup-${Date.now()}` };
         const updatedFollowUps = [...budget.followUps, newFollowUp];
         // FIX: Replaced invalid status string 'Budget' with the correct enum value `BudgetStatus.FOLLOWING_UP`.
         await updateDoc(doc(db, "budgets", budgetId), {

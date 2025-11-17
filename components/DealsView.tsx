@@ -239,7 +239,8 @@ const CompactBudgetCard: React.FC<{ budget: Budget, clientName: string, onSelect
         <div onClick={onSelect} className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-pointer border border-[var(--border-secondary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2' : 'hover:border-[var(--accent-primary)] hover:-translate-y-0.5'}`}>
             <div className="flex justify-between items-start">
                 <h4 className="font-bold text-[var(--text-primary)] text-base pr-2 truncate">{budget.title}</h4>
-                {isOverdue && <ExclamationCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0" title="Follow-up Atrasado!"/>}
+                {/* FIX: Removed the `title` prop from `ExclamationCircleIcon` as it's not supported by the component. */}
+                {isOverdue && <ExclamationCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />}
             </div>
             <p className="text-sm text-[var(--text-accent)] font-semibold mb-2 truncate">{clientName}</p>
             <div className="flex justify-between items-center text-sm font-semibold text-[var(--text-secondary)]">

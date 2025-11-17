@@ -74,203 +74,199 @@ const ProspectCard: React.FC<{
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--border-primary)]">
                 <div className={`flex items-center gap-1.5 text-xs font-semibold ${isNextContactOverdue ? 'text-red-500' : 'text-[var(--text-tertiary)]'}`} title="Próximo Contato">
                     <CalendarIcon className="w-4 h-4"/>
-                    <span>{prospect.nextContactDate ? new Date(prospect.nextContactDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</span>
+                    <span>{prospect.nextContactDate ? new Date(prospect.nextContactDate).toLocaleDateString() : 'N/A'}</span>
                 </div>
-                {prospect.estimatedBudget && prospect.estimatedBudget > 0 ? (
-                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(prospect.estimatedBudget)}
-                    </span>
-                ) : null}
             </div>
         </div>
     );
 };
 
-// Main Component
-const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onConvertProspect, onDeleteProspect }) => {
-    const [draggingOverColumn, setDraggingOverColumn] = useState<string | null>(null);
-    const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
-    const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
-    const [aiModal, setAiModal] = useState<{ isOpen: boolean; mode: 'research' | 'icebreaker' | 'strategy' }>({ isOpen: false, mode: 'research' });
-
-    // Filters
-    const [searchTerm, setSearchTerm] = useState('');
-    const [segmentFilter, setSegmentFilter] = useState('all');
-    const [sizeFilter, setSizeFilter] = useState('all');
-    const [urgencyFilter, setUrgencyFilter] = useState('all');
-
+const Column: React.FC<{
+    stage: ProspectingStage;
+    prospects: Prospect[];
+    onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+    onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+    setDraggingProspectId: (id: string | null) => void;
+    draggingProspectId: string | null;
+    isDraggingOver: boolean;
+    onConvertProspect: (id: string) => void;
+    onDeleteProspect: (id: string) => void;
+    onOpenAIModal: (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => void;
+}> = ({ stage, prospects, onDragOver, onDrop, setDraggingProspectId, draggingProspectId, isDraggingOver, onConvertProspect, onDeleteProspect, onOpenAIModal }) => {
     
-    const sortedStages = useMemo(() => [...stages].sort((a,b) => a.order - b.order), [stages]);
+    const totalValue = useMemo(() => {
+        return prospects.reduce((sum, p) => sum + (p.estimatedBudget || 0), 0)
+    }, [prospects]);
+
+    return (
+        <div 
+            onDragOver={onDragOver} 
+            onDrop={onDrop}
+            className={`flex-1 min-w-[320px] bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors ${isDraggingOver ? 'bg-[var(--background-secondary-hover)]' : ''}`}
+        >
+            <div className="flex justify-between items-center mb-1 px-1">
+                <h3 className="font-semibold text-lg text-[var(--text-primary)]">{stage.name}</h3>
+                <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{prospects.length}</span>
+            </div>
+            <div className="text-sm font-bold text-[var(--text-accent)] mb-3 px-1">~ R$ {new Intl.NumberFormat('pt-BR').format(totalValue)}</div>
+            
+            <div className="overflow-y-auto pr-2 custom-scrollbar flex-grow">
+                {prospects.map((prospect, index) => (
+                    <div 
+                        key={prospect.id} 
+                        draggable 
+                        onDragStart={(e) => {
+                            e.dataTransfer.setData('prospectId', prospect.id);
+                            setDraggingProspectId(prospect.id);
+                        }}
+                        onDragEnd={() => setDraggingProspectId(null)}
+                        className="mb-3 animated-item"
+                        style={{ animationDelay: `${index * 50}ms`}}
+                    >
+                        <ProspectCard 
+                            prospect={prospect} 
+                            isDragging={draggingProspectId === prospect.id}
+                            onOpenAIModal={(mode) => onOpenAIModal(prospect, mode)}
+                        />
+                    </div>
+                ))}
+                {isDraggingOver && <div className="h-24 border-2 border-dashed border-[var(--border-secondary)] rounded-lg bg-[var(--background-tertiary-hover)] mt-2" />}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-3 text-sm font-semibold">
+                 <div
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        const prospectId = e.dataTransfer.getData('prospectId');
+                        onConvertProspect(prospectId);
+                    }}
+                    className="bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-lg p-3 flex items-center justify-center gap-2 text-center transition-colors hover:bg-green-200 dark:hover:bg-green-900 border-2 border-dashed border-transparent hover:border-green-400"
+                >
+                    <TrophyIcon className="w-5 h-5"/> Converter
+                </div>
+                 <div
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        const prospectId = e.dataTransfer.getData('prospectId');
+                        onDeleteProspect(prospectId);
+                    }}
+                    className="bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg p-3 flex items-center justify-center gap-2 text-center transition-colors hover:bg-red-200 dark:hover:bg-red-900 border-2 border-dashed border-transparent hover:border-red-400"
+                >
+                    <XCircleIcon className="w-5 h-5"/> Perder
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// --- MAIN VIEW COMPONENT ---
+
+export const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, onAddProspectClick, onUpdateProspectStage, onConvertProspect, onDeleteProspect }) => {
+    const [draggingProspectId, setDraggingProspectId] = useState<string | null>(null);
+    const [draggingOverStageId, setDraggingOverStageId] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [aiModalState, setAiModalState] = useState<{ isOpen: boolean; prospect: Prospect | null; mode: 'research' | 'icebreaker' | 'strategy' }>({ isOpen: false, prospect: null, mode: 'research' });
+
+    const sortedStages = useMemo(() => stages.sort((a, b) => a.order - b.order), [stages]);
 
     const filteredProspects = useMemo(() => {
-        return prospects.filter(p => {
-            const searchLower = searchTerm.toLowerCase();
-            const searchMatch = !searchTerm || p.company.toLowerCase().includes(searchLower) || p.name.toLowerCase().includes(searchLower) || p.cnpj?.includes(searchLower);
-            const segmentMatch = segmentFilter === 'all' || p.segment === segmentFilter;
-            const sizeMatch = sizeFilter === 'all' || p.companySize === sizeFilter;
-            const urgencyMatch = urgencyFilter === 'all' || p.urgencyLevel === urgencyFilter;
-            return searchMatch && segmentMatch && sizeMatch && urgencyMatch;
-        });
-    }, [prospects, searchTerm, segmentFilter, sizeFilter, urgencyFilter]);
-
+        if (!searchTerm) return prospects;
+        const lowerSearch = searchTerm.toLowerCase();
+        return prospects.filter(p => 
+            p.company.toLowerCase().includes(lowerSearch) || 
+            p.name.toLowerCase().includes(lowerSearch)
+        );
+    }, [prospects, searchTerm]);
+    
     const prospectsByStage = useMemo(() => {
-        const grouped: { [key: string]: Prospect[] } = {};
-        stages.forEach(stage => { grouped[stage.id] = []; });
+        const grouped: { [stageId: string]: Prospect[] } = {};
+        sortedStages.forEach(stage => grouped[stage.id] = []);
         filteredProspects.forEach(prospect => {
             if (grouped[prospect.stageId]) {
                 grouped[prospect.stageId].push(prospect);
             }
         });
         return grouped;
-    }, [filteredProspects, stages]);
-
-    const metrics = useMemo(() => {
-        const qualifiedStages = sortedStages.slice(1).map(s => s.id);
-        const qualifiedLeads = prospects.filter(p => qualifiedStages.includes(p.stageId));
-        const negotiationValue = prospects.filter(p => p.stageId === sortedStages.find(s => s.name.toLowerCase().includes('negociação'))?.id).reduce((sum, p) => sum + (p.estimatedBudget || 0), 0);
-        
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        
-        const idleLeads = prospects.filter(p => {
-            if (!p.nextContactDate) return true; // No next contact scheduled
-            const nextContact = new Date(p.nextContactDate);
-            return nextContact < sevenDaysAgo; // Next contact was over 7 days ago
-        }).length;
-        
-        return {
-            total: prospects.length,
-            qualified: qualifiedLeads.length,
-            negotiationValue,
-            idleLeads,
-        };
-    }, [prospects, sortedStages]);
-
-    const uniqueSegments = useMemo(() => [...new Set(prospects.map(p => p.segment).filter(Boolean))], [prospects]);
-
-    const handleOpenAIModal = (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => {
-        setSelectedProspect(prospect);
-        setAiModal({ isOpen: true, mode });
-    };
+    }, [filteredProspects, sortedStages]);
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stageId: string) => {
         e.preventDefault();
         const prospectId = e.dataTransfer.getData('prospectId');
-        
-        if (stageId === 'CONVERT') {
-            onConvertProspect(prospectId);
-        } else if (stageId === 'DELETE') {
-            onDeleteProspect(prospectId);
-        } else {
-            const prospect = prospects.find(p => p.id === prospectId);
-            if (prospect && prospect.stageId !== stageId) {
-                 onUpdateProspectStage(prospectId, stageId);
-            }
-        }
-        setDraggingOverColumn(null);
-        setDraggingProspectId(null);
-    }
-    
+        onUpdateProspectStage(prospectId, stageId);
+        setDraggingOverStageId(null);
+    };
+
+    const handleOpenAIModal = (prospect: Prospect, mode: 'research' | 'icebreaker' | 'strategy') => {
+        setAiModalState({ isOpen: true, prospect, mode });
+    };
+
     return (
-        <div className="flex flex-col h-full w-full -mx-4 sm:-mx-6">
-            <div className="flex-shrink-0 mb-6 px-4 sm:px-6">
-                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Central de Prospecção e Geração de Leads</h2>
-                <p className="text-[var(--text-secondary)]">Encontre novos clientes, valide oportunidades, registre dados críticos e acompanhe o funil até virar venda.</p>
-                 <div className="flex justify-end">
-                    <button onClick={onAddProspectClick} className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm">
+        <div className="flex flex-col h-full w-full space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Funil de Prospecção</h1>
+                    <p className="text-[var(--text-secondary)]">Gerencie seus leads e transforme oportunidades em clientes.</p>
+                </div>
+                <div className="flex items-center gap-4 self-start sm:self-center">
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                            <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" />
+                        </span>
+                        <input 
+                            type="text"
+                            placeholder="Buscar prospect..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="bg-[var(--background-secondary)] border border-[var(--border-secondary)] text-[var(--text-primary)] rounded-lg py-2 pl-10 pr-4 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                        />
+                    </div>
+                    <button
+                        onClick={onAddProspectClick}
+                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors duration-200 shadow-sm"
+                    >
                         <PlusIcon className="w-5 h-5 mr-2" />
-                        Criar Lead
+                        Novo Prospect
                     </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 px-4 sm:px-6">
-                <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Total de Leads</p><p className="text-2xl font-bold">{metrics.total}</p></div>
-                <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Leads Qualificados</p><p className="text-2xl font-bold">{metrics.qualified}</p></div>
-                <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Valor em Negociação</p><p className="text-2xl font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(metrics.negotiationValue)}</p></div>
-                <div className="bg-[var(--background-secondary)] p-4 rounded-lg border border-[var(--border-primary)]"><p className="text-sm text-[var(--text-secondary)]">Leads sem Follow-up (&gt;7d)</p><p className="text-2xl font-bold text-yellow-500">{metrics.idleLeads}</p></div>
+            <div className="flex-1 flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 custom-scrollbar">
+                {sortedStages.length > 0 ? (
+                    sortedStages.map(stage => (
+                        <Column
+                            key={stage.id}
+                            stage={stage}
+                            prospects={prospectsByStage[stage.id] || []}
+                            onDragOver={(e) => { e.preventDefault(); setDraggingOverStageId(stage.id); }}
+                            onDrop={(e) => handleDrop(e, stage.id)}
+                            setDraggingProspectId={setDraggingProspectId}
+                            draggingProspectId={draggingProspectId}
+                            isDraggingOver={draggingOverStageId === stage.id}
+                            onConvertProspect={onConvertProspect}
+                            onDeleteProspect={onDeleteProspect}
+                            onOpenAIModal={handleOpenAIModal}
+                        />
+                    ))
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center bg-[var(--background-tertiary)] p-8 rounded-lg">
+                        <FunnelIcon className="w-16 h-16 text-[var(--text-tertiary)] mb-4"/>
+                        <h3 className="text-xl font-semibold text-[var(--text-primary)]">Nenhum funil de prospecção configurado.</h3>
+                        <p className="text-[var(--text-secondary)]">Vá para as Configurações para criar suas etapas e começar a prospectar.</p>
+                    </div>
+                )}
             </div>
 
-             <div className="bg-[var(--background-secondary)] p-3 rounded-lg border border-[var(--border-primary)] mb-4 flex flex-wrap items-center gap-4 mx-4 sm:mx-6">
-                 <div className="relative flex-grow min-w-[200px]">
-                    <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2"/>
-                    <input type="text" placeholder="Buscar por empresa, contato..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 pl-10 pr-3"/>
-                 </div>
-                 <select value={segmentFilter} onChange={e => setSegmentFilter(e.target.value)} className="flex-grow min-w-[150px] bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 px-3"><option value="all">Todos Segmentos</option>{uniqueSegments.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                 <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} className="flex-grow min-w-[150px] bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 px-3"><option value="all">Todos Portes</option><option value="Pequena">Pequena</option><option value="Média">Média</option><option value="Grande">Grande</option></select>
-                 <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} className="flex-grow min-w-[150px] bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-md py-2 px-3"><option value="all">Toda Urgência</option><option value="Baixa">Baixa</option><option value="Média">Média</option><option value="Alta">Alta</option></select>
-            </div>
-
-            <div className="flex-grow flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-0 px-4 sm:px-6">
-                {sortedStages.map((stage) => {
-                    const stageProspects = prospectsByStage[stage.id] || [];
-                    return (
-                        <div key={stage.id} onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(stage.id); }} onDrop={(e) => handleDrop(e, stage.id)} onDragLeave={() => setDraggingOverColumn(null)} className={`flex-1 min-w-72 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors ${draggingOverColumn === stage.id ? 'bg-[var(--background-tertiary-hover)]' : ''}`}>
-                            <div className="flex justify-between items-center mb-4 flex-shrink-0 px-1">
-                                <h3 className="font-semibold text-lg text-[var(--text-primary)]">{stage.name}</h3>
-                                <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{stageProspects.length}</span>
-                            </div>
-                            <div className="overflow-y-auto pr-1 -mr-3 custom-scrollbar flex-grow">
-                                {stageProspects.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {stageProspects.map(prospect => (
-                                            <div key={prospect.id} draggable onDragStart={(e) => { e.dataTransfer.setData('prospectId', prospect.id); setDraggingProspectId(prospect.id); }} onDragEnd={() => setDraggingProspectId(null)}>
-                                                <ProspectCard prospect={prospect} onOpenAIModal={(mode) => handleOpenAIModal(prospect, mode)} isDragging={draggingProspectId === prospect.id} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    draggingOverColumn !== stage.id && (
-                                        <div className="flex h-full items-center justify-center">
-                                            <p className="text-xs text-center text-[var(--text-tertiary)] p-4">Nenhum lead nesta etapa.</p>
-                                        </div>
-                                    )
-                                )}
-                                {draggingOverColumn === stage.id && <div className="h-20 border-2 border-dashed border-[var(--border-secondary)] rounded-lg mt-3"></div>}
-                            </div>
-                        </div>
-                    );
-                })}
-                 <div className="flex-shrink-0 w-64 space-y-4">
-                     <div onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn('CONVERT'); }} onDrop={(e) => handleDrop(e, 'CONVERT')} onDragLeave={() => setDraggingOverColumn(null)} className={`h-1/2 flex flex-col items-center justify-center text-center p-4 rounded-lg border-2 border-dashed transition-colors ${draggingOverColumn === 'CONVERT' ? 'bg-green-100 dark:bg-green-900/50 border-green-400' : 'bg-green-50 dark:bg-green-900/30 border-green-300'}`}>
-                         <TrophyIcon className="w-8 h-8 text-green-500 mb-2"/>
-                         <h3 className="font-bold text-green-800 dark:text-green-200">Converter em Venda</h3>
-                         <p className="text-xs text-green-600 dark:text-green-400">Arraste aqui para criar um orçamento</p>
-                     </div>
-                     <div onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn('DELETE'); }} onDrop={(e) => handleDrop(e, 'DELETE')} onDragLeave={() => setDraggingOverColumn(null)} className={`h-1/2 flex flex-col items-center justify-center text-center p-4 rounded-lg border-2 border-dashed transition-colors ${draggingOverColumn === 'DELETE' ? 'bg-red-100 dark:bg-red-900/50 border-red-400' : 'bg-red-50 dark:bg-red-900/30 border-red-300'}`}>
-                         <XCircleIcon className="w-8 h-8 text-red-500 mb-2"/>
-                         <h3 className="font-bold text-red-800 dark:text-red-200">Marcar como Perdido</h3>
-                         <p className="text-xs text-red-600 dark:text-red-400">Arraste aqui para remover do funil</p>
-                     </div>
-                 </div>
-            </div>
-            
-            <footer className="flex-shrink-0 flex items-center justify-center gap-4 sm:gap-6 text-sm text-[var(--text-secondary)] mt-4 border-t border-[var(--border-primary)] py-4 px-4 sm:px-6">
-                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <ArrowUpTrayIcon className="w-5 h-5" /> Importar Lista
-                </button>
-                <span className="text-[var(--border-secondary)]">|</span>
-                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <ArrowDownTrayIcon className="w-5 h-5" /> Exportar Leads
-                </button>
-                <span className="text-[var(--border-secondary)]">|</span>
-                <button title="Em breve" disabled className="flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <ChartBarIcon className="w-5 h-5" /> Gerar Relatórios
-                </button>
-            </footer>
-
-            {aiModal.isOpen && selectedProspect && (
-                <ProspectAIModal
-                    isOpen={aiModal.isOpen}
-                    onClose={() => setAiModal({ isOpen: false, mode: 'research' })}
-                    prospect={selectedProspect}
-                    mode={aiModal.mode}
+            {aiModalState.isOpen && aiModalState.prospect && (
+                <ProspectAIModal 
+                    isOpen={aiModalState.isOpen}
+                    onClose={() => setAiModalState({ isOpen: false, prospect: null, mode: 'research'})}
+                    prospect={aiModalState.prospect}
+                    mode={aiModalState.mode}
                 />
             )}
         </div>
     );
 };
-
-export default ProspectingView;

@@ -17,7 +17,7 @@ const ThemePreview: React.FC<{ variant: ThemeVariant; name: string; isActive: bo
     const vibrantColors = { bg: 'bg-slate-50', sidebar: 'bg-white', accent: 'bg-purple-600' };
     const flowColors = { bg: 'bg-gray-50', sidebar: 'bg-white', accent: 'bg-cyan-500' };
     const dashboardColors = { bg: 'bg-[#eef1f8]', sidebar: 'bg-[#28334d]', accent: 'bg-blue-500' };
-    const auroraColors = { bg: 'bg-[#f6f8fa]', sidebar: 'bg-[#0a0c10]', accent: 'bg-[#22d3ee]' };
+    const auroraColors = { bg: 'bg-[#f6f8fa]', sidebar: 'bg-white', accent: 'bg-[#1f6feb]' };
     
     const colors = variant === 'classic' ? classicColors : variant === 'vibrant' ? vibrantColors : variant === 'dashboard' ? dashboardColors : variant === 'aurora' ? auroraColors : flowColors;
     
@@ -69,8 +69,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Tema da Aplicação</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <ThemePreview variant="aurora" name="Aurora Imersiva" isActive={currentThemeVariant === 'aurora'} onClick={() => setThemeVariant('aurora')} />
-                            <ThemePreview variant="dashboard" name="Painel Moderno" isActive={currentThemeVariant === 'dashboard'} onClick={() => setThemeVariant('dashboard')} />
+                            <ThemePreview variant="aurora" name="Aurora" isActive={currentThemeVariant === 'aurora'} onClick={() => setThemeVariant('aurora')} />
+                            <ThemePreview variant="dashboard" name="Painel" isActive={currentThemeVariant === 'dashboard'} onClick={() => setThemeVariant('dashboard')} />
                             <ThemePreview variant="classic" name="Clássico" isActive={currentThemeVariant === 'classic'} onClick={() => setThemeVariant('classic')} />
                             <ThemePreview variant="flow" name="Fluxo" isActive={currentThemeVariant === 'flow'} onClick={() => setThemeVariant('flow')} />
                         </div>

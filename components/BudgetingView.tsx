@@ -263,7 +263,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
                                     <td className="p-3 cursor-pointer" onClick={() => onSelectBudget(budget.id)}>
                                         <div className="flex items-center gap-2">
-                                            {/* FIX: Replaced `title` prop on the `ExclamationTriangleIcon` component with a wrapping `<span>` element that has a `title` attribute. This resolves the TypeScript error as the icon component does not accept a `title` prop. */}
                                             {isBudgetStale && <span title="Atenção: Orçamento sem follow-up há mais de 7 dias."><ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0" /></span>}
                                             <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors truncate" title={budget.title}>{budget.title}</p>
                                         </div>
@@ -299,7 +298,6 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                             className="flex items-center gap-2 cursor-pointer"
                                             onClick={() => onSelectBudget(budget.id)}
                                         >
-                                            {/* FIX: Replaced `title` prop on the `ExclamationTriangleIcon` component with a wrapping `<span>` element that has a `title` attribute. This resolves the TypeScript error as the icon component does not accept a `title` prop. */}
                                             {isBudgetStale && <span title="Atenção: Orçamento sem follow-up há mais de 7 dias."><ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0" /></span>}
                                             <p className="font-bold text-[var(--text-primary)] hover:text-[var(--text-accent)]">{budget.title}</p>
                                         </div>

@@ -134,7 +134,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
-        // FIX: The `reduce` accumulator `acc` was inferred as `any` because its initial value was an empty object `{}`. Explicitly typing `acc` as `Record<string, number>` allows TypeScript to correctly perform the arithmetic operation and type `reasonCounts`.
         const reasonCounts = lostBudgets.reduce((acc: Record<string, number>, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;
@@ -170,7 +169,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
                 case 'value':
                     value = monthlyBudgets
                         .filter(b => b.status === BudgetStatus.INVOICED)
-                        .reduce((sum, b) => sum + b.value, 0);
+                        // FIX: Ensure budget value is treated as a number to prevent arithmetic errors.
+                        .reduce((sum, b) => sum + Number(b.value), 0);
                     break;
                 case 'count':
                     value = monthlyBudgets.filter(b => b.status === BudgetStatus.INVOICED).length;
@@ -345,7 +345,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
                 <div className="space-y-3">
                     {leaderboardData.length > 0 ? leaderboardData.map((salesperson, index) => {
                         const rank = index + 1;
-                        const isCurrentUser = salesperson.id === userProfile.id;
+                        const isCurrentUser = salesperson.id === (userProfile as UserData).id;
                         const topValue = leaderboardData[0].value || 1;
                         const progress = (salesperson.value / topValue) * 100;
                         

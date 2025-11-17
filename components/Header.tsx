@@ -135,15 +135,15 @@ const Header: React.FC<HeaderProps> = ({
     .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
 
   const renderSearchResults = () => {
-    // FIX: The initial value for the `reduce` accumulator was an empty object `{}`, causing TypeScript to infer its type as `unknown`. By explicitly casting the initial value to `Record<string, SearchResult[]>`, we ensure that `groupedResults` is correctly typed, resolving the error.
-    const groupedResults = globalSearchResults.reduce((acc, result) => {
+    // FIX: Explicitly set generic type for the reduce accumulator to avoid potential mis-inference by TypeScript.
+    const groupedResults = globalSearchResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
       const key = result.type;
       if (!acc[key]) {
         acc[key] = [];
       }
       acc[key].push(result);
       return acc;
-    }, {} as Record<string, SearchResult[]>);
+    }, {});
 
     const getIconForType = (type: string) => {
         switch(type) {

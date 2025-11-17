@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
-// FIX: Imported `getDocs` from 'firebase/firestore' to resolve 'Cannot find name' error.
 import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from './lib/firebase';
@@ -11,7 +10,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DealsView from './components/DealsView';
-// FIX: `ProspectingView` is not a default export. It is imported as a named export.
 import { ProspectingView } from './components/ProspectingView';
 import CalendarView from './components/CalendarView';
 import TasksView from './components/TasksView';
@@ -324,25 +322,38 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             }, 1000);
         } else if (isPomodoroActive && pomodoroSecondsLeft === 0) {
             pomodoroAudioRef.current?.play();
-            setIsPomodoroActive(false);
+            
+            const prevMode = pomodoroMode;
+            let nextMode: 'work' | 'shortBreak' | 'longBreak' = 'work';
+            let nextDuration = WORK_DURATION;
+            let newPomodoros = pomodoroCount;
 
-            if (pomodoroMode === 'work') {
-                const newPomodoros = pomodoroCount + 1;
+            if (prevMode === 'work') {
+                newPomodoros = pomodoroCount + 1;
                 setPomodoroCount(newPomodoros);
-                const nextMode = newPomodoros % 4 === 0 ? 'longBreak' : 'shortBreak';
-                setPomodoroMode(nextMode);
-                const nextDuration = nextMode === 'longBreak' ? LONG_BREAK_DURATION : SHORT_BREAK_DURATION;
-                setPomodoroSecondsLeft(nextDuration);
-                
-                if (Notification.permission === 'granted') {
+                nextMode = newPomodoros % 4 === 0 ? 'longBreak' : 'shortBreak';
+                nextDuration = nextMode === 'longBreak' ? LONG_BREAK_DURATION : SHORT_BREAK_DURATION;
+            } else { // It was a break
+                nextMode = 'work';
+                nextDuration = WORK_DURATION;
+            }
+
+            setPomodoroMode(nextMode);
+            setPomodoroSecondsLeft(nextDuration);
+
+            // Notification logic should reflect the *new* state
+            if (Notification.permission === 'granted') {
+                if (nextMode === 'work') {
+                    new Notification('Hora de focar!', { body: `Iniciando ${WORK_DURATION / 60} minutos de trabalho.` });
+                } else {
                     new Notification('Faça uma pausa!', { body: `Descanse por ${nextDuration / 60} minutos.` });
                 }
-            } else { // It was a break
-                setPomodoroMode('work');
-                setPomodoroSecondsLeft(WORK_DURATION);
-                if (Notification.permission === 'granted') {
-                    new Notification('Hora de focar!', { body: `Iniciando ${WORK_DURATION / 60} minutos de trabalho.` });
-                }
+            }
+             // Immediately start the new cycle if it was a break, otherwise pause
+            if (prevMode !== 'work') {
+                setIsPomodoroActive(true);
+            } else {
+                setIsPomodoroActive(false);
             }
         }
 
@@ -350,6 +361,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             if (interval) clearInterval(interval);
         };
     }, [isPomodoroActive, pomodoroSecondsLeft, pomodoroMode, pomodoroCount]);
+
 
     const handleTogglePomodoro = () => {
         setIsPomodoroActive(!isPomodoroActive);

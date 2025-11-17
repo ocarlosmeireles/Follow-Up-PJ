@@ -164,7 +164,6 @@ export interface Reminder {
 }
 
 export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard' | 'aurora';
-// FIX: Moved Theme type here to be accessible globally and fix import errors.
 export type Theme = 'light' | 'dark';
 
 export type ScriptCategory = 'Prospecção Fria' | 'Follow-up Pós-Envio' | 'Reuniões e Apresentações' | 'Reengajamento' | 'Negociação e Fechamento' | 'Pós-Venda';

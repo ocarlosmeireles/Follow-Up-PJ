@@ -901,6 +901,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                         client={clients.find(c => c.id === selectedBudget.clientId)!}
                         contact={contacts.find(c => c.id === selectedBudget.contactId)}
                         userProfile={effectiveUserProfile}
+                        users={users}
                         onAddFollowUp={handleAddFollowUp}
                         onAddComment={handleAddComment}
                         onChangeStatus={handleChangeBudgetStatus}

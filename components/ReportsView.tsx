@@ -132,6 +132,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
+        // FIX: Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly infers the types for `reasonCounts` and resolves arithmetic operation errors on values of type `unknown`.
         const reasonCounts = lostBudgets.reduce((acc, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;

@@ -52,336 +52,319 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-const cleanPhoneNumber = (phone: string | undefined) => phone ? phone.replace(/\D/g, '') : '';
-
-const formatCurrencyForInput = (value: string): string => {
-    const digitsOnly = value.replace(/\D/g, '');
-    if (!digitsOnly) return '';
-    const numberValue = parseInt(digitsOnly, 10) / 100;
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numberValue);
+const getStatusBadgeColor = (status: BudgetStatus) => {
+    switch (status) {
+        case BudgetStatus.SENT: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+        case BudgetStatus.FOLLOWING_UP: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
+        case BudgetStatus.ORDER_PLACED: return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+        case BudgetStatus.INVOICED: return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300';
+        case BudgetStatus.LOST: return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
+        case BudgetStatus.ON_HOLD: return 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200';
+        default: return 'bg-gray-100 text-gray-700';
+    }
 };
 
 const unmaskCurrency = (maskedValue: string): number => {
     if (!maskedValue) return 0;
-    return parseFloat(maskedValue.replace(/\./g, '').replace(',', '.'));
+    const numericString = maskedValue.replace(/\./g, '').replace(',', '.');
+    return parseFloat(numericString);
 };
 
-const today = new Date().toISOString().split('T')[0];
+const formatCurrencyForInput = (value: string): string => {
+    if (!value) return '';
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') return '';
+    const numberValue = parseInt(digitsOnly, 10) / 100;
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numberValue);
+};
 
-const InfoItem: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; className?: string }> = ({ icon, label, value, className }) => (
-    <div className={`flex items-start gap-3 ${className}`}>
-        <div className="flex-shrink-0 text-[var(--text-accent)] mt-1">{icon}</div>
-        <div>
-            <p className="text-sm font-medium text-[var(--text-secondary)]">{label}</p>
-            <div className="text-base font-semibold text-[var(--text-primary)]">{value}</div>
-        </div>
-    </div>
-);
-
-
-const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({ isOpen, onClose, budget, client, contact, onAddFollowUp, onChangeStatus, onConfirmWin, onUpdateBudget, scripts }) => {
-    // Follow-up form state
-    const [followUpNotes, setFollowUpNotes] = useState('');
-    const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>(FollowUpStatus.COMPLETED);
+export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
+    isOpen,
+    onClose,
+    budget,
+    client,
+    contact,
+    onAddFollowUp,
+    onChangeStatus,
+    onConfirmWin,
+    onUpdateBudget,
+    scripts,
+}) => {
+    const [newFollowUpNote, setNewFollowUpNote] = useState('');
+    const [newFollowUpStatus, setNewFollowUpStatus] = useState<FollowUpStatus>(FollowUpStatus.WAITING_RESPONSE);
     const [nextFollowUpDate, setNextFollowUpDate] = useState<string | null>(null);
-
-    // Editing state
+    const [isLoadingAI, setIsLoadingAI] = useState(false);
+    const [generatedScript, setGeneratedScript] = useState('');
+    const [closingValue, setClosingValue] = useState('');
+    const [isConfirmingWin, setIsConfirmingWin] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(budget.title);
     const [editableValue, setEditableValue] = useState(formatCurrency(budget.value));
-
-    // Win confirmation state
-    const [isConfirmingWin, setIsConfirmingWin] = useState(false);
-    const [closingValue, setClosingValue] = useState(formatCurrency(budget.value));
-    
-    // AI Analysis Modal State
     const [isAIModalOpen, setAIModalOpen] = useState(false);
+    
+    const [scriptCategory, setScriptCategory] = useState<ScriptCategory>('Follow-up Pós-Envio');
+    const [selectedScript, setSelectedScript] = useState<Script | null>(null);
 
-    // Script state
-    const [isScriptMenuOpen, setScriptMenuOpen] = useState(false);
-    const scriptMenuRef = useRef<HTMLDivElement>(null);
+    const filteredScripts = useMemo(() => scripts.filter(s => s.category === scriptCategory), [scripts, scriptCategory]);
+    
+    const modalRef = useRef<HTMLDivElement>(null);
     
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (scriptMenuRef.current && !scriptMenuRef.current.contains(event.target as Node)) {
-                setScriptMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleAddFollowUp = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!followUpNotes.trim()) {
-            alert('Por favor, adicione uma nota ao follow-up.');
-            return;
+        if (isOpen) {
+            setNewFollowUpNote('');
+            setNextFollowUpDate(null);
+            setGeneratedScript('');
+            setIsLoadingAI(false);
+            setClosingValue(formatCurrency(budget.value));
+            setIsConfirmingWin(false);
+            setEditableTitle(budget.title);
+            setEditableValue(formatCurrency(budget.value));
+            setIsEditing(false);
+            setScriptCategory('Follow-up Pós-Envio');
+            setSelectedScript(null);
         }
-        const followUpData = { date: new Date().toISOString(), notes: followUpNotes, status: followUpStatus };
-        onAddFollowUp(budget.id, followUpData, nextFollowUpDate);
-        setFollowUpNotes('');
-        setNextFollowUpDate(null);
+    }, [isOpen, budget]);
+
+    const handleSaveFollowUp = () => {
+        if (newFollowUpNote.trim()) {
+            onAddFollowUp(budget.id, { date: new Date().toISOString(), notes: newFollowUpNote.trim(), status: newFollowUpStatus }, nextFollowUpDate);
+            setNewFollowUpNote('');
+        }
+    };
+    
+    const handleSendExternal = (channel: 'WhatsApp' | 'Email') => {
+        if (!newFollowUpNote.trim()) return;
+
+        const noteWithPrefix = `(Enviado via ${channel}): ${newFollowUpNote.trim()}`;
+        
+        onAddFollowUp(budget.id, { date: new Date().toISOString(), notes: noteWithPrefix, status: FollowUpStatus.WAITING_RESPONSE }, nextFollowUpDate);
+        
+        const encodedMessage = encodeURIComponent(newFollowUpNote.trim());
+        
+        if (channel === 'WhatsApp' && contact?.phone) {
+            const phoneNumber = contact.phone.replace(/\D/g, '');
+            const whatsappUrl = `https://wa.me/${phoneNumber.startsWith('55') ? phoneNumber : '55' + phoneNumber}?text=${encodedMessage}`;
+            window.open(whatsappUrl, '_blank');
+        } else if (channel === 'Email' && contact?.email) {
+            const subject = encodeURIComponent(`Proposta: ${budget.title}`);
+            const mailtoUrl = `mailto:${contact.email}?subject=${subject}&body=${encodedMessage}`;
+            window.location.href = mailtoUrl;
+        }
+
+        setNewFollowUpNote('');
+    };
+
+    const handleGenerateScript = async () => {
+        setIsLoadingAI(true);
+        setGeneratedScript('');
+        try {
+            if (!process.env.API_KEY) throw new Error("A chave da API não foi configurada.");
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `Gere um texto curto e amigável para um follow-up de orçamento.
+Cliente: ${client.name}
+Contato: ${contact?.name || 'Prezado(a)'}
+Orçamento: ${budget.title}
+Valor: ${formatCurrency(budget.value)}
+Histórico: ${budget.followUps.length > 0 ? budget.followUps.map(f => f.notes).join(' | ') : 'Primeiro follow-up.'}
+Objetivo: Manter a conversa ativa e buscar o próximo passo.
+O tom deve ser profissional, mas pessoal.`;
+
+            const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+            setGeneratedScript(response.text || 'Não foi possível gerar um script.');
+        } catch (error) {
+            console.error(error);
+            setGeneratedScript('Erro ao gerar script. Verifique sua chave de API.');
+        } finally {
+            setIsLoadingAI(false);
+        }
+    };
+
+    const handleApplyScript = (content: string) => {
+        let finalContent = content;
+        if (contact?.name) finalContent = finalContent.replace(/\[Nome do Cliente\]/g, contact.name.split(' ')[0]);
+        if (budget.title) finalContent = finalContent.replace(/\[Título da Proposta\]/g, `"${budget.title}"`);
+        setNewFollowUpNote(finalContent);
+        setGeneratedScript('');
+        setSelectedScript(null);
     };
 
     const handleSaveEdit = () => {
-        const updates: Partial<Budget> = {};
-        const numericValue = unmaskCurrency(editableValue);
-
-        if (editableTitle !== budget.title) updates.title = editableTitle;
-        if (numericValue !== budget.value) updates.value = numericValue;
-        
-        if (Object.keys(updates).length > 0) {
-            onUpdateBudget(budget.id, updates);
+        const value = unmaskCurrency(editableValue);
+        if (editableTitle.trim() === '' || isNaN(value) || value <= 0) {
+            alert('Título e valor são obrigatórios.');
+            return;
         }
+        onUpdateBudget(budget.id, { title: editableTitle.trim(), value });
         setIsEditing(false);
     };
     
-    const handleConfirmWin = () => {
-        const numericClosingValue = unmaskCurrency(closingValue);
-        if (isNaN(numericClosingValue) || numericClosingValue < 0) {
-            alert("Por favor, insira um valor de fechamento válido.");
-            return;
-        }
-        onConfirmWin(budget.id, numericClosingValue);
-        setIsConfirmingWin(false);
-        onClose();
-    };
-
-    const useScript = (script: Script) => {
-        const personalizedContent = script.content
-            .replace(/\[Nome do Cliente\]/g, contact?.name || client.name)
-            .replace(/\[Título da Proposta\]/g, budget.title)
-            .replace(/\[Sua Empresa\]/g, 'Nossa Empresa') // Placeholder, ideally from org settings
-            .replace(/\[Seu Nome\]/g, 'Seu Nome'); // Placeholder, ideally from user profile
-        setFollowUpNotes(personalizedContent);
-        setScriptMenuOpen(false);
-    };
-
-    const getStatusInfo = (status: BudgetStatus) => {
-        switch (status) {
-            case BudgetStatus.INVOICED: return { icon: <CheckCircleIcon className="w-5 h-5" />, color: 'text-emerald-500' };
-            case BudgetStatus.LOST: return { icon: <XCircleIcon className="w-5 h-5" />, color: 'text-red-500' };
-            case BudgetStatus.ON_HOLD: return { icon: <PauseCircleIcon className="w-5 h-5" />, color: 'text-gray-500' };
-            default: return { icon: <ClockIcon className="w-5 h-5" />, color: 'text-yellow-600' };
-        }
-    };
-    
-    const isFinished = [BudgetStatus.INVOICED, BudgetStatus.LOST, BudgetStatus.ON_HOLD].includes(budget.status);
-
-    const timelineEvents = useMemo(() => {
-        const creationEvent = {
-            id: 'creation',
-            date: budget.dateSent,
-            notes: `Orçamento "${budget.title}" criado e enviado no valor de R$ ${formatCurrency(budget.value)}.`,
-            status: 'Criado' as const
-        };
-
-        const followUpEvents = budget.followUps.map(fu => ({
-            ...fu,
-            status: fu.status || FollowUpStatus.COMPLETED
-        }));
-        
-        return [creationEvent, ...followUpEvents].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [budget]);
-
-    const getEventIcon = (status: FollowUpStatus | 'Criado') => {
-        switch(status) {
-            case FollowUpStatus.COMPLETED: return <CheckCircleIcon className="w-5 h-5 text-green-500" />;
-            case FollowUpStatus.RESCHEDULED: return <ArrowPathIcon className="w-5 h-5 text-yellow-500" />;
-            case FollowUpStatus.WAITING_RESPONSE: return <ClockIcon className="w-5 h-5 text-blue-500" />;
-            case 'Criado': return <ClipboardDocumentListIcon className="w-5 h-5 text-purple-500" />;
-            default: return <ClipboardDocumentListIcon className="w-5 h-5 text-gray-500" />;
-        }
-    };
-
-    const getEventTitle = (event: typeof timelineEvents[0]) => {
-        if (event.id === 'creation') return "Orçamento Criado";
-        return event.status || "Follow-up Realizado";
-    };
+    const canSaveFollowUp = newFollowUpNote.trim().length > 0;
+    const canSendWhatsApp = canSaveFollowUp && !!contact?.phone;
+    const canSendEmail = canSaveFollowUp && !!contact?.email;
 
     if (!isOpen) return null;
-    if (!client) return <div>Cliente não encontrado.</div>;
+    
+    const sortedFollowUps = [...budget.followUps].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return (
         <>
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex justify-center items-center z-50 p-4" onClick={onClose}>
-                <div className="bg-[var(--background-secondary)] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex justify-center items-center z-50 p-2 sm:p-4" onClick={onClose}>
+                <div ref={modalRef} onClick={e => e.stopPropagation()} className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col transform transition-all">
                     {/* Header */}
-                    <div className="p-4 sm:p-6 flex justify-between items-start border-b border-[var(--border-primary)]">
+                    <div className="p-4 sm:p-6 flex justify-between items-start pb-4 border-b border-gray-200 dark:border-slate-700">
                         <div>
-                            {isEditing ? (
-                                <input type="text" value={editableTitle} onChange={e => setEditableTitle(e.target.value)} className="text-2xl font-bold bg-slate-100 dark:bg-slate-700 rounded p-1 -m-1"/>
-                            ) : (
-                                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{budget.title}</h2>
-                            )}
-                            <p className="text-base font-semibold text-[var(--text-accent)]">{client.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
                              {isEditing ? (
-                                 <button onClick={handleSaveEdit} className="p-2 text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-full"><CheckCircleIcon className="w-6 h-6"/></button>
-                             ) : (
-                                 <button onClick={() => setIsEditing(true)} className="p-2 text-[var(--text-secondary)] hover:bg-[var(--background-tertiary)] rounded-full"><PencilIcon className="w-5 h-5"/></button>
-                             )}
-                            <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><XMarkIcon className="w-7 h-7" /></button>
+                                <input type="text" value={editableTitle} onChange={e => setEditableTitle(e.target.value)} className="text-2xl font-bold bg-slate-100 dark:bg-slate-700 rounded-md p-1 -m-1" autoFocus/>
+                            ) : (
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{budget.title}</h2>
+                            )}
+                            <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold mt-1">{client.name}</p>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-slate-400 mt-2">
+                                <span className="flex items-center gap-1.5"><CalendarIcon className="w-4 h-4"/> <strong>Enviado em:</strong> {formatDisplayDate(budget.dateSent)}</span>
+                                {budget.nextFollowUpDate && <span className="flex items-center gap-1.5"><ClockIcon className="w-4 h-4"/> <strong>Próximo Follow-up:</strong> {formatDisplayDate(budget.nextFollowUpDate)}</span>}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                             {isEditing ? (
+                                <>
+                                    <button onClick={handleSaveEdit} className="p-2 text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-full"><CheckCircleIcon className="w-6 h-6"/></button>
+                                    <button onClick={() => setIsEditing(false)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full"><XCircleIcon className="w-6 h-6"/></button>
+                                </>
+                            ) : (
+                                <button onClick={() => setIsEditing(true)} className="p-2 text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full"><PencilIcon className="w-5 h-5"/></button>
+                            )}
+                            <button onClick={onClose} className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full">
+                                <XMarkIcon className="w-7 h-7" />
+                            </button>
                         </div>
                     </div>
-                    
+
                     {/* Content */}
-                    <div className="flex-grow p-4 sm:p-6 overflow-y-auto custom-scrollbar">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            <InfoItem icon={<CurrencyDollarIcon className="w-6 h-6"/>} label="Valor" value={isEditing ? <input value={editableValue} onChange={e => setEditableValue(formatCurrencyForInput(e.target.value))} className="font-semibold text-base bg-slate-100 dark:bg-slate-700 rounded p-1 w-full"/> : `R$ ${formatCurrency(budget.value)}`} />
-                            <InfoItem icon={getStatusInfo(budget.status).icon} label="Status" value={<span className={getStatusInfo(budget.status).color}>{budget.status}</span>} />
-                            <InfoItem icon={<CalendarIcon className="w-6 h-6"/>} label="Data de Envio" value={formatDisplayDate(budget.dateSent)} />
-                            <InfoItem icon={<CalendarIcon className="w-6 h-6"/>} label="Próximo Follow-up" value={formatDisplayDate(budget.nextFollowUpDate)} />
-                        </div>
-                        
-                        {contact && (
-                            <div className="bg-[var(--background-tertiary)] p-4 rounded-lg mb-6">
-                                <h3 className="font-semibold text-lg text-[var(--text-primary)] mb-2">Contato</h3>
-                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                                    <p className="font-bold text-[var(--text-primary)]">{contact.name}</p>
-                                    {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-accent)]"><PhoneIcon className="w-4 h-4"/> {contact.phone}</a>}
-                                    {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-accent)]"><EnvelopeIcon className="w-4 h-4"/> {contact.email}</a>}
-                                    {contact.phone && <a href={`https://wa.me/55${cleanPhoneNumber(contact.phone)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-green-600 hover:text-green-700"><WhatsAppIcon className="w-4 h-4"/> Chamar no WhatsApp</a>}
-                                </div>
-                            </div>
-                        )}
-                        
-                        {/* Action Center */}
-                        <div className="bg-[var(--background-tertiary)] p-4 rounded-lg mb-6">
-                            <h3 className="font-semibold text-lg text-[var(--text-primary)] mb-3">Centro de Ações</h3>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <button onClick={() => setAIModalOpen(true)} className="flex items-center gap-2 bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                    <SparklesIcon className="w-5 h-5"/> Análise com IA
-                                </button>
-                                {!isFinished ? (
-                                    <>
-                                        <button onClick={() => setIsConfirmingWin(true)} className="flex items-center gap-2 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                            <TrophyIcon className="w-5 h-5"/> Marcar como Ganho
-                                        </button>
-                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="flex items-center gap-2 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                            <XCircleIcon className="w-5 h-5"/> Marcar como Perdido
-                                        </button>
-                                        <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="flex items-center gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                            <PauseCircleIcon className="w-5 h-5"/> Congelar
-                                        </button>
-                                    </>
-                                ) : (
-                                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.FOLLOWING_UP)} className="flex items-center gap-2 bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-900 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                        <ArrowPathIcon className="w-5 h-5"/> Reativar Orçamento
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Timeline */}
-                        <div className="mt-6 pt-4 border-t border-[var(--border-secondary)]">
-                            <h3 className="font-semibold text-lg text-[var(--text-primary)] mb-4 flex items-center">
-                                <ClockIcon className="w-5 h-5 mr-2 text-[var(--text-accent)]" /> Linha do Tempo
-                            </h3>
-                            {timelineEvents.length > 0 ? (
-                                <div className="relative pl-12 border-l-2 border-[var(--border-secondary)] space-y-8">
-                                    {timelineEvents.map((event) => (
-                                        <div key={event.id} className="relative">
-                                            <div className="absolute -left-[17px] top-0 flex items-center justify-center w-8 h-8 bg-[var(--background-tertiary)] rounded-full ring-4 ring-[var(--background-secondary)]">
-                                                {getEventIcon(event.status)}
-                                            </div>
-                                            <div className="bg-[var(--background-secondary-hover)] p-3 rounded-lg border border-[var(--border-secondary)]">
-                                                <div className="flex justify-between items-center flex-wrap gap-2">
-                                                    <span className="font-bold text-[var(--text-primary)]">{getEventTitle(event)}</span>
-                                                    <span className="text-xs font-medium text-[var(--text-secondary)]">{formatDisplayDate(event.date)}</span>
-                                                </div>
-                                                <p className="text-sm text-[var(--text-secondary)] mt-2 whitespace-pre-wrap">{event.notes}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-center text-[var(--text-secondary)] py-4">Nenhum evento no histórico.</p>
-                            )}
-                        </div>
-
-                        {/* Add Follow-up Form */}
-                        {!isFinished && (
-                            <form onSubmit={handleAddFollowUp} className="mt-6 pt-6 border-t border-[var(--border-primary)]">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-semibold text-lg text-[var(--text-primary)]">Adicionar Follow-up</h3>
-                                    <div className="relative" ref={scriptMenuRef}>
-                                        <button type="button" onClick={() => setScriptMenuOpen(prev => !prev)} className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-accent)] hover:underline">
-                                            Usar Script <ChevronDownIcon className="w-4 h-4"/>
-                                        </button>
-                                        {isScriptMenuOpen && (
-                                            <div className="absolute bottom-full right-0 mb-2 w-72 bg-[var(--background-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] z-10 max-h-64 overflow-y-auto">
-                                                {scriptCategories.map(category => {
-                                                    const categoryScripts = scripts.filter(s => s.category === category);
-                                                    if (categoryScripts.length === 0) return null;
-                                                    return (
-                                                        <div key={category}>
-                                                            <h4 className="p-2 text-xs font-bold uppercase text-[var(--text-tertiary)] bg-[var(--background-tertiary)]">{category}</h4>
-                                                            {categoryScripts.map(script => (
-                                                                <button key={script.id} type="button" onClick={() => useScript(script)} className="w-full text-left p-2 text-sm hover:bg-[var(--background-tertiary)] text-[var(--text-primary)]">
-                                                                    {script.title}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <textarea
-                                    value={followUpNotes}
-                                    onChange={e => setFollowUpNotes(e.target.value)}
-                                    placeholder="Descreva a interação com o cliente..."
+                    <div className="flex-grow overflow-y-auto custom-scrollbar p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Left Column */}
+                        <div className="md:col-span-2 space-y-6">
+                            {/* Follow-up form */}
+                            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                                <h3 className="font-semibold text-lg mb-2 text-gray-700 dark:text-slate-300">Novo Follow-up</h3>
+                                 <textarea
+                                    value={newFollowUpNote}
+                                    onChange={(e) => setNewFollowUpNote(e.target.value)}
                                     rows={4}
-                                    className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                                ></textarea>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Status da Interação</label>
-                                        <select value={followUpStatus} onChange={e => setFollowUpStatus(e.target.value as FollowUpStatus)} className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2">
-                                            {Object.values(FollowUpStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                    placeholder="Digite sua anotação ou gere um script com a IA..."
+                                    className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                {generatedScript && (
+                                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-md">
+                                        <p className="text-sm whitespace-pre-wrap text-blue-800 dark:text-blue-200">{generatedScript}</p>
+                                        <div className="flex gap-2 mt-2">
+                                            <button onClick={() => handleApplyScript(generatedScript)} className="text-sm bg-blue-500 text-white px-2 py-1 rounded">Aplicar</button>
+                                            <button onClick={() => setGeneratedScript('')} className="text-sm bg-gray-200 px-2 py-1 rounded">Descartar</button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
+                                    <div className="flex flex-wrap gap-2 items-center">
+                                         <button onClick={handleGenerateScript} disabled={isLoadingAI} className="text-sm bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-semibold py-1 px-3 rounded-lg flex items-center gap-1.5 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors">
+                                            <SparklesIcon className={`w-4 h-4 ${isLoadingAI ? 'animate-pulse' : ''}`}/> {isLoadingAI ? 'Gerando...' : 'Gerar com IA'}
+                                        </button>
+                                        <select value={scriptCategory} onChange={e => {setScriptCategory(e.target.value as ScriptCategory); setSelectedScript(null);}} className="text-sm bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded-lg py-1 px-2">
+                                            {scriptCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <select value={selectedScript?.id || ''} onChange={e => {const s = filteredScripts.find(fs => fs.id === e.target.value); if(s) { setSelectedScript(s); handleApplyScript(s.content); } else {setSelectedScript(null);}}} className="text-sm bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded-lg py-1 px-2">
+                                            <option value="">Usar script...</option>
+                                            {filteredScripts.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Agendar Próximo Follow-up</label>
-                                        <input type="date" value={nextFollowUpDate || ''} onChange={e => setNextFollowUpDate(e.target.value)} min={today} className="w-full bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2 dark:[color-scheme:dark]"/>
+                                </div>
+                                <div className="flex flex-wrap gap-2 items-end mt-4">
+                                     <div className="flex-grow">
+                                        <label className="text-xs font-medium text-gray-500 dark:text-slate-400">Próximo Contato (opcional)</label>
+                                        <input type="date" value={nextFollowUpDate || ''} onChange={(e) => setNextFollowUpDate(e.target.value)} className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-sm dark:[color-scheme:dark]"/>
+                                    </div>
+                                    <button onClick={handleSaveFollowUp} disabled={!canSaveFollowUp} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm">
+                                        <PencilIcon className="w-4 h-4 mr-1.5"/> Salvar Nota
+                                    </button>
+                                    <button onClick={() => handleSendExternal('WhatsApp')} disabled={!canSendWhatsApp} title={!contact?.phone ? 'Contato sem telefone' : !canSaveFollowUp ? 'Digite uma mensagem' : 'Enviar via WhatsApp'} className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 dark:disabled:bg-green-800 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm">
+                                        <WhatsAppIcon className="w-4 h-4 mr-1.5"/> WhatsApp
+                                    </button>
+                                    <button onClick={() => handleSendExternal('Email')} disabled={!canSendEmail} title={!contact?.email ? 'Contato sem e-mail' : !canSaveFollowUp ? 'Digite uma mensagem' : 'Enviar via E-mail'} className="bg-slate-600 hover:bg-slate-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm">
+                                        <EnvelopeIcon className="w-4 h-4 mr-1.5"/> E-mail
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* History */}
+                            <div>
+                                <h3 className="font-semibold text-lg mb-2 text-gray-700 dark:text-slate-300">Histórico de Follow-ups</h3>
+                                <div className="space-y-4">
+                                    {sortedFollowUps.length > 0 ? sortedFollowUps.map(fu => (
+                                        <div key={fu.id} className="border-l-4 border-gray-200 dark:border-slate-600 pl-4">
+                                            <p className="text-sm font-semibold text-gray-500 dark:text-slate-400">{formatDisplayDate(fu.date)} {fu.status && <span className="text-xs font-bold bg-gray-200 dark:bg-slate-600 px-2 py-0.5 rounded-full ml-2">{fu.status}</span>}</p>
+                                            <p className="text-gray-700 dark:text-slate-300 whitespace-pre-wrap mt-1">{fu.notes}</p>
+                                        </div>
+                                    )) : (
+                                        <p className="text-gray-400 dark:text-slate-500 italic">Nenhum follow-up registrado.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="md:col-span-1 space-y-4">
+                             {/* Budget Info */}
+                             <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className={`px-3 py-1 text-sm font-bold rounded-full ${getStatusBadgeColor(budget.status)}`}>{budget.status}</span>
+                                     <button onClick={() => setAIModalOpen(true)} className="text-sm bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-semibold py-1 px-3 rounded-lg flex items-center gap-1.5 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors">
+                                        <SparklesIcon className="w-4 h-4"/> Analisar
+                                    </button>
+                                </div>
+                                 {isEditing ? (
+                                    <input type="text" value={editableValue} onChange={e => setEditableValue(formatCurrencyForInput(e.target.value))} className="text-3xl font-bold text-gray-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 p-1 -m-1 rounded-md w-full"/>
+                                ) : (
+                                    <p className="text-3xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2"><CurrencyDollarIcon className="w-7 h-7 text-green-500"/> {formatCurrency(budget.value)}</p>
+                                )}
+                                {contact && (
+                                    <div className="pt-3 border-t border-gray-200 dark:border-slate-600">
+                                        <p className="font-bold text-gray-700 dark:text-slate-200">{contact.name}</p>
+                                        {contact.email && <a href={`mailto:${contact.email}`} className="text-sm text-gray-500 dark:text-slate-400 hover:text-blue-600 flex items-center gap-1.5 truncate"><EnvelopeIcon className="w-4 h-4"/>{contact.email}</a>}
+                                        {contact.phone && <p className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1.5"><PhoneIcon className="w-4 h-4"/>{contact.phone}</p>}
+                                    </div>
+                                )}
+                             </div>
+                            
+                            {/* Actions */}
+                            {!isConfirmingWin && (
+                                 <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 space-y-2">
+                                    <h4 className="font-semibold text-gray-700 dark:text-slate-300 mb-2">Alterar Status</h4>
+                                    <button onClick={() => onChangeStatus(budget.id, BudgetStatus.FOLLOWING_UP)} className="w-full text-left bg-yellow-100 hover:bg-yellow-200 text-yellow-800 dark:bg-yellow-900/50 dark:hover:bg-yellow-900 dark:text-yellow-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><ArrowPathIcon className="w-5 h-5"/> Em Follow-up</button>
+                                    <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="w-full text-left bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 dark:text-slate-200 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><PauseCircleIcon className="w-5 h-5"/> Congelar</button>
+                                    <button onClick={() => setIsConfirmingWin(true)} className="w-full text-left bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/50 dark:hover:bg-green-900 dark:text-green-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><TrophyIcon className="w-5 h-5"/> Ganho/Faturado</button>
+                                    <button onClick={() => onChangeStatus(budget.id, BudgetStatus.LOST)} className="w-full text-left bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900/50 dark:hover:bg-red-900 dark:text-red-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><XCircleIcon className="w-5 h-5"/> Perdido</button>
+                                </div>
+                            )}
+                            {isConfirmingWin && (
+                                <div className="bg-green-50 dark:bg-green-900/50 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                                    <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">Confirmar Valor de Fechamento</h4>
+                                    <input type="text" value={closingValue} onChange={e => setClosingValue(formatCurrencyForInput(e.target.value))} className="w-full bg-white dark:bg-green-900 border border-green-300 dark:border-green-700 rounded-lg p-2 mb-3"/>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => onConfirmWin(budget.id, unmaskCurrency(closingValue))} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg">Confirmar</button>
+                                        <button onClick={() => setIsConfirmingWin(false)} className="w-full bg-transparent hover:bg-green-200 dark:hover:bg-green-800 text-green-700 dark:text-green-200 font-semibold py-2 px-3 rounded-lg border border-green-300 dark:border-green-700">Cancelar</button>
                                     </div>
                                 </div>
-                                <div className="flex justify-end mt-4">
-                                    <button type="submit" className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold py-2 px-4 rounded-lg">Salvar Follow-up</button>
-                                </div>
-                            </form>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-             {/* Win Confirmation Modal */}
-            {isConfirmingWin && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-[var(--background-secondary)] rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
-                        <TrophyIcon className="w-12 h-12 text-green-500 mx-auto mb-4"/>
-                        <h3 className="text-xl font-bold text-[var(--text-primary)]">Confirmar Venda!</h3>
-                        <p className="text-[var(--text-secondary)] mt-2">Parabéns! Qual o valor final de fechamento do orçamento?</p>
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-left text-[var(--text-secondary)] mb-1">Valor de Fechamento</label>
-                             <input 
-                                value={closingValue} 
-                                onChange={e => setClosingValue(formatCurrencyForInput(e.target.value))} 
-                                className="w-full text-center text-xl font-bold bg-[var(--background-tertiary)] border border-[var(--border-secondary)] rounded-lg p-2"
-                            />
-                        </div>
-                        <div className="flex justify-center gap-4 mt-6">
-                            <button onClick={() => setIsConfirmingWin(false)} className="bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-black dark:text-white font-semibold py-2 px-6 rounded-lg">Cancelar</button>
-                            <button onClick={handleConfirmWin} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Confirmar</button>
-                        </div>
-                    </div>
-                </div>
+            {isAIModalOpen && (
+                <BudgetAIAnalysisModal 
+                    isOpen={isAIModalOpen}
+                    onClose={() => setAIModalOpen(false)}
+                    budget={budget}
+                    clientName={client.name}
+                />
             )}
-             <BudgetAIAnalysisModal isOpen={isAIModalOpen} onClose={() => setAIModalOpen(false)} budget={budget} clientName={client.name} />
         </>
     );
 };
-
-export default BudgetDetailModal;

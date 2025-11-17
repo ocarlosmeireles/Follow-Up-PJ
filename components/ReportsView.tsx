@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react';
-import type { Budget, Client, UserProfile } from '../types';
-import { BudgetStatus } from '../types';
+import React, { useMemo, useState } from 'react';
+import type { Budget, Client, UserProfile, UserData } from '../types';
+import { BudgetStatus, UserRole } from '../types';
 import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon, CalendarIcon, ExclamationTriangleIcon } from './icons';
 
 interface ReportsViewProps {
   budgets: Budget[];
   clients: Client[];
+  users: UserData[];
   userProfile: UserProfile;
   onGenerateDailyReport: () => void;
   onOpenReportDetail: (title: string, budgets: Budget[]) => void;
@@ -31,7 +32,8 @@ const MetricCard = ({ title, value, icon }: { title: string, value: string | num
     </div>
 );
 
-const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile, onGenerateDailyReport, onOpenReportDetail }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, userProfile, onGenerateDailyReport, onOpenReportDetail }) => {
+    const [leaderboardMetric, setLeaderboardMetric] = useState<'value' | 'count' | 'created'>('value');
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
     
     const metrics = useMemo(() => {
@@ -132,12 +134,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
-        // FIX: Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly infers the types for `reasonCounts` and resolves arithmetic operation errors on values of type `unknown`.
-        const reasonCounts = lostBudgets.reduce((acc, budget) => {
+        // FIX: Explicitly typed the accumulator `acc` to ensure TypeScript knows its shape.
+        const reasonCounts = lostBudgets.reduce((acc: Record<string, number>, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
 
         const data = Object.entries(reasonCounts)
             .map(([reason, count]) => ({ reason, count }))
@@ -147,6 +149,50 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
 
         return { data, maxValue, totalLost: lostBudgets.length };
     }, [budgets]);
+
+    const leaderboardData = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const salespeople = users.filter(u => u.role === UserRole.SALESPERSON || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
+
+        const rankedSalespeople = salespeople.map(user => {
+            const userBudgets = budgets.filter(b => b.userId === user.id);
+            
+            const monthlyBudgets = userBudgets.filter(b => {
+                const budgetDate = new Date(b.dateSent);
+                return budgetDate.getMonth() === currentMonth && budgetDate.getFullYear() === currentYear;
+            });
+            
+            let value = 0;
+            switch(leaderboardMetric) {
+                case 'value':
+                    value = monthlyBudgets
+                        .filter(b => b.status === BudgetStatus.INVOICED)
+                        .reduce((sum, b) => sum + b.value, 0);
+                    break;
+                case 'count':
+                    value = monthlyBudgets.filter(b => b.status === BudgetStatus.INVOICED).length;
+                    break;
+                case 'created':
+                    value = monthlyBudgets.length;
+                    break;
+            }
+
+            return {
+                id: user.id,
+                name: user.name,
+                value: value,
+            };
+        });
+
+        return rankedSalespeople
+            .filter(s => s.value > 0)
+            .sort((a, b) => b.value - a.value);
+
+    }, [budgets, users, leaderboardMetric]);
+
 
     const handleOpenLostReasonDetail = (reason: string) => {
         const budgetsForReason = budgets.filter(b => b.status === BudgetStatus.LOST && b.lostReason === reason);
@@ -284,6 +330,58 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                 <div className="animated-item" style={{ animationDelay: '200ms' }}><MetricCard title="Faturamento Total" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-7 h-7 text-green-500 dark:text-green-400" />} /></div>
                 <div className="animated-item" style={{ animationDelay: '300ms' }}><MetricCard title="Taxa de Conversão" value={metrics.conversionRate} icon={<ChartPieIcon className="w-7 h-7 text-yellow-500 dark:text-yellow-400" />} /></div>
                 <div className="animated-item" style={{ animationDelay: '400ms' }}><MetricCard title="Ticket Médio" value={formatCurrency(metrics.averageTicket)} icon={<CurrencyDollarIcon className="w-7 h-7 text-blue-500 dark:text-blue-400" />} /></div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '500ms' }}>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
+                    <TrophyIcon className="w-6 h-6 mr-3 text-yellow-500"/>
+                    Ranking de Vendedores (Mês Atual)
+                </h2>
+                 <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mb-4">
+                    <button onClick={() => setLeaderboardMetric('value')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${leaderboardMetric === 'value' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Valor Faturado</button>
+                    <button onClick={() => setLeaderboardMetric('count')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${leaderboardMetric === 'count' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Negócios Ganhos</button>
+                    <button onClick={() => setLeaderboardMetric('created')} className={`px-3 py-1 text-sm font-semibold rounded-md transition ${leaderboardMetric === 'created' ? 'bg-[var(--background-secondary)] shadow-sm text-[var(--text-accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--background-secondary-hover)]'}`}>Orçamentos Criados</button>
+                </div>
+                <div className="space-y-3">
+                    {leaderboardData.length > 0 ? leaderboardData.map((salesperson, index) => {
+                        const rank = index + 1;
+                        const isCurrentUser = salesperson.id === userProfile.id;
+                        const topValue = leaderboardData[0].value || 1;
+                        const progress = (salesperson.value / topValue) * 100;
+                        
+                        let rankIcon;
+                        if (rank === 1) rankIcon = <TrophyIcon className="w-5 h-5 text-yellow-400" />;
+                        else if (rank === 2) rankIcon = <TrophyIcon className="w-5 h-5 text-gray-400" />;
+                        else if (rank === 3) rankIcon = <TrophyIcon className="w-5 h-5 text-amber-600" />;
+                        else rankIcon = <span className="text-sm font-bold w-5 text-center">{rank}</span>;
+
+                        const formatMetric = (value: number) => {
+                            if (leaderboardMetric === 'value') return `R$ ${formatCurrency(value)}`;
+                            if (leaderboardMetric === 'count') return `${value} negócio(s)`;
+                            if (leaderboardMetric === 'created') return `${value} orçamento(s)`;
+                            return value;
+                        };
+                        
+                        return (
+                             <div key={salesperson.id} className={`p-3 rounded-lg ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-shrink-0 w-6 flex justify-center">{rankIcon}</div>
+                                    <div className="flex-grow">
+                                        <p className="font-bold text-gray-800 dark:text-slate-100">{salesperson.name}</p>
+                                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
+                                            <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-shrink-0 font-bold text-blue-600 dark:text-blue-400 text-lg">
+                                        {formatMetric(salesperson.value)}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    }) : (
+                        <p className="text-center py-8 text-gray-400 dark:text-slate-500">Nenhum dado para exibir no ranking deste mês.</p>
+                    )}
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '500ms' }}>

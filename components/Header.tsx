@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon, MagnifyingGlassIcon, UserIcon, BriefcaseIcon } from './icons';
 import type { Notification, UserProfile, Theme, ThemeVariant, Reminder } from '../types';
 import { UserRole } from '../types';
+import PomodoroTimer from './PomodoroTimer';
 
 type SearchResult = {
   type: 'client' | 'budget' | 'prospect' | 'contact';
@@ -32,6 +33,13 @@ interface HeaderProps {
   onGlobalSearch: (term: string) => void;
   onClearGlobalSearch: () => void;
   onSearchResultClick: (result: SearchResult) => void;
+  pomodoroMode: 'work' | 'shortBreak' | 'longBreak';
+  pomodoroSecondsLeft: number;
+  isPomodoroActive: boolean;
+  pomodoroCount: number;
+  onTogglePomodoro: () => void;
+  onResetPomodoro: () => void;
+  pomodoroAudioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -56,6 +64,13 @@ const Header: React.FC<HeaderProps> = ({
     onGlobalSearch,
     onClearGlobalSearch,
     onSearchResultClick,
+    pomodoroMode,
+    pomodoroSecondsLeft,
+    isPomodoroActive,
+    pomodoroCount,
+    onTogglePomodoro,
+    onResetPomodoro,
+    pomodoroAudioRef,
 }) => {
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
@@ -120,11 +135,7 @@ const Header: React.FC<HeaderProps> = ({
     .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
 
   const renderSearchResults = () => {
-    // FIX: Property 'map' does not exist on type 'unknown'.
-    // Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly
-    // infers the type of `groupedResults` and resolves the error where `.map` was being called on a value of type `unknown`.
-    // FIX: Provide a type for the initial value of the reduce function to correctly infer the type of `groupedResults`.
-    // FIX: Explicitly typed the initial value for the `reduce` method's accumulator to `Record<string, SearchResult[]>`. This ensures TypeScript correctly infers the type of `groupedResults` and resolves the error where `Object.entries(...).map` was failing due to an `unknown` type.
+    // FIX: The initial value for the `reduce` accumulator was an empty object `{}`, causing TypeScript to infer its type as `unknown`. By explicitly casting the initial value to `Record<string, SearchResult[]>`, we ensure that `groupedResults` is correctly typed, resolving the error.
     const groupedResults = globalSearchResults.reduce((acc, result) => {
       const key = result.type;
       if (!acc[key]) {
@@ -181,7 +192,7 @@ const Header: React.FC<HeaderProps> = ({
         <Bars3Icon className="w-6 h-6" />
       </button>
 
-      <div className="flex-1 flex justify-center" ref={searchRef}>
+      <div className="flex-1 flex justify-start" ref={searchRef}>
           <div className="relative w-full max-w-xl">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" />
@@ -202,6 +213,19 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex justify-end items-center gap-2 sm:gap-4">
+        {/* Pomodoro Timer - hidden on smaller screens to avoid clutter */}
+        <div className="hidden lg:flex">
+             <PomodoroTimer
+                mode={pomodoroMode}
+                secondsLeft={pomodoroSecondsLeft}
+                isActive={isPomodoroActive}
+                pomodoros={pomodoroCount}
+                onToggle={onTogglePomodoro}
+                onReset={onResetPomodoro}
+                audioRef={pomodoroAudioRef}
+            />
+        </div>
+
         {/* Action Buttons */}
         {userProfile.role !== UserRole.SUPER_ADMIN && (
           <div className="hidden sm:flex items-center gap-2 sm:gap-4">

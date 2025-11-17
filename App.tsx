@@ -127,6 +127,17 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [globalSearchResults, setGlobalSearchResults] = useState<SearchResult[]>([]);
     const searchDebounceRef = useRef<number | null>(null);
 
+    // --- Pomodoro State ---
+    const [pomodoroMode, setPomodoroMode] = useState<'work' | 'shortBreak' | 'longBreak'>('work');
+    const WORK_DURATION = 25 * 60;
+    const SHORT_BREAK_DURATION = 5 * 60;
+    const LONG_BREAK_DURATION = 15 * 60;
+    const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(WORK_DURATION);
+    const [isPomodoroActive, setIsPomodoroActive] = useState(false);
+    const [pomodoroCount, setPomodoroCount] = useState(0);
+    const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
+
+
     // Derived states for impersonation
     const effectiveUserProfile = useMemo<UserData | null>(() => {
         if (impersonatingOrg && userProfile?.role === UserRole.SUPER_ADMIN) {
@@ -296,6 +307,61 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         document.documentElement.setAttribute('data-theme', themeVariant);
         localStorage.setItem('themeVariant', themeVariant);
     }, [themeVariant]);
+    
+    // --- Pomodoro Logic ---
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    useEffect(() => {
+        let interval: number | null = null;
+
+        if (isPomodoroActive && pomodoroSecondsLeft > 0) {
+            interval = window.setInterval(() => {
+                setPomodoroSecondsLeft(prev => prev - 1);
+            }, 1000);
+        } else if (isPomodoroActive && pomodoroSecondsLeft === 0) {
+            pomodoroAudioRef.current?.play();
+            setIsPomodoroActive(false);
+
+            if (pomodoroMode === 'work') {
+                const newPomodoros = pomodoroCount + 1;
+                setPomodoroCount(newPomodoros);
+                const nextMode = newPomodoros % 4 === 0 ? 'longBreak' : 'shortBreak';
+                setPomodoroMode(nextMode);
+                const nextDuration = nextMode === 'longBreak' ? LONG_BREAK_DURATION : SHORT_BREAK_DURATION;
+                setPomodoroSecondsLeft(nextDuration);
+                
+                if (Notification.permission === 'granted') {
+                    new Notification('Faça uma pausa!', { body: `Descanse por ${nextDuration / 60} minutos.` });
+                }
+            } else { // It was a break
+                setPomodoroMode('work');
+                setPomodoroSecondsLeft(WORK_DURATION);
+                if (Notification.permission === 'granted') {
+                    new Notification('Hora de focar!', { body: `Iniciando ${WORK_DURATION / 60} minutos de trabalho.` });
+                }
+            }
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isPomodoroActive, pomodoroSecondsLeft, pomodoroMode, pomodoroCount]);
+
+    const handleTogglePomodoro = () => {
+        setIsPomodoroActive(!isPomodoroActive);
+    };
+
+    const handleResetPomodoro = () => {
+        setIsPomodoroActive(false);
+        setPomodoroMode('work');
+        setPomodoroSecondsLeft(WORK_DURATION);
+        setPomodoroCount(0);
+    };
+
 
     const changeView = (view: ActiveView) => {
         setActiveView(view);
@@ -873,6 +939,13 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     onGlobalSearch={handleGlobalSearch}
                     onClearGlobalSearch={handleClearSearch}
                     onSearchResultClick={handleSearchResultClick}
+                    pomodoroMode={pomodoroMode}
+                    pomodoroSecondsLeft={pomodoroSecondsLeft}
+                    isPomodoroActive={isPomodoroActive}
+                    pomodoroCount={pomodoroCount}
+                    onTogglePomodoro={handleTogglePomodoro}
+                    onResetPomodoro={handleResetPomodoro}
+                    pomodoroAudioRef={pomodoroAudioRef}
                 />
                 
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto">

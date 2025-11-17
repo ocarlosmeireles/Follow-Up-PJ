@@ -2,13 +2,32 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Budget, Client } from '../types';
 import { BudgetStatus } from '../types';
 import { 
-    CalendarIcon, ExclamationCircleIcon
+    CalendarIcon, ExclamationCircleIcon, ExclamationTriangleIcon
 } from './icons';
 
 // --- Helper Functions & Interfaces ---
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+};
+
+const isStale = (budget: Budget): boolean => {
+    if (budget.status !== BudgetStatus.SENT && budget.status !== BudgetStatus.FOLLOWING_UP) {
+        return false;
+    }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    let lastActivityDate;
+    if (budget.followUps && budget.followUps.length > 0) {
+        // Find the latest follow-up date
+        const latestFollowUpDate = Math.max(...budget.followUps.map(fu => new Date(fu.date).getTime()));
+        lastActivityDate = new Date(latestFollowUpDate);
+    } else {
+        lastActivityDate = new Date(budget.dateSent);
+    }
+
+    return lastActivityDate < sevenDaysAgo;
 };
 
 // --- Componente Principal da View ---
@@ -24,13 +43,16 @@ interface DealsViewProps {
 const CompactBudgetCard: React.FC<{ budget: Budget, clientName: string, onSelect: () => void, isDragging: boolean }> = ({ budget, clientName, onSelect, isDragging }) => {
      const today = new Date(); today.setHours(0, 0, 0, 0);
      const isOverdue = budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < today;
+     const isBudgetStale = useMemo(() => isStale(budget), [budget]);
 
     return (
         <div onClick={onSelect} className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-pointer border border-[var(--border-secondary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2' : 'hover:border-[var(--accent-primary)] hover:-translate-y-0.5'}`}>
             <div className="flex justify-between items-start">
                 <h4 className="font-bold text-[var(--text-primary)] text-base pr-2 truncate">{budget.title}</h4>
-                {/* FIX: Removed the `title` prop from `ExclamationCircleIcon` as it's not supported by the component. */}
-                {isOverdue && <ExclamationCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isBudgetStale && <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" title="Atenção: Orçamento sem follow-up há mais de 7 dias." />}
+                    {isOverdue && <ExclamationCircleIcon className="w-5 h-5 text-red-500" title="Follow-up atrasado!" />}
+                </div>
             </div>
             <p className="text-sm text-[var(--text-accent)] font-semibold mb-2 truncate">{clientName}</p>
             <div className="flex justify-between items-center text-sm font-semibold text-[var(--text-secondary)]">
@@ -96,7 +118,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
     return (
         <div className="flex flex-col h-full w-full space-y-6">
             <div>
-                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Cockpit de Vendas</h2>
+                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Hub de Negócios</h2>
                 <p className="text-[var(--text-secondary)] mt-1">Sua central de ações para fechar mais negócios.</p>
             </div>
             

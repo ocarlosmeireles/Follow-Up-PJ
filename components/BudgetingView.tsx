@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon, ChartPieIcon, PencilSquareIcon } from './icons';
+import { MagnifyingGlassIcon, PrinterIcon, CurrencyDollarIcon, TrophyIcon, ArrowTrendingUpIcon, ChevronUpIcon, ChevronDownIcon, ChartPieIcon, PencilSquareIcon, ExclamationTriangleIcon } from './icons';
 
 interface BudgetingViewProps {
   budgets: Budget[];
@@ -36,6 +36,24 @@ const getStatusStyles = (status: BudgetStatus) => {
   };
   return styles[status] || styles[BudgetStatus.ON_HOLD];
 }
+
+const isStale = (budget: Budget): boolean => {
+    if (budget.status !== BudgetStatus.SENT && budget.status !== BudgetStatus.FOLLOWING_UP) {
+        return false;
+    }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    let lastActivityDate;
+    if (budget.followUps && budget.followUps.length > 0) {
+        const latestFollowUpDate = Math.max(...budget.followUps.map(fu => new Date(fu.date).getTime()));
+        lastActivityDate = new Date(latestFollowUpDate);
+    } else {
+        lastActivityDate = new Date(budget.dateSent);
+    }
+
+    return lastActivityDate < sevenDaysAgo;
+};
 
 
 // --- SUB-COMPONENTS ---
@@ -190,7 +208,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Central de Propostas Estratégicas</h2>
+                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Central de Propostas</h2>
                 <p className="text-[var(--text-secondary)]">Uma visão completa e inteligente de suas propostas comerciais.</p>
             </div>
 
@@ -234,7 +252,9 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border-primary)]">
-                            {filteredAndSortedBudgets.map((budget, index) => (
+                            {filteredAndSortedBudgets.map((budget, index) => {
+                                const isBudgetStale = isStale(budget);
+                                return (
                                 <tr 
                                     key={budget.id} 
                                     className={`hover:bg-[var(--background-secondary-hover)] transition-colors group animated-item border-l-4 ${getStatusStyles(budget.status).bar} ${selectedBudgetIds.has(budget.id) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
@@ -242,7 +262,10 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                 >
                                     <td className="p-3"><input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
                                     <td className="p-3 cursor-pointer" onClick={() => onSelectBudget(budget.id)}>
-                                        <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors truncate" title={budget.title}>{budget.title}</p>
+                                        <div className="flex items-center gap-2">
+                                            {isBudgetStale && <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0" title="Atenção: Orçamento sem follow-up há mais de 7 dias." />}
+                                            <p className="font-bold text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors truncate" title={budget.title}>{budget.title}</p>
+                                        </div>
                                     </td>
                                     <td className="p-3">
                                         <p className="font-semibold text-[var(--text-primary)] truncate" title={budget.client?.name}>{budget.client?.name || 'Cliente'}</p>
@@ -256,25 +279,28 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                     </td>
                                     <td className="p-3 text-[var(--text-secondary)]">{new Date(budget.dateSent).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                 </div>
 
                 {/* --- CARD VIEW for small screens --- */}
                 <div className="space-y-3 md:hidden">
-                    {filteredAndSortedBudgets.map((budget, index) => (
+                    {filteredAndSortedBudgets.map((budget, index) => {
+                        const isBudgetStale = isStale(budget);
+                        return (
                         <div key={budget.id} className={`bg-[var(--background-secondary-hover)] p-3 rounded-lg border-l-4 animated-item ${getStatusStyles(budget.status).bar} ${selectedBudgetIds.has(budget.id) ? 'ring-2 ring-blue-500' : ''}`} style={{ animationDelay: `${index * 30}ms`}}>
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-start gap-3">
                                     <input type="checkbox" checked={selectedBudgetIds.has(budget.id)} onChange={() => handleToggleSelect(budget.id)} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
                                     <div>
-                                        <p 
-                                            className="font-bold text-[var(--text-primary)] hover:text-[var(--text-accent)] cursor-pointer"
+                                        <div 
+                                            className="flex items-center gap-2 cursor-pointer"
                                             onClick={() => onSelectBudget(budget.id)}
                                         >
-                                            {budget.title}
-                                        </p>
+                                            {isBudgetStale && <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0" title="Atenção: Orçamento sem follow-up há mais de 7 dias." />}
+                                            <p className="font-bold text-[var(--text-primary)] hover:text-[var(--text-accent)]">{budget.title}</p>
+                                        </div>
                                         <p className="text-sm font-semibold text-[var(--text-secondary)]">{budget.client?.name || 'Cliente'}</p>
                                     </div>
                                 </div>
@@ -292,7 +318,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
 
 

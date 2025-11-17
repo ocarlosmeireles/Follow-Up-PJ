@@ -8,6 +8,7 @@ interface ReportsViewProps {
   clients: Client[];
   userProfile: UserProfile;
   onGenerateDailyReport: () => void;
+  onOpenReportDetail: (title: string, budgets: Budget[]) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -30,7 +31,7 @@ const MetricCard = ({ title, value, icon }: { title: string, value: string | num
     </div>
 );
 
-const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile, onGenerateDailyReport }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile, onGenerateDailyReport, onOpenReportDetail }) => {
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
     
     const metrics = useMemo(() => {
@@ -131,8 +132,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
-        // FIX: Explicitly typed the initial value for the `reduce` method's accumulator. This resolves type errors
-        // where arithmetic operations were attempted on `unknown` values and `Math.max` received an `unknown` argument.
         const reasonCounts = lostBudgets.reduce((acc, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;
@@ -147,6 +146,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
 
         return { data, maxValue, totalLost: lostBudgets.length };
     }, [budgets]);
+
+    const handleOpenLostReasonDetail = (reason: string) => {
+        const budgetsForReason = budgets.filter(b => b.status === BudgetStatus.LOST && b.lostReason === reason);
+        onOpenReportDetail(`Orçamentos perdidos por: ${reason}`, budgetsForReason);
+    };
 
     const handleExport = () => {
         const date = new Date().toLocaleString('pt-BR');
@@ -354,13 +358,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, userProfile
                             {lostReasonAnalysis.data.map(item => {
                                 const percentage = lostReasonAnalysis.maxValue > 0 ? (item.count / lostReasonAnalysis.maxValue) * 100 : 0;
                                 return (
-                                    <div key={item.reason} className="flex items-center gap-3 text-sm">
-                                        <span className="w-40 text-gray-600 dark:text-slate-400 truncate font-medium">{item.reason}</span>
+                                    <button 
+                                        key={item.reason} 
+                                        onClick={() => handleOpenLostReasonDetail(item.reason)}
+                                        className="w-full flex items-center gap-3 text-sm group"
+                                    >
+                                        <span className="w-40 text-gray-600 dark:text-slate-400 truncate font-medium text-left group-hover:text-blue-600">{item.reason}</span>
                                         <div className="flex-grow bg-gray-200 dark:bg-slate-700 rounded-full h-4">
-                                            <div className="bg-red-400 dark:bg-red-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div>
+                                            <div className="bg-red-400 dark:bg-red-500 h-4 rounded-full group-hover:bg-red-500 dark:group-hover:bg-red-400 transition-colors" style={{ width: `${percentage}%` }}></div>
                                         </div>
                                         <span className="w-8 text-right font-bold text-gray-800 dark:text-slate-200">{item.count}</span>
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>

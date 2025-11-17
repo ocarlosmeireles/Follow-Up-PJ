@@ -65,6 +65,14 @@ export interface FollowUp {
   status?: FollowUpStatus;
 }
 
+export interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface Budget {
   id: string;
   userId: string;
@@ -77,6 +85,7 @@ export interface Budget {
   dateSent: string;
   nextFollowUpDate: string | null;
   followUps: FollowUp[];
+  comments?: Comment[];
   observations?: string;
   lostReason?: string;
   lostNotes?: string;

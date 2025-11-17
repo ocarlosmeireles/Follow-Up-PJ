@@ -18,7 +18,7 @@ interface TasksViewProps {
 // --- TYPES ---
 type UnifiedTask = {
   id: string;
-  type: 'follow-up' | 'reminder';
+  type: 'follow-up' | 'reminder' | 'stale';
   date: number; // Storing as timestamp for stability
   title: string;
   isCompleted?: boolean;
@@ -27,6 +27,7 @@ type UnifiedTask = {
   budgetId?: string;
   isOverdue: boolean;
   isToday: boolean;
+  daysSince?: number;
 };
 
 // --- HELPER FUNCTIONS ---
@@ -84,6 +85,7 @@ const FocusOfTheDay: React.FC = () => {
 interface GoalsPanelTasks {
     today: UnifiedTask[];
     overdue: UnifiedTask[];
+    stale: UnifiedTask[];
     potentialValue: number;
 }
 
@@ -109,8 +111,8 @@ const GoalsPanel: React.FC<{ tasks: GoalsPanelTasks, budgets: Budget[] }> = ({ t
             <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3">Painel de Metas</h3>
             <div className="grid grid-cols-2 gap-3">
                 <MetricCard style={{ animationDelay: '100ms' }} title="Follow-ups Hoje" value={tasks.today.length} icon={<CalendarIcon className="w-6 h-6 text-blue-500"/>} />
-                <MetricCard style={{ animationDelay: '200ms' }} title="Tarefas Atrasadas" value={tasks.overdue.length} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500"/>} />
-                <MetricCard style={{ animationDelay: '300ms' }} title="Valor em Jogo" value={`R$ ${formatCurrency(tasks.potentialValue)}`} icon={<TrophyIcon className="w-6 h-6 text-green-500"/>} />
+                <MetricCard style={{ animationDelay: '200ms' }} title="Atrasados" value={tasks.overdue.length} icon={<ExclamationCircleIcon className="w-6 h-6 text-red-500"/>} />
+                <MetricCard style={{ animationDelay: '300ms' }} title="Esquecidos" value={tasks.stale.length} icon={<ExclamationTriangleIcon className="w-6 h-6 text-yellow-500"/>} />
                 <MetricCard style={{ animationDelay: '400ms' }} title="Orçamentos (7d)" value={weeklyNewBudgets} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500"/>} />
             </div>
         </div>
@@ -143,25 +145,34 @@ const DailyRhythm = () => {
 
 const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => void; index: number; }> = React.memo(({ task, onSelectBudget, index }) => {
     const isFollowUp = task.type === 'follow-up';
-    
+    const isStale = task.type === 'stale';
+
+    const baseClasses = "flex items-center gap-3 p-3 rounded-lg border-l-4 animated-item";
+    const colorClasses = isStale
+        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/50'
+        : isFollowUp 
+        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50' 
+        : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30';
+
+    const icon = isStale 
+        ? <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500"/>
+        : isFollowUp 
+        ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/>
+        : <LightBulbIcon className="w-5 h-5 text-purple-500"/>;
+
     return (
         <div 
-            onClick={() => isFollowUp && task.budgetId && onSelectBudget(task.budgetId)}
+            onClick={() => (isFollowUp || isStale) && task.budgetId && onSelectBudget(task.budgetId)}
             style={{ animationDelay: `${50 * index}ms` }}
-            className={`flex items-center gap-3 p-3 rounded-lg border-l-4 animated-item ${
-                isFollowUp ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50' 
-                           : 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
-            } ${task.isCompleted ? 'opacity-60' : ''}`}
+            className={`${baseClasses} ${colorClasses} ${task.isCompleted ? 'opacity-60' : ''}`}
         >
-            <div className="flex-shrink-0">
-                {isFollowUp ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/> : <LightBulbIcon className="w-5 h-5 text-purple-500"/>}
-            </div>
+            <div className="flex-shrink-0">{icon}</div>
             <div className="flex-grow overflow-hidden">
                 <p className={`font-semibold text-[var(--text-primary)] truncate ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
                 {task.clientName && <p className="text-xs text-[var(--text-accent)] truncate">{task.clientName}</p>}
             </div>
             <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold text-[var(--text-secondary)]">{formatTimeOrDate(task.date, !task.isOverdue)}</p>
+                <p className="text-sm font-bold text-[var(--text-secondary)]">{isStale ? `${task.daysSince} dias parado` : formatTimeOrDate(task.date, !task.isOverdue)}</p>
                 {task.isOverdue && !task.isCompleted && <p className="text-xs font-bold text-red-500">Atrasado</p>}
             </div>
         </div>
@@ -170,10 +181,11 @@ const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => vo
 
 const UpcomingTasks: React.FC<{ 
     overdueTasks: UnifiedTask[],
+    staleTasks: UnifiedTask[],
     todayTasks: UnifiedTask[],
     upcomingTasks: UnifiedTask[],
     onSelectBudget: (id: string) => void 
-}> = ({ overdueTasks, todayTasks, upcomingTasks, onSelectBudget }) => {
+}> = ({ overdueTasks, staleTasks, todayTasks, upcomingTasks, onSelectBudget }) => {
     
     const TaskSection: React.FC<{ title: string, tasks: UnifiedTask[], icon: React.ReactNode }> = ({ title, tasks, icon }) => {
         if (tasks.length === 0) return null;
@@ -194,10 +206,11 @@ const UpcomingTasks: React.FC<{
             <h3 className="font-semibold text-[var(--text-primary)] text-lg mb-3">Lista de Tarefas</h3>
             <div className="space-y-6">
                 <TaskSection title="Atrasadas" tasks={overdueTasks} icon={<ExclamationCircleIcon className="w-5 h-5 text-red-500" />} />
-                <TaskSection title="Para Hoje" tasks={todayTasks} icon={<CalendarIcon className="w-5 h-5 text-yellow-500" />} />
-                <TaskSection title="Próximas" tasks={upcomingTasks} icon={<ClockIcon className="w-5 h-5 text-blue-500" />} />
+                <TaskSection title="Orçamentos Esquecidos (>7d)" tasks={staleTasks} icon={<ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />} />
+                <TaskSection title="Para Hoje" tasks={todayTasks} icon={<CalendarIcon className="w-5 h-5 text-blue-500" />} />
+                <TaskSection title="Próximas" tasks={upcomingTasks} icon={<ClockIcon className="w-5 h-5 text-gray-500" />} />
 
-                {overdueTasks.length === 0 && todayTasks.length === 0 && upcomingTasks.length === 0 && (
+                {overdueTasks.length === 0 && todayTasks.length === 0 && upcomingTasks.length === 0 && staleTasks.length === 0 && (
                     <div className="text-center py-8 text-[var(--text-secondary)]">
                         <CheckCircleIcon className="w-12 h-12 mx-auto mb-2 text-green-500"/>
                         <p className="font-semibold text-[var(--text-primary)]">Tudo em dia!</p>
@@ -218,6 +231,8 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayTime = today.getTime();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const parseDateString = (dateString: string): Date => {
             if (dateString.includes('T')) {
@@ -227,18 +242,43 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
             return new Date(parts[0], parts[1] - 1, parts[2]);
         };
 
-        const followUpTasks: UnifiedTask[] = budgets
-            .filter(b => (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) && b.nextFollowUpDate)
-            .map(b => {
-                const eventDate = parseDateString(b.nextFollowUpDate!);
+        const followUpTasks: UnifiedTask[] = [];
+        const staleBudgets: UnifiedTask[] = [];
+
+        budgets.forEach(b => {
+            // Stale logic
+            if (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) {
+                let lastActivityDate;
+                if (b.followUps && b.followUps.length > 0) {
+                    const latestFollowUpDate = Math.max(...b.followUps.map(fu => new Date(fu.date).getTime()));
+                    lastActivityDate = new Date(latestFollowUpDate);
+                } else {
+                    lastActivityDate = new Date(b.dateSent);
+                }
+
+                if (lastActivityDate < sevenDaysAgo) {
+                    const diffTime = Math.abs(new Date().getTime() - lastActivityDate.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    staleBudgets.push({
+                        id: `stale-${b.id}`, type: 'stale', date: lastActivityDate.getTime(), title: b.title,
+                        clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
+                        isOverdue: false, isToday: false, daysSince: diffDays,
+                    });
+                }
+            }
+
+            // Follow-up task logic
+            if ((b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) && b.nextFollowUpDate) {
+                 const eventDate = parseDateString(b.nextFollowUpDate!);
                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                return {
+                followUpTasks.push({
                     id: `budget-${b.id}`, type: 'follow-up', date: eventDate.getTime(), title: b.title,
                     clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
                     isOverdue: eventDateOnly.getTime() < todayTime,
                     isToday: eventDateOnly.getTime() === todayTime,
-                };
-            });
+                });
+            }
+        });
         
         const reminderTasks: UnifiedTask[] = reminders
             .filter(r => !r.isDismissed)
@@ -265,6 +305,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
 
         return { 
             overdue: overdue.sort(sortByDate), 
+            stale: staleBudgets.sort((a,b) => b.date - a.date),
             today: todayTasks.sort(sortByDate), 
             upcoming: upcoming.sort(sortByDate), 
             potentialValue 
@@ -275,7 +316,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Plano de Ação Estratégico</h2>
+                <h2 className="text-3xl font-bold text-[var(--text-primary)]">Plano de Ação</h2>
                 <p className="text-[var(--text-secondary)]">Seu centro de comando para um dia de vendas produtivo e focado.</p>
             </div>
             
@@ -285,6 +326,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                     <div className="animated-item" style={{ animationDelay: '200ms' }}>
                         <UpcomingTasks 
                             overdueTasks={tasks.overdue}
+                            staleTasks={tasks.stale}
                             todayTasks={tasks.today}
                             upcomingTasks={tasks.upcoming}
                             onSelectBudget={onSelectBudget} 

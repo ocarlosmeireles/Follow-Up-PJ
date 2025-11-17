@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 // FIX: Imported `getDocs` from 'firebase/firestore' to resolve 'Cannot find name' error.
-import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from './lib/firebase';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder, Script, ScriptCategory } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder, Script, ScriptCategory, Comment } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Auth from './components/Auth';
 import Header from './components/Header';
@@ -36,6 +36,7 @@ import ReminderNotification from './components/ReminderNotification';
 import ScriptsView from './components/ScriptsView';
 import ScriptModal from './components/ScriptModal';
 import { scriptData } from './lib/scripts';
+import ReportDetailModal from './components/ReportDetailModal';
 
 
 export type ActiveView = 
@@ -113,6 +114,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
     const [isScriptModalOpen, setScriptModalOpen] = useState(false);
     const [scriptToEdit, setScriptToEdit] = useState<Script | null>(null);
+    const [isReportDetailModalOpen, setReportDetailModalOpen] = useState(false);
+    const [reportModalData, setReportModalData] = useState<{ title: string; budgets: Budget[] } | null>(null);
     
     // Global Search State
     const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -426,7 +429,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     // --- Data Handlers (Firestore interactions) ---
 
     const handleAddBudget = async (
-        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId'>,
+        budgetData: Omit<Budget, 'id' | 'followUps' | 'status' | 'userId' | 'organizationId' | 'clientId' | 'contactId' | 'comments'>,
         clientInfo: { existingId?: string; newClientData?: Omit<Client, 'id' | 'userId' | 'organizationId'> },
         contactInfo: { existingId?: string; newContactData?: Omit<Contact, 'id' | 'clientId' | 'organizationId'> }
     ) => {
@@ -454,7 +457,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             clientId,
             contactId: contactId || null,
             status: BudgetStatus.SENT,
-            followUps: []
+            followUps: [],
+            comments: [],
         };
         await addDoc(collection(db, "budgets"), newBudget);
     };
@@ -479,19 +483,31 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handleAddFollowUp = async (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => {
-        const budget = budgets.find(b => b.id === budgetId);
-        if (!budget) return;
-
+        const budgetRef = doc(db, "budgets", budgetId);
         const newFollowUp = { ...followUp, id: `followup-${Date.now()}` };
-        const updatedFollowUps = [...budget.followUps, newFollowUp];
-        // FIX: Replaced invalid status string 'Budget' with the correct enum value `BudgetStatus.FOLLOWING_UP`.
-        await updateDoc(doc(db, "budgets", budgetId), {
-            followUps: updatedFollowUps,
+        
+        await updateDoc(budgetRef, {
+            followUps: arrayUnion(newFollowUp),
             status: BudgetStatus.FOLLOWING_UP,
             nextFollowUpDate: nextFollowUpDate,
         });
     };
     
+    const handleAddComment = async (budgetId: string, commentText: string) => {
+        if (!effectiveUserProfile) return;
+        const budgetRef = doc(db, "budgets", budgetId);
+        const newComment: Comment = {
+            id: `comment-${Date.now()}`,
+            userId: effectiveUserProfile.id,
+            userName: effectiveUserProfile.name,
+            text: commentText,
+            createdAt: new Date().toISOString(),
+        };
+        await updateDoc(budgetRef, {
+            comments: arrayUnion(newComment)
+        });
+    };
+
     const handleConfirmWin = async (budgetId: string, closingValue: number) => {
         await updateDoc(doc(db, "budgets", budgetId), {
             status: BudgetStatus.INVOICED,
@@ -786,6 +802,12 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             effectiveOrganization
         );
     };
+    
+    const handleOpenReportDetail = (title: string, budgets: Budget[]) => {
+        setReportModalData({ title, budgets });
+        setReportDetailModalOpen(true);
+    };
+
 
     // --- RENDER LOGIC ---
     if (loading || !effectiveUserProfile) {
@@ -847,7 +869,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
                     {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
                     {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)} onBulkDelete={handleBulkDeleteClients} />}
-                    {activeView === 'reports' && <ReportsView key={viewKey} budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport}/>}
+                    {activeView === 'reports' && <ReportsView key={viewKey} budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport} onOpenReportDetail={handleOpenReportDetail} />}
                     {activeView === 'calendar' && <CalendarView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onAddReminder={handleAddReminder}/>}
                     {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} userProfile={effectiveUserProfile} />}
                     {activeView === 'map' && <MapView key={viewKey} clients={clients} />}
@@ -878,7 +900,9 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                         budget={selectedBudget}
                         client={clients.find(c => c.id === selectedBudget.clientId)!}
                         contact={contacts.find(c => c.id === selectedBudget.contactId)}
+                        userProfile={effectiveUserProfile}
                         onAddFollowUp={handleAddFollowUp}
+                        onAddComment={handleAddComment}
                         onChangeStatus={handleChangeBudgetStatus}
                         onConfirmWin={handleConfirmWin}
                         onUpdateBudget={handleUpdateBudget}
@@ -903,7 +927,20 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                  {isAddClientModalOpen && <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />}
                  {isAddUserModalOpen && <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onAddUser={handleAddUser} />}
                  {isScriptModalOpen && <ScriptModal isOpen={isScriptModalOpen} onClose={() => setScriptModalOpen(false)} onSave={handleSaveScript} scriptToEdit={scriptToEdit}/>}
-                
+                 {isReportDetailModalOpen && reportModalData && (
+                    <ReportDetailModal
+                        isOpen={isReportDetailModalOpen}
+                        onClose={() => setReportDetailModalOpen(false)}
+                        data={reportModalData}
+                        clients={clients}
+                        onSelectBudget={(budgetId) => {
+                            setReportDetailModalOpen(false);
+                            setSelectedBudget(budgets.find(b => b.id === budgetId) || null);
+                            setBudgetDetailModalOpen(true);
+                        }}
+                    />
+                )}
+
                 {activeReminder && <ReminderNotification reminder={activeReminder} onDismiss={() => { updateDoc(doc(db, 'reminders', activeReminder.id), { isDismissed: true }); setActiveReminder(null); }}/>}
             </div>
         </div>

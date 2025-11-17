@@ -137,6 +137,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
         // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
         // Explicitly typed the accumulator `acc` to ensure TypeScript knows its shape.
         // FIX: Explicitly type the accumulator of the reduce function to resolve type errors in subsequent operations.
+        // FIX: Explicitly typed the accumulator `acc` in the `reduce` function to `Record<string, number>`. This resolves multiple TypeScript errors related to arithmetic operations on unknown types and ensures that `reasonCounts` is correctly typed.
         const reasonCounts = lostBudgets.reduce((acc: Record<string, number>, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;

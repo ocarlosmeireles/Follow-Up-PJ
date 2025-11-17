@@ -124,6 +124,7 @@ const Header: React.FC<HeaderProps> = ({
     // Explicitly typed the initial value for the `reduce` method's accumulator. This ensures TypeScript correctly
     // infers the type of `groupedResults` and resolves the error where `.map` was being called on a value of type `unknown`.
     // FIX: Provide a type for the initial value of the reduce function to correctly infer the type of `groupedResults`.
+    // FIX: Explicitly typed the initial value for the `reduce` method's accumulator to `Record<string, SearchResult[]>`. This ensures TypeScript correctly infers the type of `groupedResults` and resolves the error where `Object.entries(...).map` was failing due to an `unknown` type.
     const groupedResults = globalSearchResults.reduce((acc, result) => {
       const key = result.type;
       if (!acc[key]) {

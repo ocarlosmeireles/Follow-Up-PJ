@@ -207,19 +207,27 @@ const ProspectingView: React.FC<ProspectingViewProps> = ({ prospects, stages, on
                 {sortedStages.map((stage) => {
                     const stageProspects = prospectsByStage[stage.id] || [];
                     return (
-                        <div key={stage.id} onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(stage.id); }} onDrop={(e) => handleDrop(e, stage.id)} onDragLeave={() => setDraggingOverColumn(null)} className={`flex-shrink-0 w-80 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors ${draggingOverColumn === stage.id ? 'bg-[var(--background-tertiary-hover)]' : ''}`}>
+                        <div key={stage.id} onDragOver={(e) => { e.preventDefault(); setDraggingOverColumn(stage.id); }} onDrop={(e) => handleDrop(e, stage.id)} onDragLeave={() => setDraggingOverColumn(null)} className={`flex-1 min-w-72 bg-[var(--background-tertiary)] rounded-lg p-3 flex flex-col transition-colors ${draggingOverColumn === stage.id ? 'bg-[var(--background-tertiary-hover)]' : ''}`}>
                             <div className="flex justify-between items-center mb-4 flex-shrink-0 px-1">
                                 <h3 className="font-semibold text-lg text-[var(--text-primary)]">{stage.name}</h3>
                                 <span className="text-sm font-bold bg-[var(--background-secondary)] text-[var(--text-secondary)] rounded-full px-2.5 py-0.5">{stageProspects.length}</span>
                             </div>
                             <div className="overflow-y-auto pr-1 -mr-3 custom-scrollbar flex-grow">
-                                <div className="space-y-3">
-                                    {stageProspects.map(prospect => (
-                                        <div key={prospect.id} draggable onDragStart={(e) => { e.dataTransfer.setData('prospectId', prospect.id); setDraggingProspectId(prospect.id); }} onDragEnd={() => setDraggingProspectId(null)}>
-                                            <ProspectCard prospect={prospect} onOpenAIModal={(mode) => handleOpenAIModal(prospect, mode)} isDragging={draggingProspectId === prospect.id} />
+                                {stageProspects.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {stageProspects.map(prospect => (
+                                            <div key={prospect.id} draggable onDragStart={(e) => { e.dataTransfer.setData('prospectId', prospect.id); setDraggingProspectId(prospect.id); }} onDragEnd={() => setDraggingProspectId(null)}>
+                                                <ProspectCard prospect={prospect} onOpenAIModal={(mode) => handleOpenAIModal(prospect, mode)} isDragging={draggingProspectId === prospect.id} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    draggingOverColumn !== stage.id && (
+                                        <div className="flex h-full items-center justify-center">
+                                            <p className="text-xs text-center text-[var(--text-tertiary)] p-4">Nenhum lead nesta etapa.</p>
                                         </div>
-                                    ))}
-                                </div>
+                                    )
+                                )}
                                 {draggingOverColumn === stage.id && <div className="h-20 border-2 border-dashed border-[var(--border-secondary)] rounded-lg mt-3"></div>}
                             </div>
                         </div>

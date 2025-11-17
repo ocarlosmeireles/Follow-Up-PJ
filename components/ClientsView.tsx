@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { Budget, Client, Contact } from '../types';
 import { BudgetStatus } from '../types';
-import { MagnifyingGlassIcon, UserPlusIcon, UserGroupIcon, CurrencyDollarIcon, SparklesIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, Squares2X2Icon, ViewColumnsIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import { MagnifyingGlassIcon, UserPlusIcon, UserGroupIcon, CurrencyDollarIcon, SparklesIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, Squares2X2Icon, ViewColumnsIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownTrayIcon, TrashIcon } from './icons';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -10,6 +10,7 @@ interface ClientsViewProps {
   budgets: Budget[];
   onSelectClient: (clientId: string) => void;
   onAddClientClick: () => void;
+  onBulkDelete: (clientIds: string[]) => void;
 }
 
 type ExtendedClient = Client & {
@@ -59,34 +60,47 @@ const ActivityBadge: React.FC<{ status: ExtendedClient['activityStatus'], showTe
     );
 };
 
-const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, style?: React.CSSProperties, className?: string }> = ({ client, onSelectClient, onGenerateIdea, style, className }) => {
+const ClientCard: React.FC<{ client: ExtendedClient, onSelectClient: (id: string) => void, onGenerateIdea: (client: ExtendedClient) => void, isSelected: boolean, onToggleSelect: (id: string) => void, style?: React.CSSProperties, className?: string }> = ({ client, onSelectClient, onGenerateIdea, isSelected, onToggleSelect, style, className }) => {
     
     return (
-        <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${className || ''}`}>
+        <div style={style} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col p-4 transition-all duration-200 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${isSelected ? 'border-blue-500 ring-2 ring-blue-500' : ''} ${className || ''}`}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-slate-100">{client.name}</h3>
+                     <div className="flex items-start gap-3">
+                         <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={() => onToggleSelect(client.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div onClick={() => onSelectClient(client.id)} className="cursor-pointer">
+                            <h3 className="font-bold text-lg text-gray-800 dark:text-slate-100">{client.name}</h3>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">{client.cnpj || 'Sem CNPJ'}</p>
+                        </div>
+                    </div>
                     <ActivityBadge status={client.activityStatus} />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400">{client.cnpj || 'Sem CNPJ'}</p>
                 
-                <div className="grid grid-cols-3 gap-2 text-center my-4 py-2 border-y border-gray-100 dark:border-slate-700">
-                    <div>
-                        <p className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(client.totalValue)}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">Ganhos</p>
+                <div onClick={() => onSelectClient(client.id)} className="cursor-pointer">
+                    <div className="grid grid-cols-3 gap-2 text-center my-4 py-2 border-y border-gray-100 dark:border-slate-700">
+                        <div>
+                            <p className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(client.totalValue)}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Ganhos</p>
+                        </div>
+                        <div>
+                            <p className="font-bold text-gray-700 dark:text-slate-200">{client.budgetCount}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Orçamentos</p>
+                        </div>
+                         <div>
+                            <p className="font-bold text-gray-700 dark:text-slate-200">{client.contactCount}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Contatos</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="font-bold text-gray-700 dark:text-slate-200">{client.budgetCount}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">Orçamentos</p>
-                    </div>
-                     <div>
-                        <p className="font-bold text-gray-700 dark:text-slate-200">{client.contactCount}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">Contatos</p>
-                    </div>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                        Última atividade: {client.lastActivityDate ? client.lastActivityDate.toLocaleDateString('pt-BR') : 'Nenhuma'}
+                    </p>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400">
-                    Última atividade: {client.lastActivityDate ? client.lastActivityDate.toLocaleDateString('pt-BR') : 'Nenhuma'}
-                </p>
             </div>
             <div className="mt-4 flex gap-2">
                 <button onClick={() => onSelectClient(client.id)} className="w-full text-sm bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-200 font-semibold py-2 px-3 rounded-md transition-colors">
@@ -115,12 +129,13 @@ const SortableHeader: React.FC<{ label: string; sortKey: SortKey; sortConfig: { 
 };
 
 
-const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, onSelectClient, onAddClientClick }) => {
+const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, onSelectClient, onAddClientClick, onBulkDelete }) => {
     const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [aiIdea, setAiIdea] = useState<{ client: ExtendedClient | null, idea: string, loading: boolean, error: string | null }>({ client: null, idea: '', loading: false, error: null });
     const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>({ key: 'totalValue', direction: 'desc' });
+    const [selectedClientIds, setSelectedClientIds] = useState(new Set<string>());
 
     const clientData = useMemo<ExtendedClient[]>(() => {
         const INACTIVE_THRESHOLD_DAYS = 90;
@@ -207,6 +222,8 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, contacts, budgets, o
         }
         return filtered;
     }, [clientData, searchTerm, filter, sortConfig]);
+    
+    const isAllSelected = sortedAndFilteredClients.length > 0 && selectedClientIds.size === sortedAndFilteredClients.length;
 
      const handleGenerateIdea = useCallback(async (client: ExtendedClient) => {
         setAiIdea({ client, idea: '', loading: true, error: null });
@@ -228,13 +245,69 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                  contents: prompt,
                  config: { systemInstruction: "Você é um assistente de vendas especialista em reengajamento de clientes (CRM). Suas sugestões são proativas e focadas em criar valor." }
              });
-
-             setAiIdea({ client, idea: response.text || '', loading: false, error: null });
+             
+             if (response.text) {
+                setAiIdea({ client, idea: response.text, loading: false, error: null });
+             } else {
+                 throw new Error("Resposta da IA vazia.");
+             }
         } catch(error) {
             console.error("Erro ao gerar ideia com IA:", error);
             setAiIdea({ client, idea: '', loading: false, error: 'Falha ao gerar sugestão. Tente novamente.' });
         }
     }, []);
+
+    const handleToggleSelect = (clientId: string) => {
+        setSelectedClientIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(clientId)) {
+                newSet.delete(clientId);
+            } else {
+                newSet.add(clientId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedClientIds(new Set(sortedAndFilteredClients.map(c => c.id)));
+        } else {
+            setSelectedClientIds(new Set());
+        }
+    };
+    
+    const handleExportSelected = () => {
+        const selected = sortedAndFilteredClients.filter(c => selectedClientIds.has(c.id));
+        if (selected.length === 0) return;
+
+        const headers = ["ID", "Nome", "CNPJ", "Endereço", "Orçamentos (Qtd)", "Valor Ganho (R$)", "Última Atividade"];
+        const rows = selected.map(c => [
+            c.id,
+            `"${c.name.replace(/"/g, '""')}"`,
+            c.cnpj || '',
+            c.address ? `"${c.address.replace(/"/g, '""')}"` : '',
+            c.budgetCount,
+            c.totalValue.toString().replace('.', ','),
+            c.lastActivityDate ? c.lastActivityDate.toLocaleDateString('pt-BR') : ''
+        ].join(';')); 
+
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + [headers.join(';'), ...rows].join("\n");
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "clientes_exportados.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleBulkDeleteClick = () => {
+        onBulkDelete(Array.from(selectedClientIds));
+        setSelectedClientIds(new Set());
+    };
 
     return (
         <div className="space-y-6">
@@ -288,7 +361,7 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                     viewMode === 'card' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             {sortedAndFilteredClients.map((client, index) => (
-                                <ClientCard style={{ animationDelay: `${index * 50}ms` }} className="animated-item" key={client.id} client={client} onSelectClient={onSelectClient} onGenerateIdea={handleGenerateIdea} />
+                                <ClientCard style={{ animationDelay: `${index * 50}ms` }} className="animated-item" key={client.id} client={client} onSelectClient={onSelectClient} onGenerateIdea={handleGenerateIdea} isSelected={selectedClientIds.has(client.id)} onToggleSelect={handleToggleSelect} />
                             ))}
                         </div>
                     ) : (
@@ -296,6 +369,9 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-[var(--background-tertiary)] text-[var(--text-secondary)] uppercase text-xs">
                                     <tr>
+                                        <th className="p-3 w-10">
+                                            <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} disabled={sortedAndFilteredClients.length === 0} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        </th>
                                         <th className="p-3">Status</th>
                                         <SortableHeader label="Cliente" sortKey="name" sortConfig={sortConfig} requestSort={requestSort} />
                                         <SortableHeader label="Valor Total" sortKey="totalValue" sortConfig={sortConfig} requestSort={requestSort} />
@@ -305,9 +381,12 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                                 </thead>
                                 <tbody>
                                     {sortedAndFilteredClients.map((client, index) => (
-                                        <tr key={client.id} onClick={() => onSelectClient(client.id)} className="border-b border-[var(--border-primary)] last:border-b-0 hover:bg-[var(--background-secondary-hover)] cursor-pointer animated-item" style={{ animationDelay: `${index * 30}ms` }}>
-                                            <td className="p-3"><ActivityBadge status={client.activityStatus} /></td>
+                                        <tr key={client.id} className={`border-b border-[var(--border-primary)] last:border-b-0 hover:bg-[var(--background-secondary-hover)] animated-item ${selectedClientIds.has(client.id) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`} style={{ animationDelay: `${index * 30}ms` }}>
                                             <td className="p-3">
+                                                <input type="checkbox" checked={selectedClientIds.has(client.id)} onChange={() => handleToggleSelect(client.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                            </td>
+                                            <td className="p-3"><ActivityBadge status={client.activityStatus} /></td>
+                                            <td className="p-3 cursor-pointer" onClick={() => onSelectClient(client.id)}>
                                                 <p className="font-bold text-[var(--text-primary)]">{client.name}</p>
                                                 <p className="text-xs text-[var(--text-secondary)]">{client.cnpj || 'Sem CNPJ'}</p>
                                             </td>
@@ -327,6 +406,20 @@ Formate a resposta em markdown simples. Forneça apenas o texto da mensagem, sem
                     </div>
                 )}
             </div>
+            {selectedClientIds.size > 0 && (
+                <div className="fixed bottom-0 left-0 md:left-64 right-0 z-30 bg-[var(--background-secondary)] p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] border-t border-[var(--border-primary)] flex justify-between items-center transition-transform duration-300">
+                    <span className="font-semibold text-sm text-[var(--text-primary)]">{selectedClientIds.size} selecionado(s)</span>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setSelectedClientIds(new Set())} className="text-sm font-semibold py-2 px-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Limpar</button>
+                        <button onClick={handleExportSelected} className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 font-semibold py-2 px-3 rounded-lg flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                            <ArrowDownTrayIcon className="w-4 h-4" /> Exportar
+                        </button>
+                        <button onClick={handleBulkDeleteClick} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg flex items-center gap-2 text-sm">
+                            <TrashIcon className="w-4 h-4" /> Excluir
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

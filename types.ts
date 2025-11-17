@@ -137,6 +137,7 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   organizationId: string;
+  monthlyGoal?: number;
 }
 
 export interface UserData extends UserProfile {

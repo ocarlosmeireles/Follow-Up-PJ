@@ -565,6 +565,46 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         await updateDoc(doc(db, 'clients', clientId), finalUpdates);
     };
 
+    const handleBulkDeleteClients = async (clientIds: string[]) => {
+        if (clientIds.length === 0) return;
+        if (!window.confirm(`Tem certeza que deseja excluir ${clientIds.length} cliente(s)? Esta ação também excluirá todos os orçamentos e contatos associados e não pode ser desfeita.`)) return;
+
+        if (!effectiveOrganization) return;
+        
+        setLoading(true);
+        try {
+            const batch = writeBatch(db);
+
+            // Batch delete clients
+            clientIds.forEach(clientId => {
+                const clientRef = doc(db, "clients", clientId);
+                batch.delete(clientRef);
+            });
+            
+            // Find and batch delete associated contacts
+            const contactsQuery = query(collection(db, "contacts"), where('clientId', 'in', clientIds));
+            const contactsSnapshot = await getDocs(contactsQuery);
+            contactsSnapshot.forEach(contactDoc => {
+                batch.delete(contactDoc.ref);
+            });
+
+            // Find and batch delete associated budgets
+            const budgetsQuery = query(collection(db, "budgets"), where('clientId', 'in', clientIds));
+            const budgetsSnapshot = await getDocs(budgetsQuery);
+            budgetsSnapshot.forEach(budgetDoc => {
+                batch.delete(budgetDoc.ref);
+            });
+            
+            await batch.commit();
+            alert(`${clientIds.length} cliente(s) e seus dados associados foram excluídos com sucesso.`);
+        } catch (error) {
+            console.error("Erro ao excluir clientes em massa:", error);
+            alert("Ocorreu um erro ao excluir os clientes. Verifique o console para mais detalhes.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleUpdateProfile = async (profileUpdates: Partial<UserProfile>) => {
         if (!effectiveUserProfile) return;
         await updateDoc(doc(db, 'users', effectiveUserProfile.id), profileUpdates);
@@ -642,6 +682,26 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         });
         setAddUserModalOpen(false);
         alert('Convite enviado com sucesso!');
+    };
+
+    const handleUpdateUserGoals = async (goals: { [userId: string]: number }) => {
+        if (!effectiveOrganization) return;
+    
+        setLoading(true);
+        try {
+            const batch = writeBatch(db);
+            Object.entries(goals).forEach(([userId, goal]) => {
+                const userRef = doc(db, "users", userId);
+                batch.update(userRef, { monthlyGoal: goal });
+            });
+            await batch.commit();
+            alert('Metas atualizadas com sucesso!');
+        } catch (error) {
+            console.error("Erro ao atualizar metas dos usuários:", error);
+            alert("Ocorreu um erro ao atualizar as metas.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleAddReminder = async (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => {
@@ -785,7 +845,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect}/>}
                     {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
                     {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
-                    {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)}/>}
+                    {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)} onBulkDelete={handleBulkDeleteClients} />}
                     {activeView === 'reports' && <ReportsView key={viewKey} budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport}/>}
                     {activeView === 'calendar' && <CalendarView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onAddReminder={handleAddReminder}/>}
                     {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} userProfile={effectiveUserProfile} />}
@@ -793,7 +853,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     {activeView === 'scripts' && <ScriptsView key={viewKey} scripts={scripts} onAdd={() => { setScriptToEdit(null); setScriptModalOpen(true); }} onEdit={(script) => { setScriptToEdit(script); setScriptModalOpen(true); }} onDelete={handleDeleteScript}/>}
                     
                     {/* Admin Views */}
-                    {activeView === 'users' && <UsersView key={viewKey} users={users} onUpdateRole={() => {}} onAddUserClick={() => setAddUserModalOpen(true)}/>}
+                    {activeView === 'users' && <UsersView key={viewKey} users={users} onUpdateRole={() => {}} onAddUserClick={() => setAddUserModalOpen(true)} onUpdateUserGoals={handleUpdateUserGoals} />}
                     {activeView === 'settings' && effectiveOrganization && <AdminSettingsView key={viewKey} organization={effectiveOrganization} userProfile={effectiveUserProfile} stages={stages} users={users} onSaveOrganization={handleSaveOrganization} onUpdateStages={handleUpdateStages} setActiveView={changeView}/>}
                     {activeView === 'organizations' && <SuperAdminView key={viewKey} organizations={allOrganizations} users={allUsers} clients={allClients} budgets={allBudgets} onImpersonate={handleImpersonate} onToggleStatus={()=>{}} onDelete={()=>{}} />}
                 </main>

@@ -121,6 +121,30 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
         return { totalActiveValue, totalWonValue: totalInvoicedValue, conversionRate, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
     }, [filteredBudgetsByTime, budgets]);
     
+    const { monthlyAchieved, monthlyGoal, goalProgress } = useMemo(() => {
+        const goal = userProfile.monthlyGoal || 0;
+        if (goal === 0) {
+            return { monthlyAchieved: 0, monthlyGoal: 0, goalProgress: 0 };
+        }
+    
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+    
+        const achieved = budgets
+            .filter(b => 
+                b.userId === userProfile.id && 
+                b.status === BudgetStatus.INVOICED &&
+                new Date(b.dateSent).getMonth() === currentMonth &&
+                new Date(b.dateSent).getFullYear() === currentYear
+            )
+            .reduce((sum, b) => sum + b.value, 0);
+    
+        const progress = goal > 0 ? (achieved / goal) * 100 : 0;
+        
+        return { monthlyAchieved: achieved, monthlyGoal: goal, goalProgress: progress };
+    }, [budgets, userProfile]);
+
     const nextTasks = useMemo(() => {
          const activeBudgetsWithFollowUp = budgets.filter(b =>
             (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) && b.nextFollowUpDate
@@ -164,6 +188,26 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                 </div>
             )}
             
+            {monthlyGoal > 0 && (
+                <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '500ms' }}>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)] mb-4">Sua Meta Mensal</h3>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-end font-semibold">
+                            <span className="text-3xl font-bold text-[var(--text-accent)]">{formatCurrency(monthlyAchieved)}</span>
+                            <span className="text-lg text-[var(--text-secondary)]">de {formatCurrency(monthlyGoal)}</span>
+                        </div>
+                        <div className="w-full bg-[var(--background-tertiary)] rounded-full h-4 overflow-hidden">
+                            <div 
+                                className="bg-[var(--accent-primary)] h-4 rounded-full transition-all duration-1000 ease-out" 
+                                style={{ width: `${Math.min(goalProgress, 100)}%` }}
+                            ></div>
+                        </div>
+                        <div className="text-right text-sm font-bold text-[var(--text-primary)]">
+                            {goalProgress.toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
                  <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>

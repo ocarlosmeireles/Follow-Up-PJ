@@ -122,9 +122,10 @@ const UsersView: React.FC<UsersViewProps> = ({ users, budgets, onUpdateRole, onA
                                         <button
                                             onClick={() => onOpenGoalAIModal(user)}
                                             title="Sugerir meta com IA"
-                                            className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors"
+                                            className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1.5 text-sm font-semibold"
                                         >
-                                            <SparklesIcon className="w-5 h-5"/>
+                                            <SparklesIcon className="w-4 h-4"/>
+                                            <span className="hidden lg:inline">Sugerir</span>
                                         </button>
                                     </div>
                                 </td>
@@ -177,9 +178,10 @@ const UsersView: React.FC<UsersViewProps> = ({ users, budgets, onUpdateRole, onA
                                     <button
                                         onClick={() => onOpenGoalAIModal(user)}
                                         title="Sugerir meta com IA"
-                                        className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors"
+                                        className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1.5 text-sm font-semibold"
                                     >
-                                        <SparklesIcon className="w-5 h-5"/>
+                                        <SparklesIcon className="w-4 h-4"/>
+                                        Sugerir Meta
                                     </button>
                                 </div>
                             </div>

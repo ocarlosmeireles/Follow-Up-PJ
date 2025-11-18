@@ -4,6 +4,8 @@ import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 import InfoBar from './InfoBar';
 import Leaderboard from './Leaderboard';
+// Fix: Use named import for AIBriefing
+import { AIBriefing } from './AIBriefing';
 
 interface DashboardProps {
   budgets: Budget[];
@@ -177,6 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, users, onSelect
 
     return (
         <div className="space-y-8">
+            <AIBriefing budgets={budgets} userProfile={userProfile} />
             <InfoBar />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                  <div>

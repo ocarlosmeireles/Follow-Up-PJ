@@ -28,17 +28,20 @@ const ProspectAIModal: React.FC<ProspectAIModalProps> = ({ isOpen, onClose, pros
                 
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-                const researchPrompt = `Faça uma pesquisa concisa sobre a empresa "${prospect.company}". Foco em:
-- Principal área de atuação e produtos/serviços.
-- Notícias recentes ou conquistas notáveis.
-- Possíveis pontos de conexão para uma abordagem de vendas.
-A resposta deve ser em português do Brasil e formatada em tópicos (usando *).`;
+                const researchPrompt = `Faça uma pesquisa concisa sobre a empresa "${prospect.company}". Busque na web por informações relevantes para uma abordagem de vendas.
+A resposta deve ser em português do Brasil, formatada em tópicos (usando *) e cobrir:
+- **Atuação:** Principal área de atuação, produtos/serviços chave.
+- **Notícias Recentes:** Lançamentos, expansões, contratações ou prêmios.
+- **Pontos de Conexão:** Possíveis desafios ou oportunidades que minha solução (CRM de vendas e follow-up) poderia resolver.`;
 
-                const icebreakerPrompt = `Crie uma curta e personalizada frase de abertura para um primeiro contato (e-mail ou mensagem) com ${prospect.name} da empresa ${prospect.company}. 
-Use as seguintes anotações sobre o prospect, se disponíveis: "${prospect.notes || 'Nenhuma'}".
-O tom deve ser profissional, mas amigável e direto ao ponto. Forneça apenas o texto da abordagem.`;
+                const icebreakerPrompt = `Crie 3 opções de frases de abertura (icebreakers) para um primeiro contato (e-mail ou LinkedIn) com ${prospect.name}, ${prospect.role || 'contato'} na empresa ${prospect.company}.
+Considere o segmento da empresa: ${prospect.segment || 'Não informado'}.
+As frases devem ser curtas, personalizadas e profissionais. Forneça apenas o texto das abordagens, em uma lista numerada.`;
                 
-                const strategyPrompt = `Crie uma estratégia de prospecção simples em 3 passos para abordar ${prospect.name} da empresa ${prospect.company}. Considere as seguintes notas: "${prospect.notes || 'Nenhuma'}". A resposta deve ser concisa, em formato de lista numerada, prática e em português do Brasil.`;
+                const strategyPrompt = `Crie uma estratégia de prospecção em 3 passos para abordar ${prospect.name} da empresa ${prospect.company}.
+Seja específico sobre o canal e o conteúdo de cada passo.
+Considere as seguintes notas sobre o prospect: "${prospect.notes || 'Nenhuma'}".
+A resposta deve ser concisa, em formato de lista numerada, e em português do Brasil.`;
 
                 const prompt = mode === 'research' ? researchPrompt : mode === 'icebreaker' ? icebreakerPrompt : strategyPrompt;
                 

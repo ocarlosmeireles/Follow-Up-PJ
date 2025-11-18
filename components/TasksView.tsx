@@ -5,6 +5,7 @@ import {
     CalendarIcon, ExclamationTriangleIcon, BriefcaseIcon, LightBulbIcon,
     MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon
 } from './icons';
+import AIFocusTask from './AIFocusTask';
 
 // --- PROPS ---
 interface TasksViewProps {
@@ -28,6 +29,7 @@ type UnifiedTask = {
   isOverdue: boolean;
   isToday: boolean;
   daysSince?: number;
+  healthStatus?: 'risk' | 'attention' | 'healthy';
 };
 
 // --- HELPER FUNCTIONS ---
@@ -159,6 +161,14 @@ const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => vo
         : isFollowUp 
         ? <BriefcaseIcon className="w-5 h-5 text-blue-500"/>
         : <LightBulbIcon className="w-5 h-5 text-purple-500"/>;
+        
+    const healthConfig = {
+      risk: { color: 'bg-red-500', title: 'Em Risco: Follow-up atrasado' },
+      attention: { color: 'bg-yellow-500', title: 'Atenção: Negócio parado ou sem próximo passo' },
+      healthy: { color: 'bg-green-500', title: 'Saudável: Em dia' },
+    };
+
+    const healthInfo = task.healthStatus ? healthConfig[task.healthStatus] : null;
 
     return (
         <div 
@@ -167,6 +177,9 @@ const TaskItem: React.FC<{ task: UnifiedTask; onSelectBudget: (id: string) => vo
             className={`${baseClasses} ${colorClasses} ${task.isCompleted ? 'opacity-60' : ''}`}
         >
             <div className="flex-shrink-0">{icon}</div>
+             {healthInfo && (
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${healthInfo.color}`} title={healthInfo.title} />
+            )}
             <div className="flex-grow overflow-hidden">
                 <p className={`font-semibold text-[var(--text-primary)] truncate ${task.isCompleted ? 'line-through text-[var(--text-tertiary)]' : ''}`}>{task.title}</p>
                 {task.clientName && <p className="text-xs text-[var(--text-accent)] truncate">{task.clientName}</p>}
@@ -246,8 +259,10 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
         const staleBudgets: UnifiedTask[] = [];
 
         budgets.forEach(b => {
-            // Stale logic
-            if (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP) {
+            const healthStatus = (b as any).healthStatus;
+            
+            // Stale logic - uses healthStatus 'attention'
+            if (healthStatus === 'attention' && (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)) {
                 let lastActivityDate;
                 if (b.followUps && b.followUps.length > 0) {
                     const latestFollowUpDate = Math.max(...b.followUps.map(fu => new Date(fu.date).getTime()));
@@ -256,15 +271,15 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                     lastActivityDate = new Date(b.dateSent);
                 }
 
-                if (lastActivityDate < sevenDaysAgo) {
-                    const diffTime = Math.abs(new Date().getTime() - lastActivityDate.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    staleBudgets.push({
-                        id: `stale-${b.id}`, type: 'stale', date: lastActivityDate.getTime(), title: b.title,
-                        clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
-                        isOverdue: false, isToday: false, daysSince: diffDays,
-                    });
-                }
+                const diffTime = Math.abs(new Date().getTime() - lastActivityDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                staleBudgets.push({
+                    id: `stale-${b.id}`, type: 'stale', date: lastActivityDate.getTime(), title: b.title,
+                    clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
+                    isOverdue: false, isToday: false, daysSince: diffDays,
+                    healthStatus: 'attention'
+                });
             }
 
             // Follow-up task logic
@@ -276,6 +291,7 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
                     clientName: clientMap.get(b.clientId), value: b.value, budgetId: b.id,
                     isOverdue: eventDateOnly.getTime() < todayTime,
                     isToday: eventDateOnly.getTime() === todayTime,
+                    healthStatus: healthStatus
                 });
             }
         });
@@ -315,6 +331,12 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
 
     return (
         <div className="space-y-6">
+            <AIFocusTask 
+                budgets={budgets} 
+                clients={clients} 
+                userProfile={userProfile} 
+                onSelectBudget={onSelectBudget}
+            />
             <div>
                 <h2 className="text-3xl font-bold text-[var(--text-primary)]">Plano de Ação</h2>
                 <p className="text-[var(--text-secondary)]">Seu centro de comando para um dia de vendas produtivo e focado.</p>

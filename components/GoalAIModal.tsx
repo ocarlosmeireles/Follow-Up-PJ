@@ -54,10 +54,10 @@ const GoalAIModal: React.FC<GoalAIModalProps> = ({ isOpen, onClose, user, budget
                 
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 
-                const prompt = `Aja como um diretor de vendas experiente. Analise os dados de performance dos últimos 90 dias do vendedor "${user.name}" e sugira uma nova meta de vendas mensal (monthlyGoal) que seja ambiciosa, mas realista. Forneça uma breve justificativa (rationale).
+                const prompt = `Aja como um diretor de vendas experiente. Analise os dados de performance dos últimos 90 dias do vendedor "${user.name}" e sugira uma nova meta de vendas mensal (monthlyGoal) que seja ambiciosa, mas realista. Considere um crescimento saudável em relação à performance passada. Forneça uma breve justificativa (rationale).
 
 Dados de performance (últimos 90 dias):
-- Valor total faturado: R$ ${performanceMetrics.totalInvoicedValue.toFixed(2)}
+- Valor total faturado: R$ ${performanceMetrics.totalInvoicedValue.toFixed(2)} (Média mensal: R$ ${(performanceMetrics.totalInvoicedValue / 3).toFixed(2)})
 - Total de orçamentos criados: ${performanceMetrics.budgetsCreated}
 - Taxa de conversão: ${performanceMetrics.conversionRate}%
 - Meta mensal atual: R$ ${user.monthlyGoal || 0}
@@ -74,11 +74,11 @@ Sua resposta DEVE ser um objeto JSON.`;
                             properties: {
                                 suggestedGoal: {
                                     type: Type.NUMBER,
-                                    description: 'A nova meta mensal sugerida, como um número. Ex: 15000.',
+                                    description: 'A nova meta mensal sugerida, como um número arredondado. Ex: 15500.',
                                 },
                                 rationale: {
                                     type: Type.STRING,
-                                    description: 'Uma breve justificativa para a meta sugerida.',
+                                    description: 'Uma breve justificativa para a meta sugerida, explicando o cálculo ou a lógica.',
                                 },
                             },
                             required: ['suggestedGoal', 'rationale'],

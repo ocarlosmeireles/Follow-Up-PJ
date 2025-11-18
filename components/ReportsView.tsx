@@ -91,7 +91,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
         const orderPlaced = budgets.filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
         const invoiced = budgets.filter(b => b.status === BudgetStatus.INVOICED);
 
-        const stages = [
+        const stages: { name: string; count: number; value: number }[] = [
             { name: 'Enviado', count: sent.length, value: sent.reduce((sum, b) => sum + b.value, 0) },
             { name: 'Em Follow-up', count: followingUp.length, value: followingUp.reduce((sum, b) => sum + b.value, 0) },
             { name: 'Pedido Emitido', count: orderPlaced.length, value: orderPlaced.reduce((sum, b) => sum + b.value, 0) },
@@ -102,8 +102,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
 
         return stages.map((stage, index) => {
             const prevStage = stages[index - 1];
-            const conversionRate = prevStage && prevStage.count > 0 ? (stage.count / prevStage.count) * 100 : 100;
-            const widthPercentage = (stage.count / maxCount) * 100;
+            // Fix: Cast operands to Number to resolve type inference issue.
+            const conversionRate = (prevStage && prevStage.count > 0) ? (Number(stage.count) / Number(prevStage.count)) * 100 : 100;
+            // Fix: Cast operand to Number to resolve type inference issue.
+            const widthPercentage = maxCount > 0 ? (Number(stage.count) / maxCount) * 100 : 0;
             return { ...stage, conversionRate, widthPercentage };
         });
     }, [budgets]);
@@ -134,11 +136,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             return { data: [], maxValue: 0, totalLost: 0 };
         }
 
-        const reasonCounts = lostBudgets.reduce((acc: Record<string, number>, budget) => {
+        const reasonCounts = lostBudgets.reduce((acc, budget) => {
             const reason = budget.lostReason!;
             acc[reason] = (acc[reason] || 0) + 1;
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
 
         const data = Object.entries(reasonCounts)
             .map(([reason, count]) => ({ reason, count }))
@@ -156,8 +158,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
 
         const salespeople = users.filter(u => u.role === UserRole.SALESPERSON || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
 
-        // FIX: Explicitly type `rankedSalespeople` to prevent `value` from being inferred as `unknown`.
-        const rankedSalespeople: { id: string; name: string; value: number }[] = salespeople.map(user => {
+        const rankedSalespeople = salespeople.map(user => {
             const userBudgets = budgets.filter(b => b.userId === user.id);
             
             const monthlyBudgets = userBudgets.filter(b => {
@@ -168,10 +169,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             let value = 0;
             switch(leaderboardMetric) {
                 case 'value':
-                    // FIX: Added initial value `0` to reduce to ensure `sum` is a number, preventing arithmetic errors on empty arrays.
                     value = monthlyBudgets
                         .filter(b => b.status === BudgetStatus.INVOICED)
-                        .reduce((sum: number, b: Budget) => sum + b.value, 0);
+                        .reduce((sum, b) => sum + b.value, 0);
                     break;
                 case 'count':
                     value = monthlyBudgets.filter(b => b.status === BudgetStatus.INVOICED).length;

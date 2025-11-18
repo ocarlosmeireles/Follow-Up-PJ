@@ -43,15 +43,22 @@ interface DealsViewProps {
 const CompactBudgetCard: React.FC<{ budget: Budget, clientName: string, onSelect: () => void, isDragging: boolean }> = ({ budget, clientName, onSelect, isDragging }) => {
      const today = new Date(); today.setHours(0, 0, 0, 0);
      const isOverdue = budget.nextFollowUpDate && new Date(budget.nextFollowUpDate) < today;
-     const isBudgetStale = useMemo(() => isStale(budget), [budget]);
+     
+    const healthConfig = {
+      risk: { color: 'bg-red-500', title: 'Em Risco: Follow-up atrasado' },
+      attention: { color: 'bg-yellow-500', title: 'Atenção: Negócio parado ou sem próximo passo' },
+      healthy: { color: 'bg-green-500', title: 'Saudável: Em dia' },
+    };
+    const healthStatus = (budget as any).healthStatus;
+    const healthInfo = healthStatus ? healthConfig[healthStatus] : null;
+
 
     return (
         <div onClick={onSelect} className={`bg-[var(--background-secondary)] p-3 rounded-lg shadow-sm cursor-pointer border border-[var(--border-secondary)] transition-all duration-200 group ${isDragging ? 'opacity-50 rotate-2' : 'hover:border-[var(--accent-primary)] hover:-translate-y-0.5'}`}>
             <div className="flex justify-between items-start">
-                <h4 className="font-bold text-[var(--text-primary)] text-base pr-2 truncate">{budget.title}</h4>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {isBudgetStale && <span title="Atenção: Orçamento sem follow-up há mais de 7 dias."><ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" /></span>}
-                    {isOverdue && <span title="Follow-up atrasado!"><ExclamationCircleIcon className="w-5 h-5 text-red-500" /></span>}
+                <div className="flex items-center gap-2">
+                    {healthInfo && <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${healthInfo.color}`} title={healthInfo.title} />}
+                    <h4 className="font-bold text-[var(--text-primary)] text-base pr-2 truncate">{budget.title}</h4>
                 </div>
             </div>
             <p className="text-sm text-[var(--text-accent)] font-semibold mb-2 truncate">{clientName}</p>

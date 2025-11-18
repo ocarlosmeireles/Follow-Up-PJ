@@ -465,11 +465,21 @@ Sua resposta DEVE ser um objeto JSON com um array de strings chamado "suggestion
                                 <div className="flex justify-between items-center"><span className={`px-3 py-1 text-sm font-bold rounded-full ${getStatusBadgeColor(budget.status)}`}>{budget.status}</span></div>
                                  {isEditing ? (<input type="text" value={editableValue} onChange={e => setEditableValue(formatCurrencyForInput(e.target.value))} className="text-3xl font-bold text-gray-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 p-1 -m-1 rounded-md w-full"/>) : (<p className="text-3xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2"><CurrencyDollarIcon className="w-7 h-7 text-green-500"/> {formatCurrency(budget.value)}</p>)}
                                 {contact && (<div className="pt-3 border-t border-gray-200 dark:border-slate-600"><p className="font-bold text-gray-700 dark:text-slate-200">{contact.name}</p>{contact.email && <a href={`mailto:${contact.email}`} className="text-sm text-gray-500 dark:text-slate-400 hover:text-blue-600 flex items-center gap-1.5 truncate"><EnvelopeIcon className="w-4 h-4"/>{contact.email}</a>}{contact.phone && <p className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1.5"><PhoneIcon className="w-4 h-4"/>{contact.phone}</p>}</div>)}
-                                <button onClick={onOpenAIAnalysis} className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg">
-                                    <SparklesIcon className="w-5 h-5"/>
-                                    Análise com IA
-                                </button>
                              </div>
+                             
+                            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-800 space-y-2">
+                                <h4 className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                                    <SparklesIcon className="w-5 h-5"/>
+                                    Análise de Oportunidade com IA
+                                </h4>
+                                <p className="text-xs text-blue-700 dark:text-blue-300">
+                                    Obtenha insights sobre probabilidade de ganho, pontos fortes, fracos e um próximo passo sugerido.
+                                </p>
+                                <button onClick={onOpenAIAnalysis} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded-lg transition-colors">
+                                    Analisar com IA
+                                </button>
+                            </div>
+
                             {!isConfirmingWin && (
                                  <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 space-y-2">
                                     <h4 className="font-semibold text-gray-700 dark:text-slate-300 mb-2">Alterar Status</h4>

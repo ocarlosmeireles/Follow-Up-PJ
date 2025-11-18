@@ -908,6 +908,41 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setGoalAIModalState({isOpen: false, user: null});
     };
 
+    const budgetsWithHealth = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        return budgets.map(budget => {
+            if (![BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(budget.status)) {
+                return budget; // No health score for closed/lost/on-hold deals
+            }
+            // Correct date parsing for cross-browser compatibility
+            const nextFollowUp = budget.nextFollowUpDate ? new Date(budget.nextFollowUpDate.replace(/-/g, '/')) : null;
+            const isOverdue = nextFollowUp && nextFollowUp < today;
+
+            let lastActivity = new Date(budget.dateSent.replace(/-/g, '/'));
+            if (budget.followUps.length > 0) {
+                const lastFollowUpDate = new Date(Math.max(...budget.followUps.map(f => new Date(f.date).getTime())));
+                if (lastFollowUpDate > lastActivity) {
+                    lastActivity = lastFollowUpDate;
+                }
+            }
+            const isStale = lastActivity < sevenDaysAgo;
+
+            let healthStatus: 'risk' | 'attention' | 'healthy' = 'healthy';
+            
+            if (isOverdue) {
+                healthStatus = 'risk';
+            } else if (isStale || !budget.nextFollowUpDate) {
+                healthStatus = 'attention';
+            }
+
+            return { ...budget, healthStatus };
+        });
+    }, [budgets]);
+
 
     // --- RENDER LOGIC ---
     if (loading || !effectiveUserProfile) {
@@ -981,14 +1016,14 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                 
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto">
                     {/* Render active view based on state */}
-                    {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgets} clients={clients} users={users} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile} onOpenReportDetail={handleOpenReportDetail} />}
+                    {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgetsWithHealth} clients={clients} users={users} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile} onOpenReportDetail={handleOpenReportDetail} />}
                     {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect} onOpenAIModal={handleOpenProspectAIModal} />}
-                    {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
-                    {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
-                    {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgets} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)} onBulkDelete={handleBulkDeleteClients} />}
-                    {activeView === 'reports' && <ReportsView key={viewKey} users={users} budgets={budgets} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport} onOpenReportDetail={handleOpenReportDetail} />}
-                    {activeView === 'calendar' && <CalendarView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onAddReminder={handleAddReminder}/>}
-                    {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgets} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} userProfile={effectiveUserProfile} />}
+                    {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgetsWithHealth} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
+                    {activeView === 'deals' && <DealsView key={viewKey} budgets={budgetsWithHealth} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
+                    {activeView === 'clients' && <ClientsView key={viewKey} clients={clients} contacts={contacts} budgets={budgetsWithHealth} onSelectClient={(id) => { setSelectedClient(clients.find(c => c.id === id) || null); setClientDetailModalOpen(true); }} onAddClientClick={() => setAddClientModalOpen(true)} onBulkDelete={handleBulkDeleteClients} />}
+                    {activeView === 'reports' && <ReportsView key={viewKey} users={users} budgets={budgetsWithHealth} clients={clients} userProfile={effectiveUserProfile} onGenerateDailyReport={onGenerateDailyReport} onOpenReportDetail={handleOpenReportDetail} />}
+                    {activeView === 'calendar' && <CalendarView key={viewKey} budgets={budgetsWithHealth} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onAddReminder={handleAddReminder}/>}
+                    {activeView === 'action-plan' && <TasksView key={viewKey} budgets={budgetsWithHealth} clients={clients} reminders={reminders} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} userProfile={effectiveUserProfile} />}
                     {activeView === 'map' && <MapView key={viewKey} clients={clients} />}
                     {activeView === 'scripts' && <ScriptsView key={viewKey} scripts={scripts} onAdd={() => { setScriptToEdit(null); setScriptModalOpen(true); }} onEdit={(script) => { setScriptToEdit(script); setScriptModalOpen(true); }} onDelete={handleDeleteScript}/>}
                     

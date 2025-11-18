@@ -1,4 +1,4 @@
-import type { Budget, Client, Contact, UserProfile, FollowUp, Organization } from '../types';
+import type { Budget, Client, Contact, UserData, FollowUp, Organization } from '../types';
 
 type ReportDataItem = {
     budget: Budget;
@@ -34,7 +34,7 @@ const formatTimestamp = (dateString: string) => {
 export const generateFollowUpReport = (
     title: string,
     reportData: ReportDataItem[],
-    userProfile: UserProfile,
+    userProfile: UserData,
     organization: Organization | null
 ) => {
     const reportHtml = `
@@ -167,6 +167,7 @@ export const generateFollowUpReport = (
                     ${organization?.logoUrl ? `<img src="${organization.logoUrl}" class="org-logo" alt="${organization.name} logo">` : ''}
                     <h1>${title}</h1>
                     <p>Gerado por: <strong>${userProfile.name}</strong> (Matrícula: ${userProfile.matricula})</p>
+                    <p>E-mail: ${userProfile.email}</p>
                     <p>Data de Geração: ${new Date().toLocaleString('pt-BR')}</p>
                 </div>
             

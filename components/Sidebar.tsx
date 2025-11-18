@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ActiveView } from '../App';
-import type { UserProfile, Organization, ThemeVariant } from '../types';
+import type { UserData, Organization, ThemeVariant } from '../types';
 import { UserRole } from '../types';
 import { 
     ChartPieIcon as DashboardIcon, 
@@ -22,7 +22,7 @@ interface SidebarProps {
     activeView: ActiveView;
     setActiveView: (view: ActiveView) => void;
     isOpen: boolean;
-    userProfile: UserProfile | null;
+    userProfile: UserData | null;
     organization: Organization | null;
     themeVariant: ThemeVariant;
 }

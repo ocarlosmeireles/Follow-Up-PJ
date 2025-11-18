@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Budget, Client, UserProfile, UserData } from '../types';
+import type { Budget, Client, UserData } from '../types';
 import { BudgetStatus, UserRole } from '../types';
 import { TrophyIcon, ChartPieIcon, CurrencyDollarIcon, ChartBarIcon, FunnelIcon, UserGroupIcon, ClipboardDocumentListIcon, CalendarIcon, ExclamationTriangleIcon } from './icons';
 
@@ -7,7 +7,7 @@ interface ReportsViewProps {
   budgets: Budget[];
   clients: Client[];
   users: UserData[];
-  userProfile: UserProfile;
+  userProfile: UserData;
   onGenerateDailyReport: () => void;
   onOpenReportDetail: (title: string, budgets: Budget[]) => void;
 }
@@ -91,7 +91,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
         const orderPlaced = budgets.filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
         const invoiced = budgets.filter(b => b.status === BudgetStatus.INVOICED);
 
-        const stages: { name: string; count: number; value: number }[] = [
+        const stages = [
             { name: 'Enviado', count: sent.length, value: sent.reduce((sum, b) => sum + b.value, 0) },
             { name: 'Em Follow-up', count: followingUp.length, value: followingUp.reduce((sum, b) => sum + b.value, 0) },
             { name: 'Pedido Emitido', count: orderPlaced.length, value: orderPlaced.reduce((sum, b) => sum + b.value, 0) },
@@ -102,10 +102,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
 
         return stages.map((stage, index) => {
             const prevStage = stages[index - 1];
-            // Fix: Cast operands to Number to resolve type inference issue.
-            const conversionRate = (prevStage && prevStage.count > 0) ? (Number(stage.count) / Number(prevStage.count)) * 100 : 100;
-            // Fix: Cast operand to Number to resolve type inference issue.
-            const widthPercentage = maxCount > 0 ? (Number(stage.count) / maxCount) * 100 : 0;
+            const conversionRate = (prevStage && prevStage.count > 0) ? (stage.count / prevStage.count) * 100 : 100;
+            const widthPercentage = maxCount > 0 ? (stage.count / maxCount) * 100 : 0;
             return { ...stage, conversionRate, widthPercentage };
         });
     }, [budgets]);
@@ -346,7 +344,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
                 <div className="space-y-3">
                     {leaderboardData.length > 0 ? leaderboardData.map((salesperson, index) => {
                         const rank = index + 1;
-                        const isCurrentUser = salesperson.id === (userProfile as UserData).id;
+                        const isCurrentUser = salesperson.id === userProfile.id;
                         const topValue = leaderboardData[0].value || 1;
                         const progress = (salesperson.value / topValue) * 100;
                         

@@ -15,7 +15,8 @@ interface BudgetDetailModalProps {
     budget: Budget;
     client: Client;
     contact?: Contact;
-    userProfile: UserProfile;
+    // FIX: Changed userProfile type from UserProfile to UserData to include the id property.
+    userProfile: UserData;
     users: UserData[];
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
     onAddComment: (budgetId: string, text: string) => void;

@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client, ThemeVariant, UserProfile, UserData } from '../types';
+import type { Budget, Client, ThemeVariant, UserData } from '../types';
 import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 import InfoBar from './InfoBar';
 import Leaderboard from './Leaderboard';
-// Fix: Use named import for AIBriefing
-import { AIBriefing } from './AIBriefing';
 
 interface DashboardProps {
   budgets: Budget[];
@@ -13,7 +11,7 @@ interface DashboardProps {
   users: UserData[];
   onSelectBudget: (id: string) => void;
   themeVariant: ThemeVariant;
-  userProfile: UserProfile;
+  userProfile: UserData;
   onOpenReportDetail: (title: string, budgets: Budget[]) => void;
 }
 
@@ -152,7 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, users, onSelect
     
         const achieved = budgets
             .filter(b => 
-                b.userId === (userProfile as UserData).id && 
+                b.userId === userProfile.id && 
                 b.status === BudgetStatus.INVOICED &&
                 new Date(b.dateSent).getMonth() === currentMonth &&
                 new Date(b.dateSent).getFullYear() === currentYear
@@ -179,7 +177,6 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, users, onSelect
 
     return (
         <div className="space-y-8">
-            <AIBriefing budgets={budgets} userProfile={userProfile} />
             <InfoBar />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                  <div>
@@ -284,7 +281,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, users, onSelect
                      )}
                 </div>
                  <div className="lg:col-span-2 animated-item" style={{ animationDelay: '700ms' }}>
-                    <Leaderboard users={users} budgets={budgets} currentUser={userProfile as UserData} />
+                    <Leaderboard users={users} budgets={budgets} currentUser={userProfile} />
                 </div>
             </div>
 

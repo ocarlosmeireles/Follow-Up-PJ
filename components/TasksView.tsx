@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Budget, Client, Reminder, UserProfile } from '../types';
+import type { Budget, Client, Reminder, UserData } from '../types';
 import { BudgetStatus } from '../types';
 import { 
     CalendarIcon, ExclamationTriangleIcon, BriefcaseIcon, LightBulbIcon,
-    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon
+    MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon,
+    SparklesIcon, XMarkIcon
 } from './icons';
 import AIFocusTask from './AIFocusTask';
+import { AIBriefing } from './AIBriefing';
+
 
 // --- PROPS ---
 interface TasksViewProps {
@@ -13,7 +16,7 @@ interface TasksViewProps {
   clients: Client[];
   reminders: Reminder[];
   onSelectBudget: (id: string) => void;
-  userProfile: UserProfile;
+  userProfile: UserData;
 }
 
 // --- TYPES ---
@@ -331,6 +334,10 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
 
     return (
         <div className="space-y-6">
+             <AIBriefing 
+                budgets={budgets} 
+                userProfile={userProfile}
+            />
             <AIFocusTask 
                 budgets={budgets} 
                 clients={clients} 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
-import type { Budget, Client, UserProfile } from '../types';
+import type { Budget, Client, UserData } from '../types';
 import { LightBulbIcon, SparklesIcon, CrosshairsIcon, BriefcaseIcon } from './icons';
 
 interface AIFocusTaskProps {
   budgets: Budget[];
   clients: Client[];
-  userProfile: UserProfile;
+  userProfile: UserData;
   onSelectBudget: (id: string) => void;
 }
 
@@ -47,7 +47,8 @@ const AIFocusTask: React.FC<AIFocusTaskProps> = ({ budgets, clients, userProfile
             return;
         }
 
-        const clientMap = new Map(clients.map(c => [c.id, c]));
+        // Explicitly type the Map to ensure TS knows the values are Client objects
+        const clientMap = new Map<string, Client>(clients.map(c => [c.id, c]));
         setFocusTask(task);
         setClient(clientMap.get(task.clientId) || null);
         
@@ -55,7 +56,6 @@ const AIFocusTask: React.FC<AIFocusTaskProps> = ({ budgets, clients, userProfile
             if (!process.env.API_KEY) throw new Error("A chave de API do Gemini não foi configurada.");
             
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            // FIX: Resolve client name before creating the prompt to avoid potential type issues.
             const clientName = clientMap.get(task.clientId)?.name || 'Cliente desconhecido';
             const prompt = `
                 Aja como um coach de vendas para ${userProfile.name}.

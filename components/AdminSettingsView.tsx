@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Organization, UserProfile, ProspectingStage, UserData } from '../types';
+import type { Organization, ProspectingStage, UserData } from '../types';
 import { BriefcaseIcon, PhotoIcon, PencilIcon, CheckCircleIcon, UserGroupIcon, TrashIcon, PlusIcon, FunnelIcon, BillingIcon } from './icons';
 import type { ActiveView } from '../App';
 
 interface AdminSettingsViewProps {
     organization: Organization;
-    userProfile: UserProfile;
+    userProfile: UserData;
     stages: ProspectingStage[];
     users: UserData[];
     onSaveOrganization: (orgUpdate: Partial<Omit<Organization, 'id'>>, logoFile?: File) => void;

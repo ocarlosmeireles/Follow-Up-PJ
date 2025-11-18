@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon, MagnifyingGlassIcon, CommandLineIcon } from './icons';
-import type { Notification, UserProfile, Theme, ThemeVariant, Reminder } from '../types';
+import type { Notification, UserData, Theme, ThemeVariant, Reminder } from '../types';
 import { UserRole } from '../types';
 import PomodoroTimer from './PomodoroTimer';
 
@@ -12,7 +12,7 @@ interface HeaderProps {
   toggleTheme: () => void;
   notifications: Notification[];
   onNotificationClick: (budgetId: string) => void;
-  userProfile: UserProfile;
+  userProfile: UserData;
   onEditProfile: () => void;
   onSettings: () => void;
   onLogout: () => void;

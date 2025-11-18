@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import type { Budget, UserProfile } from 'types';
+import type { Budget, UserData } from '../types';
 import { LightBulbIcon, SparklesIcon, XMarkIcon } from './icons';
 
 interface AIBriefingProps {
   budgets: Budget[];
-  userProfile: UserProfile;
+  userProfile: UserData;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);

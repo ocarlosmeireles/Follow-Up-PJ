@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import type { UserProfile } from '../types';
+import type { UserData, UserProfile } from '../types';
 import { XMarkIcon } from './icons';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (profile: Partial<UserProfile>) => void;
-  userProfile: UserProfile;
+  userProfile: UserData;
 }
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, onSave, userProfile }) => {

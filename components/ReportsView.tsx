@@ -156,7 +156,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
 
         const salespeople = users.filter(u => u.role === UserRole.SALESPERSON || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
 
-        const rankedSalespeople = salespeople.map(user => {
+        // FIX: Explicitly type `rankedSalespeople` to prevent `value` from being inferred as `unknown`.
+        const rankedSalespeople: { id: string; name: string; value: number }[] = salespeople.map(user => {
             const userBudgets = budgets.filter(b => b.userId === user.id);
             
             const monthlyBudgets = userBudgets.filter(b => {
@@ -167,10 +168,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             let value = 0;
             switch(leaderboardMetric) {
                 case 'value':
+                    // FIX: Added initial value `0` to reduce to ensure `sum` is a number, preventing arithmetic errors on empty arrays.
                     value = monthlyBudgets
                         .filter(b => b.status === BudgetStatus.INVOICED)
-                        // FIX: Ensure budget value is treated as a number to prevent arithmetic errors.
-                        .reduce((sum, b) => sum + Number(b.value), 0);
+                        .reduce((sum: number, b: Budget) => sum + b.value, 0);
                     break;
                 case 'count':
                     value = monthlyBudgets.filter(b => b.status === BudgetStatus.INVOICED).length;

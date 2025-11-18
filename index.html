@@ -32,9 +32,10 @@
 }
 </script>
 <script>
-  // Script para evitar flash de tema
+  // Script para evitar flash de tema e layout
   const theme = localStorage.getItem('theme') || 'light';
   const themeVariant = localStorage.getItem('themeVariant') || 'flow';
+  const layoutMode = localStorage.getItem('layoutMode') || 'comfortable';
   
   if (theme === 'dark') {
     document.documentElement.classList.add('dark');
@@ -42,6 +43,7 @@
     document.documentElement.classList.remove('dark');
   }
   document.documentElement.setAttribute('data-theme', themeVariant);
+  document.documentElement.setAttribute('data-layout', layoutMode);
 </script>
 <style>
 /* Definição de Cores com Variáveis CSS para Temas */
@@ -322,6 +324,31 @@ body {
   body {
     font-size: 0.875rem; /* 14px */
   }
+}
+
+/* Compact Layout Mode Styles */
+[data-layout='compact'] body {
+    font-size: 0.875rem;
+}
+[data-layout='compact'] main {
+    padding: 1rem;
+}
+[data-layout='compact'] table td,
+[data-layout='compact'] table th {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+/* This targets section wrappers */
+[data-layout='compact'] .p-6,
+[data-layout='compact'] .sm\:p-6 {
+    padding: 1rem;
+}
+[data-layout='compact'] .p-4 {
+    padding: 0.75rem;
+}
+/* This targets smaller cards like kanban cards */
+[data-layout='compact'] .p-3 {
+    padding: 0.75rem;
 }
 
 </style>

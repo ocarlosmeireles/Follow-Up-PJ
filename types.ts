@@ -165,6 +165,7 @@ export interface Reminder {
 
 export type ThemeVariant = 'classic' | 'vibrant' | 'flow' | 'dashboard' | 'aurora';
 export type Theme = 'light' | 'dark';
+export type LayoutMode = 'comfortable' | 'compact';
 
 export type ScriptCategory = 'Prospecção Fria' | 'Follow-up Pós-Envio' | 'Reuniões e Apresentações' | 'Reengajamento' | 'Negociação e Fechamento' | 'Pós-Venda';
 
@@ -185,3 +186,20 @@ export interface Script {
   content: string;
   category: ScriptCategory;
 }
+
+export type SearchResult = {
+  type: 'client' | 'budget' | 'prospect' | 'contact';
+  id: string;
+  title: string;
+  subtitle: string;
+};
+
+export type ActionSearchResult = {
+  type: 'action';
+  id: string; 
+  title: string;
+  subtitle: string;
+  onSelect: () => void;
+};
+
+export type CommandResult = SearchResult | ActionSearchResult;

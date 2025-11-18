@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { UserData } from '../types';
+import type { UserData, Budget } from '../types';
 import { UserRole } from '../types';
-import { UserGroupIcon, UserPlusIcon, CheckCircleIcon } from './icons';
+import { UserGroupIcon, UserPlusIcon, CheckCircleIcon, SparklesIcon } from './icons';
 
 interface UsersViewProps {
   users: UserData[];
+  budgets: Budget[];
   onUpdateRole: (userId: string, newRole: UserRole) => void;
   onAddUserClick: () => void;
   onUpdateUserGoals: (goals: { [userId: string]: number }) => void;
+  onOpenGoalAIModal: (user: UserData) => void;
 }
 
 const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
@@ -24,7 +26,7 @@ const RoleBadge: React.FC<{ role: UserRole }> = ({ role }) => {
     );
 };
 
-const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onAddUserClick, onUpdateUserGoals }) => {
+const UsersView: React.FC<UsersViewProps> = ({ users, budgets, onUpdateRole, onAddUserClick, onUpdateUserGoals, onOpenGoalAIModal }) => {
     const [goals, setGoals] = useState<{ [userId: string]: string }>({});
     const [initialGoals, setInitialGoals] = useState<{ [userId: string]: string }>({});
 
@@ -109,13 +111,22 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onAddUserCli
                                 <td className="p-4 text-gray-800 dark:text-slate-100 font-semibold">{user.name}</td>
                                 <td className="p-4 text-gray-600 dark:text-slate-300">{user.email}</td>
                                 <td className="p-4">
-                                    <input
-                                        type="number"
-                                        value={goals[user.id] || ''}
-                                        onChange={(e) => handleGoalChange(user.id, e.target.value)}
-                                        placeholder="0"
-                                        className="w-32 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={goals[user.id] || ''}
+                                            onChange={(e) => handleGoalChange(user.id, e.target.value)}
+                                            placeholder="0"
+                                            className="w-32 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                        <button
+                                            onClick={() => onOpenGoalAIModal(user)}
+                                            title="Sugerir meta com IA"
+                                            className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors"
+                                        >
+                                            <SparklesIcon className="w-5 h-5"/>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td className="p-4">
                                     <select
@@ -152,16 +163,25 @@ const UsersView: React.FC<UsersViewProps> = ({ users, onUpdateRole, onAddUserCli
                             </div>
                             <RoleBadge role={user.role} />
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-4">
+                        <div className="mt-4 grid grid-cols-1 gap-4">
                              <div>
                                 <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Meta Mensal (R$)</label>
-                                <input
-                                    type="number"
-                                    value={goals[user.id] || ''}
-                                    onChange={(e) => handleGoalChange(user.id, e.target.value)}
-                                    placeholder="0"
-                                    className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={goals[user.id] || ''}
+                                        onChange={(e) => handleGoalChange(user.id, e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <button
+                                        onClick={() => onOpenGoalAIModal(user)}
+                                        title="Sugerir meta com IA"
+                                        className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors"
+                                    >
+                                        <SparklesIcon className="w-5 h-5"/>
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Alterar Cargo</label>

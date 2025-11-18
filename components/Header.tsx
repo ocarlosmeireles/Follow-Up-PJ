@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon, MagnifyingGlassIcon, UserIcon, BriefcaseIcon } from './icons';
+import { PlusIcon, Bars3Icon, BellIcon, SunIcon, MoonIcon, ExclamationTriangleIcon, CalendarIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ClockIcon, TrashIcon, FunnelIcon, MagnifyingGlassIcon, CommandLineIcon } from './icons';
 import type { Notification, UserProfile, Theme, ThemeVariant, Reminder } from '../types';
 import { UserRole } from '../types';
 import PomodoroTimer from './PomodoroTimer';
-
-type SearchResult = {
-  type: 'client' | 'budget' | 'prospect' | 'contact';
-  id: string;
-  title: string;
-  subtitle: string;
-};
 
 interface HeaderProps {
   onAddBudget: () => void;
@@ -28,11 +21,7 @@ interface HeaderProps {
   onAddReminder: (reminderData: Omit<Reminder, 'id' | 'userId' | 'organizationId' | 'isDismissed' | 'isCompleted'>) => void;
   onDeleteReminder: (reminderId: string) => void;
   onToggleReminderStatus: (reminderId: string) => void;
-  globalSearchTerm: string;
-  globalSearchResults: SearchResult[];
-  onGlobalSearch: (term: string) => void;
-  onClearGlobalSearch: () => void;
-  onSearchResultClick: (result: SearchResult) => void;
+  onOpenCommandPalette: () => void;
   pomodoroMode: 'work' | 'shortBreak' | 'longBreak';
   pomodoroSecondsLeft: number;
   isPomodoroActive: boolean;
@@ -59,11 +48,7 @@ const Header: React.FC<HeaderProps> = ({
     onAddReminder,
     onDeleteReminder,
     onToggleReminderStatus,
-    globalSearchTerm,
-    globalSearchResults,
-    onGlobalSearch,
-    onClearGlobalSearch,
-    onSearchResultClick,
+    onOpenCommandPalette,
     pomodoroMode,
     pomodoroSecondsLeft,
     isPomodoroActive,
@@ -79,7 +64,6 @@ const Header: React.FC<HeaderProps> = ({
   const notificationsRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const remindersRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
   
   const [newReminderTitle, setNewReminderTitle] = useState('');
   const [newReminderDate, setNewReminderDate] = useState('');
@@ -98,15 +82,10 @@ const Header: React.FC<HeaderProps> = ({
         if (remindersRef.current && !remindersRef.current.contains(event.target as Node)) {
             setRemindersOpen(false);
         }
-        if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-            if (globalSearchTerm.length > 0) {
-                onClearGlobalSearch();
-            }
-        }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [globalSearchTerm, onClearGlobalSearch]);
+  }, []);
 
   const handleNotificationItemClick = (budgetId: string) => {
     onNotificationClick(budgetId);
@@ -134,57 +113,6 @@ const Header: React.FC<HeaderProps> = ({
     .filter(r => !r.isDismissed)
     .sort((a, b) => (a.isCompleted ? 1 : -1) - (b.isCompleted ? 1 : -1) || new Date(a.reminderDateTime).getTime() - new Date(b.reminderDateTime).getTime());
 
-  const renderSearchResults = () => {
-    // FIX: Explicitly set generic type for the reduce accumulator to avoid potential mis-inference by TypeScript.
-    const groupedResults = globalSearchResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
-      const key = result.type;
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(result);
-      return acc;
-    }, {});
-
-    const getIconForType = (type: string) => {
-        switch(type) {
-            case 'client': return <UserIcon className="w-5 h-5 text-blue-500" />;
-            case 'budget': return <BriefcaseIcon className="w-5 h-5 text-green-500" />;
-            case 'prospect': return <FunnelIcon className="w-5 h-5 text-purple-500" />;
-            case 'contact': return <UserIcon className="w-5 h-5 text-yellow-500" />;
-            default: return null;
-        }
-    }
-
-    const getTypeName = (type: string) => {
-        switch(type) {
-            case 'client': return 'Clientes';
-            case 'budget': return 'Orçamentos';
-            case 'prospect': return 'Prospects';
-            case 'contact': return 'Contatos';
-            default: return 'Resultados';
-        }
-    }
-
-    return Object.entries(groupedResults).map(([type, results]) => (
-      <div key={type}>
-        <h3 className="px-4 py-2 text-xs font-bold uppercase text-[var(--text-tertiary)] bg-[var(--background-tertiary)]">{getTypeName(type)}</h3>
-        <ul>
-          {results.map(result => (
-            <li key={`${result.type}-${result.id}`} onClick={() => onSearchResultClick(result)} className="px-4 py-3 hover:bg-[var(--background-tertiary)] cursor-pointer border-b border-[var(--border-primary)]/50 last:border-b-0">
-              <div className="flex items-center gap-3">
-                {getIconForType(type)}
-                <div>
-                  <p className="font-semibold text-sm text-[var(--text-primary)]">{result.title}</p>
-                  <p className="text-xs text-[var(--text-secondary)]">{result.subtitle}</p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    ));
-  };
-
 
   return (
     <header className={`p-4 flex items-center gap-2 sm:gap-4 flex-shrink-0 transition-colors duration-300 ${isDashboardTheme ? 'bg-transparent' : 'bg-[var(--background-secondary)] sticky top-0 z-20 shadow-sm'}`}>
@@ -192,24 +120,17 @@ const Header: React.FC<HeaderProps> = ({
         <Bars3Icon className="w-6 h-6" />
       </button>
 
-      <div className="flex-1 flex justify-start" ref={searchRef}>
-          <div className="relative w-full max-w-xl">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <MagnifyingGlassIcon className="w-5 h-5 text-[var(--text-tertiary)]" />
-            </div>
-            <input
-                type="text"
-                placeholder="Busca global..."
-                value={globalSearchTerm}
-                onChange={(e) => onGlobalSearch(e.target.value)}
-                className="w-full bg-[var(--background-tertiary)] border border-transparent focus:border-[var(--border-secondary)] rounded-lg py-2 pl-10 pr-4 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition-all"
-            />
-            {globalSearchResults.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-[var(--background-secondary)] rounded-lg shadow-2xl border border-[var(--border-primary)] z-50 max-h-96 overflow-y-auto custom-scrollbar">
-                    {renderSearchResults()}
-                </div>
-            )}
-          </div>
+      <div className="flex-1 flex justify-start">
+            <button
+                onClick={onOpenCommandPalette}
+                className="flex items-center gap-2 text-sm text-[var(--text-secondary)] bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)] border border-transparent hover:border-[var(--border-secondary)] rounded-lg py-2 px-3 transition-all w-full max-w-sm"
+            >
+                <MagnifyingGlassIcon className="w-5 h-5" />
+                <span className="flex-grow text-left">Busca e Ações...</span>
+                <kbd className="hidden sm:inline-block font-sans text-xs font-semibold text-[var(--text-tertiary)] bg-[var(--background-secondary)] border border-[var(--border-primary)] rounded px-1.5 py-0.5">
+                    ⌘K
+                </kbd>
+            </button>
       </div>
 
       <div className="flex justify-end items-center gap-2 sm:gap-4">

@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import type { Budget, Client, ThemeVariant, UserProfile } from '../types';
+import type { Budget, Client, ThemeVariant, UserProfile, UserData } from '../types';
 import { BudgetStatus } from '../types';
 import { CurrencyDollarIcon, TrophyIcon, ChartPieIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, CalendarIcon, CheckCircleIcon } from './icons';
 import InfoBar from './InfoBar';
+import Leaderboard from './Leaderboard';
 
 interface DashboardProps {
   budgets: Budget[];
   clients: Client[];
+  users: UserData[];
   onSelectBudget: (id: string) => void;
   themeVariant: ThemeVariant;
   userProfile: UserProfile;
+  onOpenReportDetail: (title: string, budgets: Budget[]) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -75,7 +78,7 @@ const DashboardMetricCard = ({ title, value, subValue, icon, gradient, style, cl
 );
 
 
-const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget, themeVariant, userProfile }) => {
+const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, users, onSelectBudget, themeVariant, userProfile, onOpenReportDetail }) => {
     const [timePeriod, setTimePeriod] = useState<'month' | '30days' | 'all'>('all');
 
     const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -113,13 +116,26 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const overdueCount = budgets.filter(b => // Overdue is independent of time filter
-            b.nextFollowUpDate && 
-            new Date(b.nextFollowUpDate) < today && 
-            (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP)
-        ).length;
+        const overdueBudgets = budgets.filter(b => { // Overdue is independent of time filter
+            if (!b.nextFollowUpDate || ![BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status)) return false;
+            const followUpDate = new Date(b.nextFollowUpDate);
+            const followUpDateOnly = new Date(followUpDate.getFullYear(), followUpDate.getMonth(), followUpDate.getDate());
+            return followUpDateOnly < today;
+        });
+        const overdueCount = overdueBudgets.length;
 
-        return { totalActiveValue, totalWonValue: totalInvoicedValue, closingRate, pipelineConversion, overdueCount, forecastValue, totalActiveCount: activeBudgets.length };
+        return { 
+            totalActiveValue, 
+            totalWonValue: totalInvoicedValue, 
+            closingRate, 
+            pipelineConversion, 
+            overdueCount, 
+            forecastValue, 
+            totalActiveCount: activeBudgets.length,
+            activeBudgets,
+            invoicedBudgets,
+            overdueBudgets,
+        };
     }, [filteredBudgetsByTime, budgets]);
     
     const { monthlyAchieved, monthlyGoal, goalProgress } = useMemo(() => {
@@ -134,7 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
     
         const achieved = budgets
             .filter(b => 
-                b.userId === userProfile.id && 
+                b.userId === (userProfile as UserData).id && 
                 b.status === BudgetStatus.INVOICED &&
                 new Date(b.dateSent).getMonth() === currentMonth &&
                 new Date(b.dateSent).getFullYear() === currentYear
@@ -157,6 +173,8 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
     
     const useModernCards = themeVariant === 'dashboard' || themeVariant === 'aurora';
 
+    const timePeriodLabel = timePeriod === 'all' ? 'Todo o período' : timePeriod === 'month' ? 'Este mês' : 'Últimos 30 dias';
+
     return (
         <div className="space-y-8">
             <InfoBar />
@@ -175,19 +193,31 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
             
             {useModernCards ? (
                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6">
-                    <DashboardMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
-                    <DashboardMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-purple-500 to-purple-700'}/>
+                    <div onClick={() => onOpenReportDetail(`Pipeline Ativo (${timePeriodLabel})`, metrics.activeBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '100ms' }}>
+                        <DashboardMetricCard title="Pipeline Ativo" value={`R$ ${formatCurrency(metrics.totalActiveValue)}`} subValue={`${metrics.totalActiveCount} negócios`} icon={<CurrencyDollarIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-blue-500 to-blue-700"/>
+                    </div>
+                    <div onClick={() => onOpenReportDetail(`Total Faturado (${timePeriodLabel})`, metrics.invoicedBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '200ms' }}>
+                        <DashboardMetricCard title="Total Faturado" value={`R$ ${formatCurrency(metrics.totalWonValue)}`} subValue="no período" icon={<TrophyIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-purple-500 to-purple-700'}/>
+                    </div>
                     <DashboardMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Taxa de Fechamento" value={metrics.closingRate} subValue="de negócios decididos" icon={<ChartPieIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"/>
                     <DashboardMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Conversão Pipeline" value={metrics.pipelineConversion} subValue="do total de orçamentos" icon={<ArrowTrendingUpIcon className="w-8 h-8"/>} gradient="bg-gradient-to-br from-cyan-500 to-cyan-700"/>
-                    <DashboardMetricCard style={{ animationDelay: '500ms' }} className="animated-item" title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-teal-500 to-teal-700'}/>
+                    <div onClick={() => onOpenReportDetail('Follow-ups Atrasados', metrics.overdueBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '500ms' }}>
+                        <DashboardMetricCard title="Atrasados" value={metrics.overdueCount} subValue="follow-ups pendentes" icon={<ExclamationTriangleIcon className="w-8 h-8"/>} gradient={themeVariant === 'aurora' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-teal-500 to-teal-700'}/>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                    <ClassicMetricCard style={{ animationDelay: '100ms' }} className="animated-item" title="Pipeline Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
+                    <div onClick={() => onOpenReportDetail(`Pipeline Ativo (${timePeriodLabel})`, metrics.activeBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '100ms' }}>
+                        <ClassicMetricCard title="Pipeline Ativo" value={formatCurrency(metrics.totalActiveValue)} icon={<CurrencyDollarIcon className="w-6 h-6 text-blue-500" />} />
+                    </div>
                     <ClassicMetricCard style={{ animationDelay: '200ms' }} className="animated-item" title="Previsão de Vendas" value={formatCurrency(metrics.forecastValue)} icon={<ArrowTrendingUpIcon className="w-6 h-6 text-purple-500" />} />
-                    <ClassicMetricCard style={{ animationDelay: '300ms' }} className="animated-item" title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
+                    <div onClick={() => onOpenReportDetail(`Total Faturado (${timePeriodLabel})`, metrics.invoicedBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '300ms' }}>
+                        <ClassicMetricCard title="Total Faturado" value={formatCurrency(metrics.totalWonValue)} icon={<TrophyIcon className="w-6 h-6 text-green-500" />} />
+                    </div>
                     <ClassicMetricCard style={{ animationDelay: '400ms' }} className="animated-item" title="Taxa de Fechamento" value={metrics.closingRate} icon={<ChartPieIcon className="w-6 h-6 text-yellow-500" />} />
-                    <ClassicMetricCard style={{ animationDelay: '500ms' }} className="animated-item" title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
+                    <div onClick={() => onOpenReportDetail('Follow-ups Atrasados', metrics.overdueBudgets)} className="cursor-pointer animated-item" style={{ animationDelay: '500ms' }}>
+                        <ClassicMetricCard title="Follow-ups Atrasados" value={metrics.overdueCount} icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-500" />} />
+                    </div>
                 </div>
             )}
             
@@ -211,44 +241,50 @@ const Dashboard: React.FC<DashboardProps> = ({ budgets, clients, onSelectBudget,
                     </div>
                 </div>
             )}
-
-            <div className="bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm">
-                 <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
-                 {nextTasks.length > 0 ? (
-                    <div className="space-y-4">
-                        {nextTasks.map((budget, index) => {
-                             const today = new Date();
-                             today.setHours(0,0,0,0);
-                             const followUpDate = new Date(budget.nextFollowUpDate!);
-                             const isOverdue = followUpDate < today;
-                             return (
-                                <div 
-                                    key={budget.id}
-                                    style={{ animationDelay: `${index * 50}ms` }}
-                                    onClick={() => onSelectBudget(budget.id)}
-                                    className="animated-item bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center"
-                                >
-                                    <div>
-                                        <p className="font-bold text-[var(--text-primary)] truncate">{budget.title}</p>
-                                        <p className="text-sm text-[var(--text-accent)]">{clientMap.get(budget.clientId)}</p>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                <div className="lg:col-span-3 bg-[var(--background-secondary)] p-4 sm:p-6 rounded-xl border border-[var(--border-primary)] shadow-sm animated-item" style={{ animationDelay: '600ms' }}>
+                     <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)] mb-4">Próximas Tarefas</h3>
+                     {nextTasks.length > 0 ? (
+                        <div className="space-y-4">
+                            {nextTasks.map((budget, index) => {
+                                 const today = new Date();
+                                 today.setHours(0,0,0,0);
+                                 const followUpDate = new Date(budget.nextFollowUpDate!);
+                                 const isOverdue = followUpDate < today;
+                                 return (
+                                    <div 
+                                        key={budget.id}
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                        onClick={() => onSelectBudget(budget.id)}
+                                        className="animated-item bg-[var(--background-secondary-hover)] p-4 rounded-lg cursor-pointer hover:bg-[var(--background-tertiary)] border border-[var(--border-secondary)] shadow-sm transition-all duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center"
+                                    >
+                                        <div>
+                                            <p className="font-bold text-[var(--text-primary)] truncate">{budget.title}</p>
+                                            <p className="text-sm text-[var(--text-accent)]">{clientMap.get(budget.clientId)}</p>
+                                        </div>
+                                        <p className="text-lg font-semibold text-[var(--text-secondary)] text-left sm:text-right">{formatCurrency(budget.value)}</p>
+                                        <div className={`flex items-center gap-2 font-semibold ${isOverdue ? 'text-red-500' : 'text-yellow-600'}`}>
+                                            <CalendarIcon className="w-5 h-5"/>
+                                            <span>{formatFollowUpDate(budget.nextFollowUpDate)}</span>
+                                        </div>
                                     </div>
-                                    <p className="text-lg font-semibold text-[var(--text-secondary)] text-left sm:text-right">{formatCurrency(budget.value)}</p>
-                                    <div className={`flex items-center gap-2 font-semibold ${isOverdue ? 'text-red-500' : 'text-yellow-600'}`}>
-                                        <CalendarIcon className="w-5 h-5"/>
-                                        <span>{formatFollowUpDate(budget.nextFollowUpDate)}</span>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                 ) : (
-                    <div className="text-center py-10 bg-[var(--background-secondary-hover)] rounded-lg text-[var(--text-secondary)] border border-dashed border-[var(--border-secondary)]">
-                        <CalendarIcon className="w-12 h-12 mx-auto mb-2 text-[var(--text-tertiary)]"/>
-                        <p className="font-semibold text-[var(--text-primary)]">Nenhuma tarefa futura agendada.</p>
-                        <p className="text-sm">Agende um follow-up em um orçamento para vê-lo aqui.</p>
-                    </div>
-                 )}
+                                )
+                            })}
+                        </div>
+                     ) : (
+                        <div className="text-center py-10 bg-[var(--background-secondary-hover)] rounded-lg text-[var(--text-secondary)] border border-dashed border-[var(--border-secondary)]">
+                            <CalendarIcon className="w-12 h-12 mx-auto mb-2 text-[var(--text-tertiary)]"/>
+                            <p className="font-semibold text-[var(--text-primary)]">Nenhuma tarefa futura agendada.</p>
+                            <p className="text-sm">Agende um follow-up em um orçamento para vê-lo aqui.</p>
+                        </div>
+                     )}
+                </div>
+                 <div className="lg:col-span-2 animated-item" style={{ animationDelay: '700ms' }}>
+                    <Leaderboard users={users} budgets={budgets} currentUser={userProfile as UserData} />
+                </div>
             </div>
+
         </div>
     );
 };

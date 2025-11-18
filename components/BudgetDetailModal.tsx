@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { GoogleGenAI, Type } from '@google/genai';
 import type { Budget, Client, FollowUp, Contact, Script, ScriptCategory, UserProfile, UserData } from '../types';
 import { BudgetStatus, FollowUpStatus, scriptCategories } from '../types';
 import { 
@@ -39,6 +40,7 @@ const formatDisplayDate = (dateString: string | null | undefined): string => {
                 hour: '2-digit', minute: '2-digit'
             });
         }
+        // Fallback for date-only strings, ensuring UTC interpretation
         const [year, month, day] = dateString.split('-').map(Number);
         const utcDate = new Date(Date.UTC(year, month - 1, day));
         return utcDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -117,6 +119,14 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
     const [scriptCategory, setScriptCategory] = useState<ScriptCategory>('Follow-up Pós-Envio');
     const [selectedScript, setSelectedScript] = useState<Script | null>(null);
     const [isLostReasonModalOpen, setLostReasonModalOpen] = useState(false);
+
+    // AI Suggestions state
+    const [showAISuggestions, setShowAISuggestions] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+    const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const suggestionButtonRef = useRef<HTMLButtonElement>(null);
+    const suggestionPanelRef = useRef<HTMLDivElement>(null);
     
     // Mentions state
     const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -141,8 +151,24 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
             setSelectedScript(null);
             setLostReasonModalOpen(false);
             setShowMentions(false);
+            setShowAISuggestions(false);
         }
     }, [isOpen, budget]);
+
+     useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                suggestionPanelRef.current &&
+                !suggestionPanelRef.current.contains(event.target as Node) &&
+                suggestionButtonRef.current &&
+                !suggestionButtonRef.current.contains(event.target as Node)
+            ) {
+                setShowAISuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // --- Data Handlers ---
 
@@ -156,6 +182,7 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
         if (newFollowUpNote.trim()) {
             onAddFollowUp(budget.id, { date: new Date().toISOString(), notes: newFollowUpNote.trim(), status: newFollowUpStatus }, nextFollowUpDate);
             setNewFollowUpNote('');
+            setNextFollowUpDate(null);
         }
     };
     
@@ -174,6 +201,7 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
             window.location.href = mailtoUrl;
         }
         setNewFollowUpNote('');
+        setNextFollowUpDate(null);
     };
 
     const handleApplyScript = (content: string) => {
@@ -192,6 +220,65 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
         }
         onUpdateBudget(budget.id, { title: editableTitle.trim(), value });
         setIsEditing(false);
+    };
+
+     const handleGenerateAISuggestions = async () => {
+        setIsFetchingSuggestions(true);
+        setAiSuggestions([]);
+        setAiError(null);
+        setShowAISuggestions(true);
+
+        try {
+            if (!process.env.API_KEY) throw new Error("A chave de API do Gemini não foi configurada.");
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            
+            const prompt = `Aja como um assistente de vendas. Crie 3 opções de mensagens de follow-up curtas e eficazes para um orçamento. Considere o histórico. Seja profissional e direto.
+
+- Título: ${budget.title}
+- Valor: ${formatCurrency(budget.value)}
+- Status: ${budget.status}
+- Histórico (últimos 3):
+${budget.followUps.slice(-3).map(f => `- ${f.notes}`).join('\n') || 'Nenhum'}
+
+Forneça 3 tipos de mensagem:
+1. Um lembrete gentil sobre a proposta.
+2. Uma que agregue valor (ex: compartilhando um insight).
+3. Uma para tentar avançar a conversa (ex: perguntando sobre um obstáculo).
+
+Sua resposta DEVE ser um objeto JSON com um array de strings chamado "suggestions".`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            suggestions: {
+                                type: Type.ARRAY,
+                                items: { type: Type.STRING }
+                            }
+                        },
+                        required: ['suggestions']
+                    }
+                }
+            });
+
+            const jsonString = response.text?.trim();
+            if (jsonString) {
+                const parsed = JSON.parse(jsonString);
+                setAiSuggestions(parsed.suggestions || []);
+            } else {
+                throw new Error("Resposta vazia da IA.");
+            }
+
+        } catch (err) {
+            console.error("Erro ao gerar sugestões:", err);
+            setAiError("Não foi possível gerar sugestões.");
+        } finally {
+            setIsFetchingSuggestions(false);
+        }
     };
     
     // --- Mentions Logic ---
@@ -307,7 +394,26 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
                             {activeTab === 'followup' && (
                                 <div className="space-y-6">
                                     <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
-                                        <h3 className="font-semibold text-lg mb-2 text-gray-700 dark:text-slate-300">Novo Follow-up</h3>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300">Novo Follow-up</h3>
+                                            <div className="relative">
+                                                <button ref={suggestionButtonRef} onClick={handleGenerateAISuggestions} disabled={isFetchingSuggestions} className="text-sm font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                                                    <SparklesIcon className="w-4 h-4" />
+                                                    Resposta Inteligente
+                                                </button>
+                                                 {showAISuggestions && (
+                                                    <div ref={suggestionPanelRef} className="absolute bottom-full right-0 mb-2 w-80 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-gray-200 dark:border-slate-600 z-20 p-2 space-y-2">
+                                                        {isFetchingSuggestions && <p className="text-center text-sm p-4">Gerando sugestões...</p>}
+                                                        {aiError && <p className="text-center text-sm p-4 text-red-500">{aiError}</p>}
+                                                        {aiSuggestions.map((s, i) => (
+                                                            <button key={i} onClick={() => { setNewFollowUpNote(s); setShowAISuggestions(false); }} className="w-full text-left text-sm p-2 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors">
+                                                                {s}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         <textarea value={newFollowUpNote} onChange={(e) => setNewFollowUpNote(e.target.value)} rows={4} placeholder="Digite sua anotação ou use um script..." className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"/>
                                         <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
                                             <div className="flex flex-wrap gap-2 items-center">
@@ -316,7 +422,7 @@ export const BudgetDetailModal: React.FC<BudgetDetailModalProps> = ({
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-end mt-4">
-                                            <div className="flex-grow"><label className="text-xs font-medium text-gray-500 dark:text-slate-400">Próximo Contato (opcional)</label><input type="date" value={nextFollowUpDate || ''} onChange={(e) => setNextFollowUpDate(e.target.value)} className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-sm dark:[color-scheme:dark]"/></div>
+                                            <div className="flex-grow"><label className="text-xs font-medium text-gray-500 dark:text-slate-400">Próximo Contato (opcional)</label><input type="datetime-local" value={nextFollowUpDate || ''} onChange={(e) => setNextFollowUpDate(e.target.value)} className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-2 text-sm dark:[color-scheme:dark]"/></div>
                                             <button onClick={handleSaveFollowUp} disabled={!canSaveFollowUp} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm"><PencilIcon className="w-4 h-4 mr-1.5"/> Salvar Nota</button>
                                             <button onClick={() => handleSendExternal('WhatsApp')} disabled={!canSendWhatsApp} title={!contact?.phone ? 'Contato sem telefone' : !canSaveFollowUp ? 'Digite uma mensagem' : 'Enviar via WhatsApp'} className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 dark:disabled:bg-green-800 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm"><WhatsAppIcon className="w-4 h-4 mr-1.5"/> WhatsApp</button>
                                             <button onClick={() => handleSendExternal('Email')} disabled={!canSendEmail} title={!contact?.email ? 'Contato sem e-mail' : !canSaveFollowUp ? 'Digite uma mensagem' : 'Enviar via E-mail'} className="bg-slate-600 hover:bg-slate-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors text-sm"><EnvelopeIcon className="w-4 h-4 mr-1.5"/> E-mail</button>

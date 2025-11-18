@@ -3,7 +3,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, getDocs, writeBatch, limit, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from './lib/firebase';
-import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder, Script, ScriptCategory, Comment } from './types';
+import type { Budget, Client, FollowUp, Prospect, ProspectingStage, Contact, Notification, UserProfile, UserData, Invite, Organization, Theme, ThemeVariant, Reminder, Script, ScriptCategory, Comment, LayoutMode } from './types';
 import { BudgetStatus, UserRole } from './types';
 import Auth from './components/Auth';
 import Header from './components/Header';
@@ -37,6 +37,9 @@ import { scriptData } from './lib/scripts';
 import ReportDetailModal from './components/ReportDetailModal';
 import ProspectAIModal from './components/ProspectAIModal';
 import BudgetAIAnalysisModal from './components/BudgetAIAnalysisModal';
+import GoalAIModal from './components/GoalAIModal';
+import CommandPalette from './components/CommandPalette';
+import { ArrowDownTrayIcon, GoogleCalendarIcon } from './components/icons';
 
 
 export type ActiveView = 
@@ -60,13 +63,6 @@ const formatCurrency = (value: number) => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(value);
-};
-
-type SearchResult = {
-  type: 'client' | 'budget' | 'prospect' | 'contact';
-  id: string;
-  title: string;
-  subtitle: string;
 };
 
 // --- AUTHENTICATED APP WRAPPER ---
@@ -98,6 +94,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
     const [themeVariant, setThemeVariant] = useState<ThemeVariant>(() => (localStorage.getItem('themeVariant') as ThemeVariant) || 'aurora');
+    const [layoutMode, setLayoutModeState] = useState<LayoutMode>(() => (localStorage.getItem('layoutMode') as LayoutMode) || 'comfortable');
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [activeReminder, setActiveReminder] = useState<Reminder | null>(null);
     const [isAddBudgetModalOpen, setAddBudgetModalOpen] = useState(false);
@@ -118,12 +115,12 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     const [reportModalData, setReportModalData] = useState<{ title: string; budgets: Budget[] } | null>(null);
     const [prospectAIModalState, setProspectAIModalState] = useState<{isOpen: boolean, prospect: Prospect | null, mode: 'research' | 'icebreaker' | 'strategy'}>({isOpen: false, prospect: null, mode: 'research'});
     const [budgetAIAnalysisModalState, setBudgetAIAnalysisModalState] = useState<{isOpen: boolean, budget: Budget | null}>({isOpen: false, budget: null});
+    const [goalAIModalState, setGoalAIModalState] = useState<{isOpen: boolean, user: UserData | null}>({isOpen: false, user: null});
+    const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
     
-    // Global Search State
-    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
-    const [globalSearchResults, setGlobalSearchResults] = useState<SearchResult[]>([]);
-    const searchDebounceRef = useRef<number | null>(null);
+    // --- Toast Notification State ---
+    const [toastNotification, setToastNotification] = useState<{ message: string; googleLink?: string; icsLink?: string; } | null>(null);
 
     // --- Pomodoro State ---
     const [pomodoroMode, setPomodoroMode] = useState<'work' | 'shortBreak' | 'longBreak'>('work');
@@ -305,6 +302,30 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         document.documentElement.setAttribute('data-theme', themeVariant);
         localStorage.setItem('themeVariant', themeVariant);
     }, [themeVariant]);
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-layout', layoutMode);
+    }, [layoutMode]);
+
+    const setLayoutMode = (mode: LayoutMode) => {
+        setLayoutModeState(mode);
+        localStorage.setItem('layoutMode', mode);
+    };
+
+    // --- Command Palette Listener ---
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+                event.preventDefault();
+                setCommandPaletteOpen(prev => !prev);
+            }
+            if (event.key === 'Escape' && isCommandPaletteOpen) {
+                setCommandPaletteOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isCommandPaletteOpen]);
     
     // --- Pomodoro Logic ---
     useEffect(() => {
@@ -401,104 +422,49 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         budgets.forEach(b => {
             if (!b.nextFollowUpDate || ![BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP].includes(b.status)) return;
             const followUpDate = new Date(b.nextFollowUpDate);
-            followUpDate.setHours(0, 0, 0, 0);
+            const followUpDateOnly = new Date(followUpDate.getFullYear(), followUpDate.getMonth(), followUpDate.getDate());
             const clientName = clients.find(c => c.id === b.clientId)?.name || 'Cliente desconhecido';
-            if (followUpDate < today) {
+            if (followUpDateOnly < today) {
                 newNotifications.push({ id: `${b.id}-overdue`, type: 'overdue', message: `Follow-up atrasado!`, budgetId: b.id, clientName });
-            } else if (followUpDate.getTime() === today.getTime()) {
+            } else if (followUpDateOnly.getTime() === today.getTime()) {
                 newNotifications.push({ id: `${b.id}-today`, type: 'today', message: `Follow-up para hoje.`, budgetId: b.id, clientName });
             }
         });
         setNotifications(newNotifications);
     }, [budgets, clients, reminders, activeReminder, loading, effectiveUserProfile]);
 
-    // --- Global Search Logic ---
-    const handleGlobalSearch = useCallback((term: string) => {
-        setGlobalSearchTerm(term);
-    
-        if (searchDebounceRef.current) {
-            clearTimeout(searchDebounceRef.current);
-        }
-    
-        if (!term.trim()) {
-            setGlobalSearchResults([]);
-            return;
-        }
-    
-        searchDebounceRef.current = window.setTimeout(() => {
-            const lowerTerm = term.toLowerCase();
-            const results: SearchResult[] = [];
-    
-            clients.forEach(c => {
-                if (c.name.toLowerCase().includes(lowerTerm) || (c.cnpj && c.cnpj.replace(/\D/g, '').includes(lowerTerm.replace(/\D/g, '')))) {
-                    results.push({ type: 'client', id: c.id, title: c.name, subtitle: c.cnpj || 'Cliente' });
-                }
-            });
-    
-            budgets.forEach(b => {
-                if (b.title.toLowerCase().includes(lowerTerm)) {
-                    const clientName = clients.find(c => c.id === b.clientId)?.name;
-                    results.push({ type: 'budget', id: b.id, title: b.title, subtitle: `Em ${clientName}` || 'Orçamento' });
-                }
-            });
-            
-            prospects.forEach(p => {
-                if (p.company.toLowerCase().includes(lowerTerm) || p.name.toLowerCase().includes(lowerTerm)) {
-                    results.push({ type: 'prospect', id: p.id, title: p.company, subtitle: `Prospect: ${p.name}` });
-                }
-            });
-    
-            contacts.forEach(ct => {
-                if (ct.name.toLowerCase().includes(lowerTerm)) {
-                    const clientName = clients.find(c => c.id === ct.clientId)?.name;
-                    results.push({ type: 'contact', id: ct.clientId, title: ct.name, subtitle: `Contato em ${clientName || 'Cliente'}` });
-                }
-            });
-    
-            setGlobalSearchResults(results.slice(0, 10));
-        }, 300);
-    }, [clients, budgets, prospects, contacts]);
-    
-    const handleClearSearch = useCallback(() => {
-        setGlobalSearchTerm('');
-        setGlobalSearchResults([]);
-    }, []);
-
-    const handleSearchResultClick = (result: SearchResult) => {
-        handleClearSearch();
-        
-        switch (result.type) {
-            case 'client': {
-                const client = clients.find(c => c.id === result.id);
-                if (client) {
-                    setSelectedClient(client);
-                    setClientDetailModalOpen(true);
-                }
-                break;
+    // --- Command Palette Handlers ---
+    const handlePaletteNavigate = (view: ActiveView) => {
+        changeView(view);
+        setCommandPaletteOpen(false);
+    };
+    const handlePaletteNewBudget = () => {
+        setInitialClientIdForBudget(null);
+        setAddBudgetModalOpen(true);
+        setCommandPaletteOpen(false);
+    };
+    const handlePaletteNewProspect = () => {
+        setAddProspectModalOpen(true);
+        setCommandPaletteOpen(false);
+    };
+    const handlePaletteResultClick = (result: { type: string, id: string }) => {
+        setCommandPaletteOpen(false);
+        if (result.type === 'client' || result.type === 'contact') {
+            const client = clients.find(c => c.id === result.id);
+            if (client) {
+                setSelectedClient(client);
+                setClientDetailModalOpen(true);
             }
-            case 'budget': {
-                const budget = budgets.find(b => b.id === result.id);
-                if (budget) {
-                    setSelectedBudget(budget);
-                    setBudgetDetailModalOpen(true);
-                }
-                break;
+        } else if (result.type === 'budget') {
+            const budget = budgets.find(b => b.id === result.id);
+            if (budget) {
+                setSelectedBudget(budget);
+                setBudgetDetailModalOpen(true);
             }
-            case 'prospect': {
-                changeView('prospecting');
-                break;
-            }
-            case 'contact': {
-                const client = clients.find(c => c.id === result.id); // Note: contact search result ID is the clientId
-                 if (client) {
-                    setSelectedClient(client);
-                    setClientDetailModalOpen(true);
-                 }
-                break;
-            }
+        } else if (result.type === 'prospect') {
+            changeView('prospecting');
         }
     };
-
 
     const handleLogout = async () => {
         if (window.confirm("Deseja realmente sair?")) {
@@ -574,6 +540,40 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
             status: BudgetStatus.FOLLOWING_UP,
             nextFollowUpDate: nextFollowUpDate,
         });
+
+        // After successful save, generate calendar links and show toast
+        if (nextFollowUpDate) {
+            const budget = budgets.find(b => b.id === budgetId);
+            const client = clients.find(c => c.id === budget?.clientId);
+            if (!budget || !client) return;
+
+            const startTime = new Date(nextFollowUpDate);
+            const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 min duration
+
+            const formatForGoogle = (date: Date) => date.toISOString().replace(/-|:|\.\d+/g, '');
+            const googleLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Follow-up: ${budget.title}`)}&dates=${formatForGoogle(startTime)}/${formatForGoogle(endTime)}&details=${encodeURIComponent(`Follow-up para o orçamento com ${client.name}.`)}`;
+
+            const formatForIcs = (date: Date) => {
+                const pad = (n: number) => n < 10 ? `0${n}` : n;
+                return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
+            };
+            const icsContent = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "BEGIN:VEVENT",
+                `URL:${window.location.href}`,
+                `DTSTART:${formatForIcs(startTime)}`,
+                `DTEND:${formatForIcs(endTime)}`,
+                `SUMMARY:Follow-up: ${budget.title}`,
+                `DESCRIPTION:Follow-up para o orçamento com ${client.name}.`,
+                "END:VEVENT",
+                "END:VCALENDAR"
+            ].join('\n');
+            const icsLink = `data:text/calendar;charset=utf8,${encodeURIComponent(icsContent)}`;
+
+            setToastNotification({ message: 'Follow-up agendado!', googleLink, icsLink });
+            setTimeout(() => setToastNotification(null), 10000);
+        }
     };
     
     const handleAddComment = async (budgetId: string, commentText: string) => {
@@ -858,8 +858,8 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         const budgetsForToday = budgets.filter(b => {
             if (!b.nextFollowUpDate) return false;
             const followUpDate = new Date(b.nextFollowUpDate);
-            followUpDate.setHours(0,0,0,0);
-            return followUpDate.getTime() === today.getTime() && (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP);
+            const followUpDateOnly = new Date(followUpDate.getFullYear(), followUpDate.getMonth(), followUpDate.getDate());
+            return followUpDateOnly.getTime() === today.getTime() && (b.status === BudgetStatus.SENT || b.status === BudgetStatus.FOLLOWING_UP);
         });
         
         if (budgetsForToday.length === 0) {
@@ -899,6 +899,15 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
         setBudgetAIAnalysisModalState({ isOpen: true, budget });
     };
 
+    const handleOpenGoalAIModal = (user: UserData) => {
+        setGoalAIModalState({ isOpen: true, user });
+    };
+
+    const handleApplyAIGoal = (userId: string, newGoal: number) => {
+        handleUpdateUserGoals({ [userId]: newGoal });
+        setGoalAIModalState({isOpen: false, user: null});
+    };
+
 
     // --- RENDER LOGIC ---
     if (loading || !effectiveUserProfile) {
@@ -912,6 +921,20 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
     // Main App UI
     return (
         <div className={`min-h-screen flex ${theme === 'dark' ? 'dark' : ''}`}>
+            {isCommandPaletteOpen && (
+                <CommandPalette
+                    isOpen={isCommandPaletteOpen}
+                    onClose={() => setCommandPaletteOpen(false)}
+                    onNavigate={handlePaletteNavigate}
+                    onOpenNewBudget={handlePaletteNewBudget}
+                    onOpenNewProspect={handlePaletteNewProspect}
+                    onResultClick={handlePaletteResultClick}
+                    clients={clients}
+                    budgets={budgets}
+                    prospects={prospects}
+                    contacts={contacts}
+                />
+            )}
             {effectiveUserProfile.role !== UserRole.SUPER_ADMIN && (
                 <Sidebar 
                     activeView={activeView}
@@ -946,11 +969,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     onAddReminder={handleAddReminder}
                     onDeleteReminder={handleDeleteReminder}
                     onToggleReminderStatus={handleToggleReminderStatus}
-                    globalSearchTerm={globalSearchTerm}
-                    globalSearchResults={globalSearchResults}
-                    onGlobalSearch={handleGlobalSearch}
-                    onClearGlobalSearch={handleClearSearch}
-                    onSearchResultClick={handleSearchResultClick}
+                    onOpenCommandPalette={() => setCommandPaletteOpen(true)}
                     pomodoroMode={pomodoroMode}
                     pomodoroSecondsLeft={pomodoroSecondsLeft}
                     isPomodoroActive={isPomodoroActive}
@@ -962,7 +981,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                 
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto">
                     {/* Render active view based on state */}
-                    {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile}/>}
+                    {activeView === 'dashboard' && <Dashboard key={viewKey} budgets={budgets} clients={clients} users={users} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} themeVariant={themeVariant} userProfile={effectiveUserProfile} onOpenReportDetail={handleOpenReportDetail} />}
                     {activeView === 'prospecting' && <ProspectingView key={viewKey} prospects={prospects} stages={stages} onAddProspectClick={() => setAddProspectModalOpen(true)} onUpdateProspectStage={handleUpdateProspectStage} onConvertProspect={handleConvertProspect} onDeleteProspect={handleDeleteProspect} onOpenAIModal={handleOpenProspectAIModal} />}
                     {activeView === 'budgeting' && <BudgetingView key={viewKey} budgets={budgets} clients={clients} contacts={contacts} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onGenerateReport={onGenerateDailyReport} onBulkUpdate={handleBulkUpdateBudgets} />}
                     {activeView === 'deals' && <DealsView key={viewKey} budgets={budgets} clients={clients} onSelectBudget={(id) => { setSelectedBudget(budgets.find(b => b.id === id) || null); setBudgetDetailModalOpen(true); }} onUpdateStatus={handleChangeBudgetStatus} onScheduleFollowUp={() => {}} />}
@@ -974,7 +993,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     {activeView === 'scripts' && <ScriptsView key={viewKey} scripts={scripts} onAdd={() => { setScriptToEdit(null); setScriptModalOpen(true); }} onEdit={(script) => { setScriptToEdit(script); setScriptModalOpen(true); }} onDelete={handleDeleteScript}/>}
                     
                     {/* Admin Views */}
-                    {activeView === 'users' && <UsersView key={viewKey} users={users} onUpdateRole={() => {}} onAddUserClick={() => setAddUserModalOpen(true)} onUpdateUserGoals={handleUpdateUserGoals} />}
+                    {activeView === 'users' && <UsersView key={viewKey} users={users} budgets={budgets} onUpdateRole={() => {}} onAddUserClick={() => setAddUserModalOpen(true)} onUpdateUserGoals={handleUpdateUserGoals} onOpenGoalAIModal={handleOpenGoalAIModal} />}
                     {activeView === 'settings' && effectiveOrganization && <AdminSettingsView key={viewKey} organization={effectiveOrganization} userProfile={effectiveUserProfile} stages={stages} users={users} onSaveOrganization={handleSaveOrganization} onUpdateStages={handleUpdateStages} setActiveView={changeView}/>}
                     {activeView === 'organizations' && <SuperAdminView key={viewKey} organizations={allOrganizations} users={allUsers} clients={allClients} budgets={allBudgets} onImpersonate={handleImpersonate} onToggleStatus={()=>{}} onDelete={()=>{}} />}
                 </main>
@@ -1023,7 +1042,7 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                     />
                 )}
                  {isProfileModalOpen && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setProfileModalOpen(false)} userProfile={effectiveUserProfile} onSave={handleUpdateProfile}/>}
-                 {isSettingsModalOpen && <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant}/>}
+                 {isSettingsModalOpen && <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} currentTheme={theme} setTheme={setTheme} currentThemeVariant={themeVariant} setThemeVariant={setThemeVariant} layoutMode={layoutMode} setLayoutMode={setLayoutMode} />}
                  {isAddClientModalOpen && <AddClientModal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} onSave={handleAddClient} />}
                  {isAddUserModalOpen && <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} onAddUser={handleAddUser} />}
                  {isScriptModalOpen && <ScriptModal isOpen={isScriptModalOpen} onClose={() => setScriptModalOpen(false)} onSave={handleSaveScript} scriptToEdit={scriptToEdit}/>}
@@ -1057,8 +1076,36 @@ const AuthenticatedApp: React.FC<{ user: User }> = ({ user }) => {
                         clientName={clients.find(c => c.id === budgetAIAnalysisModalState.budget?.clientId)?.name || 'Cliente'}
                     />
                  )}
+                 {goalAIModalState.isOpen && goalAIModalState.user && (
+                    <GoalAIModal
+                        isOpen={goalAIModalState.isOpen}
+                        onClose={() => setGoalAIModalState({ isOpen: false, user: null })}
+                        user={goalAIModalState.user}
+                        budgets={budgets.filter(b => b.userId === goalAIModalState.user!.id)}
+                        onApplyGoal={handleApplyAIGoal}
+                    />
+                 )}
 
                 {activeReminder && <ReminderNotification reminder={activeReminder} onDismiss={() => { updateDoc(doc(db, 'reminders', activeReminder.id), { isDismissed: true }); setActiveReminder(null); }}/>}
+                {toastNotification && (
+                    <div className="fixed bottom-5 right-5 bg-[var(--background-secondary)] shadow-lg rounded-lg p-4 w-full max-w-sm border border-[var(--border-primary)] z-50 fade-in">
+                        <p className="font-semibold text-[var(--text-primary)]">{toastNotification.message}</p>
+                        {(toastNotification.googleLink || toastNotification.icsLink) && (
+                            <div className="flex items-center gap-4 mt-3">
+                                {toastNotification.googleLink && (
+                                    <a href={toastNotification.googleLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                        <GoogleCalendarIcon className="w-5 h-5"/> Google Agenda
+                                    </a>
+                                )}
+                                {toastNotification.icsLink && (
+                                    <a href={toastNotification.icsLink} download="follow-up.ics" className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-800">
+                                        <ArrowDownTrayIcon className="w-5 h-5"/> Outro Calendário
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

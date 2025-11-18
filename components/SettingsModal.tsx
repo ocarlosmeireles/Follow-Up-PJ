@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { UserProfile, Organization, Theme, ThemeVariant } from '../types';
+import type { UserProfile, Organization, Theme, ThemeVariant, LayoutMode } from '../types';
 import { UserRole } from '../types';
 import { XMarkIcon, BriefcaseIcon, SunIcon, MoonIcon, PhotoIcon } from './icons';
 
@@ -10,6 +10,8 @@ interface SettingsModalProps {
     setTheme: (theme: Theme) => void;
     currentThemeVariant: ThemeVariant;
     setThemeVariant: (variant: ThemeVariant) => void;
+    layoutMode: LayoutMode;
+    setLayoutMode: (mode: LayoutMode) => void;
 }
 
 const ThemePreview: React.FC<{ variant: ThemeVariant; name: string; isActive: boolean; onClick: () => void; }> = ({ variant, name, isActive, onClick }) => {
@@ -49,7 +51,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     currentTheme, 
     setTheme,
     currentThemeVariant, 
-    setThemeVariant
+    setThemeVariant,
+    layoutMode,
+    setLayoutMode
 }) => {
     
     if (!isOpen) return null;
@@ -74,6 +78,25 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <ThemePreview variant="classic" name="Clássico" isActive={currentThemeVariant === 'classic'} onClick={() => setThemeVariant('classic')} />
                             <ThemePreview variant="flow" name="Fluxo" isActive={currentThemeVariant === 'flow'} onClick={() => setThemeVariant('flow')} />
                             <ThemePreview variant="vibrant" name="Vibrante" isActive={currentThemeVariant === 'vibrant'} onClick={() => setThemeVariant('vibrant')} />
+                        </div>
+                    </div>
+
+                    {/* Layout Density Settings */}
+                    <div>
+                        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Densidade da Interface</h3>
+                        <div className="flex gap-2 rounded-lg bg-[var(--background-tertiary)] p-1">
+                            <button
+                                onClick={() => setLayoutMode('comfortable')}
+                                className={`w-full rounded-md py-2 text-sm font-semibold transition-colors ${layoutMode === 'comfortable' ? 'bg-[var(--background-secondary)] text-[var(--text-accent)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                            >
+                                Confortável
+                            </button>
+                            <button
+                                onClick={() => setLayoutMode('compact')}
+                                className={`w-full rounded-md py-2 text-sm font-semibold transition-colors ${layoutMode === 'compact' ? 'bg-[var(--background-secondary)] text-[var(--text-accent)] shadow-sm' : 'text-[var(--text-secondary)]'}`}
+                            >
+                                Compacto
+                            </button>
                         </div>
                     </div>
                 </div>

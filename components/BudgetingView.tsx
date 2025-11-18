@@ -29,7 +29,8 @@ const getStatusStyles = (status: BudgetStatus) => {
   const styles: {[key in BudgetStatus]: { pill: string; bar: string }} = {
     [BudgetStatus.SENT]: { pill: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300', bar: 'border-l-blue-500' },
     [BudgetStatus.FOLLOWING_UP]: { pill: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300', bar: 'border-l-yellow-500' },
-    [BudgetStatus.ORDER_PLACED]: { pill: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300', bar: 'border-l-indigo-500' },
+    [BudgetStatus.ORDER_PLACED]: { pill: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300', bar: 'border-l-green-500' },
+    [BudgetStatus.WAITING_MATERIAL]: { pill: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300', bar: 'border-l-orange-500' },
     [BudgetStatus.INVOICED]: { pill: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300', bar: 'border-l-emerald-500' },
     [BudgetStatus.LOST]: { pill: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', bar: 'border-l-red-500' },
     [BudgetStatus.ON_HOLD]: { pill: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200', bar: 'border-l-gray-400' },
@@ -130,7 +131,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
         let filtered = formattedBudgets;
 
         if (statusFilter !== 'all') {
-            const activeStatuses = [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED, BudgetStatus.ON_HOLD];
+            const activeStatuses = [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED, BudgetStatus.WAITING_MATERIAL, BudgetStatus.ON_HOLD];
             filtered = filtered.filter(b => {
                 if (statusFilter === 'active') return activeStatuses.includes(b.status);
                 if (statusFilter === 'won') return b.status === BudgetStatus.INVOICED;
@@ -341,7 +342,7 @@ const BudgetingView: React.FC<BudgetingViewProps> = ({ budgets, clients, contact
                                 </button>
                                 {showStatusChanger && (
                                     <div className="absolute bottom-full right-0 mb-2 w-48 bg-[var(--background-secondary)] rounded-lg shadow-lg border border-[var(--border-primary)] overflow-hidden">
-                                        {[BudgetStatus.ON_HOLD, BudgetStatus.LOST].map(status => (
+                                        {[BudgetStatus.ON_HOLD, BudgetStatus.LOST, BudgetStatus.WAITING_MATERIAL].map(status => (
                                             <button key={status} onClick={() => handleBulkStatusChange(status)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--background-tertiary)]">{status}</button>
                                         ))}
                                     </div>

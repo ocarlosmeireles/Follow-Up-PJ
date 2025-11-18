@@ -29,6 +29,7 @@ const getStatusBadgeColor = (status: BudgetStatus) => {
     case BudgetStatus.SENT: return { classes: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300', barColor: 'bg-blue-400 dark:bg-blue-600' };
     case BudgetStatus.FOLLOWING_UP: return { classes: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300', barColor: 'bg-yellow-400 dark:bg-yellow-500' };
     case BudgetStatus.ORDER_PLACED: return { classes: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300', barColor: 'bg-green-400 dark:bg-green-500' };
+    case BudgetStatus.WAITING_MATERIAL: return { classes: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300', barColor: 'bg-orange-400 dark:bg-orange-500' };
     case BudgetStatus.INVOICED: return { classes: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300', barColor: 'bg-emerald-400 dark:bg-emerald-500' };
     case BudgetStatus.LOST: return { classes: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', barColor: 'bg-red-400 dark:bg-red-500' };
     case BudgetStatus.ON_HOLD: return { classes: 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200', barColor: 'bg-gray-400 dark:bg-slate-500' };

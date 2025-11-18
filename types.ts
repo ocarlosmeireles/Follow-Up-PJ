@@ -3,6 +3,7 @@ export enum BudgetStatus {
   FOLLOWING_UP = 'Em Follow-up',
   ON_HOLD = 'Congelado',
   ORDER_PLACED = 'Pedido Emitido',
+  WAITING_MATERIAL = 'Aguardando Material',
   INVOICED = 'Faturado',
   LOST = 'Perdido',
 }

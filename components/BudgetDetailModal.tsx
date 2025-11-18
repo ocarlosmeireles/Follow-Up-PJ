@@ -5,7 +5,8 @@ import { BudgetStatus, FollowUpStatus, scriptCategories } from '../types';
 import { 
     XMarkIcon, CheckCircleIcon, XCircleIcon, CalendarIcon, ArrowPathIcon, WhatsAppIcon, 
     PauseCircleIcon, PencilIcon, ClockIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon,
-    ClipboardDocumentListIcon, PhoneIcon, EnvelopeIcon, StarIcon, ChevronDownIcon, TrophyIcon, SparklesIcon
+    ClipboardDocumentListIcon, PhoneIcon, EnvelopeIcon, StarIcon, ChevronDownIcon, TrophyIcon, SparklesIcon,
+    ExclamationTriangleIcon
 } from './icons';
 import LostReasonModal from './LostReasonModal';
 
@@ -15,7 +16,6 @@ interface BudgetDetailModalProps {
     budget: Budget;
     client: Client;
     contact?: Contact;
-    // FIX: Changed userProfile type from UserProfile to UserData to include the id property.
     userProfile: UserData;
     users: UserData[];
     onAddFollowUp: (budgetId: string, followUp: Omit<FollowUp, 'id'>, nextFollowUpDate: string | null) => void;
@@ -63,6 +63,7 @@ const getStatusBadgeColor = (status: BudgetStatus) => {
         case BudgetStatus.SENT: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
         case BudgetStatus.FOLLOWING_UP: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
         case BudgetStatus.ORDER_PLACED: return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+        case BudgetStatus.WAITING_MATERIAL: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300';
         case BudgetStatus.INVOICED: return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300';
         case BudgetStatus.LOST: return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
         case BudgetStatus.ON_HOLD: return 'bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200';
@@ -485,6 +486,7 @@ Sua resposta DEVE ser um objeto JSON com um array de strings chamado "suggestion
                                  <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-700 space-y-2">
                                     <h4 className="font-semibold text-gray-700 dark:text-slate-300 mb-2">Alterar Status</h4>
                                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.FOLLOWING_UP)} className="w-full text-left bg-yellow-100 hover:bg-yellow-200 text-yellow-800 dark:bg-yellow-900/50 dark:hover:bg-yellow-900 dark:text-yellow-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><ArrowPathIcon className="w-5 h-5"/> Em Follow-up</button>
+                                    <button onClick={() => onChangeStatus(budget.id, BudgetStatus.WAITING_MATERIAL)} className="w-full text-left bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/50 dark:hover:bg-orange-900 dark:text-orange-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><ExclamationTriangleIcon className="w-5 h-5"/> Aguardando Material</button>
                                     <button onClick={() => onChangeStatus(budget.id, BudgetStatus.ON_HOLD)} className="w-full text-left bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 dark:text-slate-200 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><PauseCircleIcon className="w-5 h-5"/> Congelar</button>
                                     <button onClick={() => setIsConfirmingWin(true)} className="w-full text-left bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/50 dark:hover:bg-green-900 dark:text-green-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><TrophyIcon className="w-5 h-5"/> Ganho/Faturado</button>
                                     <button onClick={() => setLostReasonModalOpen(true)} className="w-full text-left bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900/50 dark:hover:bg-red-900 dark:text-red-300 font-semibold p-2 rounded-md flex items-center gap-2 transition-colors"><XCircleIcon className="w-5 h-5"/> Perdido</button>

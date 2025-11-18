@@ -120,7 +120,7 @@ const DealsView: React.FC<DealsViewProps> = ({ budgets, clients, onSelectBudget,
         setDraggingOverColumn(null);
     };
     
-    const columns: BudgetStatus[] = [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED];
+    const columns: BudgetStatus[] = [BudgetStatus.SENT, BudgetStatus.FOLLOWING_UP, BudgetStatus.ORDER_PLACED, BudgetStatus.WAITING_MATERIAL];
 
     return (
         <div className="flex flex-col h-full w-full space-y-6">

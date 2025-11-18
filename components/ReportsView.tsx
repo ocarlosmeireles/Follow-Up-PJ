@@ -87,8 +87,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
     
     const salesFunnelData = useMemo(() => {
         const sent = budgets;
-        const followingUp = budgets.filter(b => [BudgetStatus.FOLLOWING_UP, BudgetStatus.ON_HOLD, BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
-        const orderPlaced = budgets.filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+        const followingUp = budgets.filter(b => [BudgetStatus.FOLLOWING_UP, BudgetStatus.ON_HOLD, BudgetStatus.ORDER_PLACED, BudgetStatus.WAITING_MATERIAL, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
+        const orderPlaced = budgets.filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.WAITING_MATERIAL, BudgetStatus.INVOICED, BudgetStatus.LOST].includes(b.status));
         const invoiced = budgets.filter(b => b.status === BudgetStatus.INVOICED);
 
         const stages = [
@@ -107,6 +107,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             return { ...stage, conversionRate, widthPercentage };
         });
     }, [budgets]);
+
+    const convertedOrders = useMemo(() => {
+        // Consider converted any budget that passed the 'ORDER_PLACED' milestone
+        return budgets
+            .filter(b => [BudgetStatus.ORDER_PLACED, BudgetStatus.WAITING_MATERIAL, BudgetStatus.INVOICED].includes(b.status))
+            .sort((a, b) => new Date(b.dateSent).getTime() - new Date(a.dateSent).getTime())
+            .map(b => ({
+                ...b,
+                clientName: clientMap.get(b.clientId) || 'Desconhecido'
+            }));
+    }, [budgets, clientMap]);
+
 
     const topClients = useMemo(() => {
         const valueByClient: { [clientId: string]: number } = {};
@@ -140,7 +152,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             return acc;
         }, {} as Record<string, number>);
 
-        const data = Object.entries(reasonCounts)
+        const data = (Object.entries(reasonCounts) as [string, number][])
             .map(([reason, count]) => ({ reason, count }))
             .sort((a, b) => b.count - a.count);
         
@@ -270,6 +282,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
                 </div>
 
                 <div class="section">
+                    <h3>Pedidos Convertidos</h3>
+                    <table>
+                        <thead><tr><th>Data</th><th>Cliente</th><th>Título</th><th>Valor</th><th>Status</th></tr></thead>
+                        <tbody>
+                            ${convertedOrders.map(o => `<tr><td>${new Date(o.dateSent).toLocaleDateString()}</td><td>${o.clientName}</td><td>${o.title}</td><td>${formatCurrency(o.value)}</td><td>${o.status}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="section">
                     <h3>Performance Mensal (Últimos 12 meses)</h3>
                      ${monthlyPerformance.data.length > 0 ? `
                     <table>
@@ -331,9 +353,55 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
                 <div className="animated-item" style={{ animationDelay: '400ms' }}><MetricCard title="Ticket Médio" value={formatCurrency(metrics.averageTicket)} icon={<CurrencyDollarIcon className="w-7 h-7 text-blue-500 dark:text-blue-400" />} /></div>
             </div>
 
+            {/* Relatório de Pedidos Convertidos */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '450ms' }}>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
+                    <TrophyIcon className="w-6 h-6 mr-3 text-green-500 dark:text-green-400"/>
+                    Relatório de Pedidos Convertidos
+                </h2>
+                {convertedOrders.length > 0 ? (
+                    <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                        <table className="w-full text-left text-sm">
+                            <thead className="text-gray-500 dark:text-gray-400 uppercase text-xs bg-gray-50 dark:bg-slate-700/50 sticky top-0 z-10">
+                                <tr>
+                                    <th className="p-3">Data</th>
+                                    <th className="p-3">Cliente</th>
+                                    <th className="p-3">Orçamento</th>
+                                    <th className="p-3 text-right">Valor</th>
+                                    <th className="p-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                                {convertedOrders.map((order) => (
+                                    <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                                        <td className="p-3 text-gray-600 dark:text-slate-300">{new Date(order.dateSent).toLocaleDateString('pt-BR')}</td>
+                                        <td className="p-3 font-medium text-gray-800 dark:text-slate-100">{order.clientName}</td>
+                                        <td className="p-3 text-gray-600 dark:text-slate-300">{order.title}</td>
+                                        <td className="p-3 text-right font-bold text-blue-600 dark:text-blue-400">{formatCurrency(order.value)}</td>
+                                        <td className="p-3 text-center">
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                                                order.status === BudgetStatus.INVOICED ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' : 
+                                                order.status === BudgetStatus.WAITING_MATERIAL ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300' :
+                                                'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                            }`}>
+                                                {order.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-400 dark:text-slate-500">
+                        <p>Nenhum pedido convertido encontrado.</p>
+                    </div>
+                )}
+            </div>
+
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm animated-item" style={{ animationDelay: '500ms' }}>
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-4 flex items-center">
-                    <TrophyIcon className="w-6 h-6 mr-3 text-yellow-500"/>
+                    <UserGroupIcon className="w-6 h-6 mr-3 text-yellow-500 dark:text-yellow-400"/>
                     Ranking de Vendedores (Mês Atual)
                 </h2>
                  <div className="flex items-center gap-1 bg-[var(--background-tertiary)] p-1 rounded-lg mb-4">

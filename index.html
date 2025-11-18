@@ -274,19 +274,15 @@
 
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 0px;
+  height: 0px;
+  display: none;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: var(--background-tertiary);
-  border-radius: 10px;
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-secondary);
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: transparent;
 }
 
 /* Page transition animation */

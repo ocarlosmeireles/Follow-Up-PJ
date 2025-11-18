@@ -119,7 +119,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ budgets, clients, users, user
             }
         });
 
-        return Object.entries(valueByClient)
+        return (Object.entries(valueByClient) as [string, number][])
             .sort(([, aValue], [, bValue]) => bValue - aValue)
             .slice(0, 5)
             .map(([clientId, totalValue]) => ({

@@ -6,7 +6,6 @@ import {
     MoonIcon, SunIcon, CheckCircleIcon, TrophyIcon, ArrowTrendingUpIcon, ClockIcon, PencilIcon, ExclamationCircleIcon,
     SparklesIcon, XMarkIcon
 } from './icons';
-import AIFocusTask from './AIFocusTask';
 import { AIBriefing } from './AIBriefing';
 
 
@@ -337,12 +336,6 @@ const TasksView: React.FC<TasksViewProps> = ({ budgets, clients, reminders, onSe
              <AIBriefing 
                 budgets={budgets} 
                 userProfile={userProfile}
-            />
-            <AIFocusTask 
-                budgets={budgets} 
-                clients={clients} 
-                userProfile={userProfile} 
-                onSelectBudget={onSelectBudget}
             />
             <div>
                 <h2 className="text-3xl font-bold text-[var(--text-primary)]">Plano de Ação</h2>
